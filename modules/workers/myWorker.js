@@ -86,7 +86,8 @@ function doOsAlert(title, body) {
 		case 'winnt':
 		case 'winmo':
 		case 'wince':
-			ostypes.API('MessageBox')(null, body, title, ostypes.CONST.MB_OK);
+			var rez = ostypes.API('MessageBox')(null, body, title, ostypes.CONST.MB_OK);
+			return cutils.jscGetDeepest(rez);
 			break;
 		/*
 		case 'linux':
@@ -97,10 +98,37 @@ function doOsAlert(title, body) {
 		case 'android': //profilist doesnt support android (android doesnt have profiles)
 			importScripts('chrome://profilist/content/modules/ostypes_nix.jsm');
 			break;
-		case 'darwin':
-			importScripts('chrome://profilist/content/modules/ostypes_mac.jsm');
-			break;
 		*/
+		case 'darwin':
+			if (ostypes.IS64BIT) {
+				var myCFStrs = {
+					head: ostypes.HELPER.makeCFStr(title),
+					body: ostypes.HELPER.makeCFStr(body)
+				};
+				
+				var rez = ostypes.API('CFUserNotificationDisplayNotice')(0, ostypes.CONST.kCFUserNotificationCautionAlertLevel, null, null, null, myCFStrs.head, myCFStrs.body, null);
+				console.info('rez:', rez.toString(), uneval(rez)); // CFUserNotificationDisplayNotice does not block till user clicks dialog, it will return immediately
+				
+				if (cutils.jscEqual(rez, 0)) {
+					console.log('Notification was succesfully shown!!');
+					return true;
+				} else {
+					throw new Error('Failed to show notification... :(');
+				}
+				
+				for (var cfstr in myCFStrs) {
+					if (myCFStrs.hasOwnProperty(cfstr)) {
+						var rez_CFRelease = ostypes.API('CFRelease')(myCFStrs[cfstr]); // returns void
+					}
+				}
+			} else {
+				var hit = ostypes.TYPE.SInt16();
+				var rez = ostypes.API('StandardAlert')(ostypes.CONST.kCFUserNotificationCautionAlertLevel, ostypes.HELPER.Str255(title), ostypes.HELPER.Str255(body), null, hit.address());
+				console.info('rez:', rez.toString(), uneval(rez));
+				console.info('hit:', hit.toString(), uneval(hit));
+				return cutils.jscGetDeepest(hit);
+			}
+			break;
 		default:
 			throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
 	}
