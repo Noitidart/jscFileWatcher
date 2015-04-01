@@ -1,0 +1,3 @@
+content jscfilewatcher ./
+locale jscfilewatcher en-US locale/en-US/
+locale jscfilewatcher en-GB locale/en-GB/
