@@ -133,6 +133,44 @@ function doOsAlert(title, body) {
 			throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
 	}
 }
+
+function initWatch(path, callback, options) {
+	
+	switch (cOS) {
+		case 'linux':
+		case 'freebsd':
+		case 'openbsd':
+		case 'sunos':
+		case 'webos': // Palm Pre
+		case 'android':
+			//new ostypes.API.;
+			if (!('masks' in options)) {
+				throw new Error('Missing required `masks` key in options objection');
+			}
+			return new Notify(path, options.masks, callback);
+			break;
+		default:
+			throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
+	}
+	
+	
+}
+
+// start - nix file watching
+function Notify(path, masks, callback){
+	this.path = path;
+	this.masks = masks;
+	this.callback = callback;
+	
+	return true;
+}
+Notify.prototype.addWatch = function(){
+  this.watch = ostypes.API('inotify_add_watch')(this.path, this.masks, false, this.callback ); // return an instance of iNotify (sorry for calling it like this, its actually something like ID for the watch). The 3rd (false) arguments is for *non* watching subdirectories.
+}        
+Notify.prototype.removeWatch(path, masks, callback){
+  iNotify._rmWatch(this.watch);
+}
+// end - nix file watching
 // end - main defintions
 
 

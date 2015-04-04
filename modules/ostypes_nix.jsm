@@ -26,7 +26,7 @@ var nixTypes = function() {
 	
 	// ABIs
 	this.CALLBACK_ABI = ctypes.default_abi;
-	this.WINABI = ctypes.default_abi;
+	this.ABI = ctypes.default_abi;
 	
 	
 }
@@ -65,6 +65,8 @@ var nixInit = function() {
 						}
 					}
 					break;
+				case 'libc':
+					lib[path] = ctypes.open(ctypes.libraryName('libc'));
 				default:
 					try {
 						_lib[path] = ctypes.open(path);
@@ -88,7 +90,20 @@ var nixInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
-		// here
+		inotify_add_watch: function() {
+			/* http://linux.die.net/man/2/inotify_add_watch
+			 * int inotify_add_watch(
+			 *   int fd,
+			 *   const char *pathname,
+			 *   uint32_t mask
+			 * );
+			 */
+			 return _lib('libc').declare('inotify_add_watch', self.TYPE.ABI,
+				ctypes.int,			// return
+				ctypes.char.ptr,	// *pathname
+				ctypes.uint32_t		// mask
+			);
+		}
 	};
 	// end - predefine your declares here
 	// end - function declares

@@ -79,20 +79,8 @@ function startWorker() {
 	// should maybe test if the promise was successful
 }
 
-function install() {}
-function uninstall() {}
-
-function startup(aData, aReason) {
-	self.aData = aData;
-	PromiseWorker = Cu.import(self.path.chrome + 'modules/PromiseWorker.jsm').BasePromiseWorker;
-	
-	//Services.prompt.alert(null, stringBundle.GetStringFromName('startup_prompt_title'), stringBundle.GetStringFromName('startup_prompt_title'));
-	
-	
-	startWorker();
-	
-	
-	
+function main() {
+	/*
 	var promise_doOsAlert = myWorker.post('doOsAlert', [stringBundle.GetStringFromName('startup_prompt_title'), stringBundle.GetStringFromName('startup_prompt_msg')]);
 	promise_doOsAlert.then(
 		function(aVal) {
@@ -113,6 +101,65 @@ function startup(aData, aReason) {
 			//deferred_createProfile.reject(rejObj);
 		}
 	);
+	*/
+	
+	switch (cOS) {
+		case 'linux':
+		case 'freebsd':
+		case 'openbsd':
+		case 'sunos':
+		case 'webos': // Palm Pre
+		case 'android':
+			//new ostypes.API.;
+			var promise_initWatch = myWorker.post('initWatch' [
+				OS.Constants.Path.desktopDir,
+				function() {
+					console.log('something happened');
+				},
+				{
+					masks: ostypes.CONST.IN_ACCESS
+				}
+			]);
+			promise_initWatch.then(
+				function(aVal) {
+					console.log('Fullfilled - promise_initWatch - ', aVal);
+					// start - do stuff here - promise_initWatch
+					// end - do stuff here - promise_initWatch
+				},
+				function(aReason) {
+					var rejObj = {name:'promise_initWatch', aReason:aReason};
+					console.error('Rejected - promise_initWatch - ', rejObj);
+					//deferred_createProfile.reject(rejObj);
+				}
+			).catch(
+				function(aCaught) {
+					var rejObj = {name:'promise_initWatch', aCaught:aCaught};
+					console.error('Caught - promise_initWatch - ', rejObj);
+					//deferred_createProfile.reject(rejObj);
+				}
+			);
+			break;
+		default:
+			throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
+	}
+	
+}
+
+function install() {}
+function uninstall() {}
+
+function startup(aData, aReason) {
+	self.aData = aData;
+	PromiseWorker = Cu.import(self.path.chrome + 'modules/PromiseWorker.jsm').BasePromiseWorker;
+	
+	//Services.prompt.alert(null, stringBundle.GetStringFromName('startup_prompt_title'), stringBundle.GetStringFromName('startup_prompt_title'));
+	
+	
+	startWorker();
+	
+	
+	
+	main();
 }
  
 function shutdown(aData, aReason) {
