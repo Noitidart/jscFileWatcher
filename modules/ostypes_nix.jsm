@@ -53,6 +53,18 @@ var nixInit = function() {
 			//need to open the library
 			//default it opens the path, but some things are special like libc in mac is different then linux or like x11 needs to be located based on linux version
 			switch (path) {
+				case 'x11':
+					try {
+						lib[path] = ctypes.open('libX11.so.6');
+					} catch (e) {
+						try {
+							lib[path] = ctypes.open(ctypes.libraryName('X11'));
+						} catch (e) {
+							console.error('Integration Level 2: Could not get libX11 name; not activating', 'e:', e);
+							throw new Error('Integration Level 2: Could not get libX11 name; not activating, e:' + e);
+						}
+					}
+					break;
 				default:
 					try {
 						_lib[path] = ctypes.open(path);
