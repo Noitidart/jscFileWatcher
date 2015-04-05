@@ -113,9 +113,6 @@ function main() {
 			//new ostypes.API.;
 			var promise_initWatch = myWorker.post('initWatch', [
 				OS.Constants.Path.desktopDir,
-				function() {
-					console.log('something happened');
-				},
 				{
 					masks: ostypes.CONST.IN_ACCESS
 				}

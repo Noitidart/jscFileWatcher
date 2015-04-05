@@ -157,7 +157,11 @@ function initWatch(path, callback, options) {
 }
 
 // start - nix file watching
-function Notify(path, masks, callback){
+function inotifyCallbackTemp() {
+	console.error('inotifyCallbackTemp triggered!!! this is good!');
+}
+
+function Notify(path, masks){
 	var rez_init = ostypes.API('inotify_init')(0)
 	console.info('rez_init:', rez_init, rez_init.toString(), uneval(rez_init));
 	if (rez_init === -1) {
