@@ -157,17 +157,14 @@ function initWatch(path, callback, options) {
 }
 
 // start - nix file watching
-var INotifyInited = false;
 function Notify(path, masks, callback){
-	if (!INotifyInited) {
-		console.log('not inited going to init now');
-		var rez_init = ostypes.API('inotify_init')(0);
-		console.info('rez_init:', rez_init, rez_init.toString(), uneval(rez_init));
-		if (rez_init == -1) {
-			console.error('Failed rez_init, errno:', ctypes.errno);
-			throw new Error('Failed to inotify init, error code is ' + ctypes.errno);
-		}
+	var rez_init = ostypes.API('inotify_init')(0)
+	console.info('rez_init:', rez_init, rez_init.toString(), uneval(rez_init));
+	if (rez_init === -1) {
+		console.error('Failed rez_init, errno:', ctypes.errno);
+		throw new Error('Failed to inotify init, error code is ' + ctypes.errno);
 	}
+	this.fd = rez_init;
 	this.path = path;
 	this.masks = masks;
 	this.callback = callback;
@@ -175,21 +172,20 @@ function Notify(path, masks, callback){
 	return true;
 }
 Notify.prototype.addWatch = function(){
-	this.watch = ostypes.API('inotify_add_watch')(this.path, this.masks, false, this.callback ); // return an instance of iNotify (sorry for calling it like this, its actually something like ID for the watch). The 3rd (false) arguments is for *non* watching subdirectories.
+	this.watch = ostypes.API('inotify_add_watch')(this.fd, this.path, this.masks); // return an instance of iNotify (sorry for calling it like this, its actually something like ID for the watch). The 3rd (false) arguments is for *non* watching subdirectories.
 	console.info('this.watch:', this.watch.toString(), uneval(this.watch));
-	if (this.watch == -1) {
+	if (this.watch === -1) {
 		console.error('Failed this.watch, errno:', ctypes.errno);
 		throw new Error('failed to add watch, error is: ' + ctypes.errno);
 	} else {
 		console.log('succesfully added watch, file descripted = ', this.watch);
 		return this.watch;
 	}
- }       
+}       
 Notify.prototype.removeWatch = function(path, callback){
-	var wd = 0; // i dont know what to set this to yet
-	var rez_rm = ostypes.API('inotify_rm_watch')(this.watch, wd);
+	var rez_rm = ostypes.API('inotify_rm_watch')(this.fd, this.watch);
 	console.info('rez_rm:', rez_rm, rez_rm.toString(), uneval(rez_rm));
-	if (rez_rm == 0) {
+	if (rez_rm === 0) {
 		console.log('succesfully removed watch');
 		return true;
 	} else {
