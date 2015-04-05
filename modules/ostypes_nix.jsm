@@ -105,16 +105,11 @@ var nixInit = function() {
 					try {
 						_lib[path] = ctypes.open('libX11.so.6');
 					} catch (e) {
-						try {
-							_lib[path] = ctypes.open(ctypes.libraryName('X11'));
-						} catch (e) {
-							console.error('Integration Level 2: Could not get libX11 name; not activating', 'e:', e);
-							throw new Error('Integration Level 2: Could not get libX11 name; not activating, e:' + e);
-						}
+						_lib[path] = ctypes.open(ctypes.libraryName('X11'));
 					}
 					break;
 				case 'libc':
-					lib[path] = ctypes.open(ctypes.libraryName('libc'));
+					_lib[path] = ctypes.open(ctypes.libraryName('libc'));
 				default:
 					try {
 						_lib[path] = ctypes.open(path);
@@ -145,22 +140,8 @@ var nixInit = function() {
 			*  );
 			*/
 			return lib('libc').declare('close', self.TYPE_ABI,
-				ctypes.int
-			);
-		},
-		read: function() {
-			/* http://linux.die.net/man/2/read
-			*  ssize_t read(
-			*    int fd, 
-			*    void *buf, 
-			*    size_t count;
-			*  );
-			*/
-			return lib('libc').declare('read', self.TYPE.ABI, 
-				ctypes.ssize_t,
-				ctypes.int,
-				ctypes.void_t.ptr, // not sure about this
-				ctypes.size_t
+				ctypes.int,		// return
+				ctypes.int		// fd
 			);
 		},
 		inotify_add_watch: function() {
@@ -200,6 +181,21 @@ var nixInit = function() {
 				ctypes.int,		// return
 				ctypes.int,		// fd
 				ctypes.int		// wd
+			);
+		},
+		read: function() {
+			/* http://linux.die.net/man/2/read
+			*  ssize_t read(
+			*    int fd, 
+			*    void *buf, 
+			*    size_t count;
+			*  );
+			*/
+			return lib('libc').declare('read', self.TYPE.ABI, 
+				ctypes.ssize_t,		// return
+				ctypes.int,			// fd
+				ctypes.void_t.ptr, 	// *buf
+				ctypes.size_t		// count
 			);
 		}
 	};
