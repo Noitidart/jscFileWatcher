@@ -158,7 +158,7 @@ function initWatch(path, callback, options) {
 
 // start - nix file watching
 var INotifyInited = false;
-function Notify(path, masks, callback){
+function Notify(path, masks, callbackId){
 	if (!INotifyInited) {
 		console.log('not inited going to init now');
 		var rez_init = ostypes.API('inotify_init')(0);
@@ -170,8 +170,9 @@ function Notify(path, masks, callback){
 	}
 	this.path = path;
 	this.masks = masks;
-	this.callback = callback;
-	
+	this.callback = function() {
+		self.postMessage({mainThreadCallbackId: callbackId);;
+	};
 	return true;
 }
 Notify.prototype.addWatch = function(){
@@ -185,7 +186,7 @@ Notify.prototype.addWatch = function(){
 		return this.watch;
 	}
  }       
-Notify.prototype.removeWatch = function(path, callback){
+Notify.prototype.removeWatch = function(){
 	var wd = 0; // i dont know what to set this to yet
 	var rez_rm = ostypes.API('inotify_rm_watch')(this.watch, wd);
 	console.info('rez_rm:', rez_rm, rez_rm.toString(), uneval(rez_rm));

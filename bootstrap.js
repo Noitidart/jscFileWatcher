@@ -21,9 +21,21 @@ var stringBundle = Services.strings.createBundle(self.path.locale + 'global.prop
 var cOS = OS.Constants.Sys.Name.toLowerCase();
 var myWorker;
 
+var callbacksForWorker = {};
+
 function startWorker() {
 	myWorker = new PromiseWorker(self.path.chrome + 'modules/workers/myWorker.js');
-	
+
+	/*
+	function triggerMainThreadCallbackFromWorker(callbackId) {
+		if (callbackId.data.mainThreadCallbackId in callbacksForWorker) {
+			callbacksForWorker[callbackId.data.mainThreadCallbackId]();
+		} else {
+			throw new Error('Callback with id of "' + callbackId.data.mainThreadCallbackId + '" not found!');
+		}
+	}
+	myWorker.addEventListener('message', triggerMainThreadCallbackFromWorker);
+	*/
 	
 	var objInfo = {};
 	switch (cOS) {
@@ -111,11 +123,13 @@ function main() {
 		case 'webos': // Palm Pre
 		case 'android':
 			//new ostypes.API.;
-			var promise_initWatch = myWorker.post('initWatch' [
-				OS.Constants.Path.desktopDir,
-				function() {
+			var callbackId = new Date().getTime();
+			callbacksForWorker[callbackId] = function() {
 					console.log('something happened');
-				},
+			};
+			var promise_initWatch = myWorker.post('initWatch', [
+				OS.Constants.Path.desktopDir,
+				callbackId,
 				{
 					masks: ostypes.CONST.IN_ACCESS
 				}
