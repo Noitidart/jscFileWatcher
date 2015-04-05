@@ -98,10 +98,35 @@ var nixInit = function() {
 			 *   uint32_t mask
 			 * );
 			 */
-			 return _lib('libc').declare('inotify_add_watch', self.TYPE.ABI,
+			 return lib('libc').declare('inotify_add_watch', self.TYPE.ABI,
 				ctypes.int,			// return
 				ctypes.char.ptr,	// *pathname
 				ctypes.uint32_t		// mask
+			);
+		},
+		inotify_init: function() {
+			/* http://linux.die.net/man/2/inotify_init
+			 * Notes: Pass 0 as flags if you want inotify_init1 to behave as `int inotify_init(void);`
+			 * int inotify_init1(
+			 *   int flags
+			 * );
+			 */
+			return lib('libc').declare('inotify_init1', self.TYPE.ABI,
+				ctypes.int,		// return
+				ctypes.int		// flags
+			);
+		},
+		inotify_rm_watch: function() {
+			/* http://linux.die.net/man/2/inotify_rm_watch
+			 * int inotify_rm_watch(
+			 *   int fd,
+			 *   int wd
+			 * );
+			 */
+			return lib('libc').declare('inotify_rm_watch', self.TYPE.ABI,
+				ctypes.int,		// return
+				ctypes.int,		// fd
+				ctypes.int		// wd
 			);
 		}
 	};
