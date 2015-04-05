@@ -28,7 +28,14 @@ var nixTypes = function() {
 	this.CALLBACK_ABI = ctypes.default_abi;
 	this.ABI = ctypes.default_abi;
 	
-	
+	// SIMPLE STRUCTS
+	this.inotify_event = ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
+		{ wd: ctypes.int },				// Watch descriptor
+		{ mask: ctypes.uint32_t },		// Mask describing event
+		{ cookie: ctypes.uint32_t },	// Unique cookie associating related events (for rename(2))
+		{ len: ctypes.uint32_t },		// Size of name field
+		{ name: ctypes.char.ptr }		// Optional null-terminated name
+	]);
 }
 
 
