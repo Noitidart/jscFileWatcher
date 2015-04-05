@@ -171,7 +171,7 @@ function Notify(path, masks){
 	this.fd = rez_init;
 	this.path = path;
 	this.masks = masks;
-	this.callback = callback;
+	this.callback = inotifyCallbackTemp;
 	
 	return true;
 }
@@ -185,7 +185,7 @@ Notify.prototype.addWatch = function(){
 		console.log('succesfully added watch, file descripted = ', this.watch);
 		return this.watch;
 	}
-}       
+}
 Notify.prototype.removeWatch = function(path, callback){
 	var rez_rm = ostypes.API('inotify_rm_watch')(this.fd, this.watch);
 	console.info('rez_rm:', rez_rm, rez_rm.toString(), uneval(rez_rm));
