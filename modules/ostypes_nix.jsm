@@ -40,8 +40,48 @@ var nixInit = function() {
 
 	// CONSTANTS
 	this.CONST = {
-		// here
+		// start - INOTIFY - from https://github.com/dsoprea/PyInotify/blob/980610f91d4c3819dce54988cfec8f138599cedf/inotify/constants.py
+		// inotify_init1 flags.
+		IN_CLOEXEC  : 02000000,
+		IN_NONBLOCK : 00004000,
+		
+		// Supported events suitable for MASK parameter of INOTIFY_ADD_WATCH.
+		IN_ACCESS        : 0x00000001,
+		IN_MODIFY        : 0x00000002,
+		IN_ATTRIB        : 0x00000004,
+		IN_CLOSE_WRITE   : 0x00000008,
+		IN_CLOSE_NOWRITE : 0x00000010,
+		IN_OPEN          : 0x00000020,
+		IN_MOVED_FROM    : 0x00000040,
+		IN_MOVED_TO      : 0x00000080,
+		IN_CREATE        : 0x00000100,
+		IN_DELETE        : 0x00000200,
+		IN_DELETE_SELF   : 0x00000400,
+		IN_MOVE_SELF     : 0x00000800,
+		
+		// Events sent by kernel.
+		IN_UNMOUNT    : 0x00002000, // Backing fs was unmounted.
+		IN_Q_OVERFLOW : 0x00004000, // Event queued overflowed.
+		IN_IGNORED    : 0x00008000, // File was ignored.
+
+		// Special flags.
+		IN_ONLYDIR     : 0x01000000, // Only watch the path if it is a directory.
+		IN_DONT_FOLLOW : 0x02000000, // Do not follow a sym link.
+		IN_MASK_ADD    : 0x20000000, // Add to the mask of an already existing watch.
+		IN_ISDIR       : 0x40000000, // Event occurred against dir.
+		IN_ONESHOT     : 0x80000000 // Only send event once.
+		// end - INOTIFY
 	};
+	
+	// ADV CONSTANTS
+	// start - INOTIFY - from https://github.com/dsoprea/PyInotify/blob/980610f91d4c3819dce54988cfec8f138599cedf/inotify/constants.py
+	// Helper events.
+	this.CONST.IN_CLOSE = (this.CONST.IN_CLOSE_WRITE | this.CONST.IN_CLOSE_NOWRITE);
+	this.CONST.IN_MOVE = (this.CONST.IN_MOVED_FROM | this.CONST.IN_MOVED_TO);
+	
+	// All events which a program can wait on.
+	this.CONST.IN_ALL_EVENTS = (this.CONST.IN_ACCESS | this.CONST.IN_MODIFY | this.CONST.IN_ATTRIB | this.CONST.IN_CLOSE_WRITE | this.CONST.IN_CLOSE_NOWRITE | this.CONST.IN_OPEN | this.CONST.IN_MOVED_FROM | this.CONST.IN_MOVED_TO | this.CONST.IN_CREATE | this.CONST.IN_DELETE | this.CONST.IN_DELETE_SELF | this.CONST.IN_MOVE_SELF);
+	// end - INOTIFY
 	
 	var _lib = {}; // cache for lib
 	var lib = function(path) {
