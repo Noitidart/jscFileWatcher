@@ -31,6 +31,7 @@ var nixTypes = function() {
 	
 }
 
+
 var nixInit = function() {
 	var self = this;
 	
@@ -95,10 +96,10 @@ var nixInit = function() {
 			switch (path) {
 				case 'x11':
 					try {
-						lib[path] = ctypes.open('libX11.so.6');
+						_lib[path] = ctypes.open('libX11.so.6');
 					} catch (e) {
 						try {
-							lib[path] = ctypes.open(ctypes.libraryName('X11'));
+							_lib[path] = ctypes.open(ctypes.libraryName('X11'));
 						} catch (e) {
 							console.error('Integration Level 2: Could not get libX11 name; not activating', 'e:', e);
 							throw new Error('Integration Level 2: Could not get libX11 name; not activating, e:' + e);
@@ -130,6 +131,31 @@ var nixInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
+		close: function() {
+			/* http://linux.die.net/man/2/close	
+			*  int close(
+			*    int fd
+			*  );
+			*/
+			return lib('libc').declare('close', self.TYPE_ABI,
+				ctypes.int
+			);
+		},
+		read: function() {
+			/* http://linux.die.net/man/2/read
+			*  ssize_t read(
+			*    int fd, 
+			*    void *buf, 
+			*    size_t count;
+			*  );
+			*/
+			return lib('libc').declare('read', self.TYPE.ABI, 
+				ctypes.ssize_t,
+				ctypes.int,
+				ctypes.void_t.ptr, // not sure about this
+				ctypes.size_t
+			);
+		},
 		inotify_add_watch: function() {
 			/* http://linux.die.net/man/2/inotify_add_watch
 			 * int inotify_add_watch(
