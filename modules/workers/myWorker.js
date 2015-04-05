@@ -164,7 +164,7 @@ function Notify(path, masks, callback){
 		var rez_init = ostypes.API('inotify_init')(0);
 		console.info('rez_init:', rez_init, rez_init.toString(), uneval(rez_init));
 		if (rez_init == -1) {
-			console.error('Failed rez_init, errno:', ctypes.errno); }
+			console.error('Failed rez_init, errno:', ctypes.errno);
 			throw new Error('Failed to inotify init, error code is ' + ctypes.errno);
 		}
 	}
@@ -185,7 +185,7 @@ Notify.prototype.addWatch = function(){
 		return this.watch;
 	}
  }       
-Notify.prototype.removeWatch(path, callback){
+Notify.prototype.removeWatch = function(path, callback){
 	var wd = 0; // i dont know what to set this to yet
 	var rez_rm = ostypes.API('inotify_rm_watch')(this.watch, wd);
 	console.info('rez_rm:', rez_rm, rez_rm.toString(), uneval(rez_rm));
