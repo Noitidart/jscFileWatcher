@@ -90,7 +90,7 @@ var nixInit = function() {
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
 		close() {
-		   /* http://linux.die.net/man/2/close	
+		       /* http://linux.die.net/man/2/close	
 			*  int close(
 			*    int fd
 			*  );
@@ -140,7 +140,7 @@ var nixInit = function() {
 			);
 		},
 		read() {
-		   /* http://linux.die.net/man/2/read
+		       /* http://linux.die.net/man/2/read
 			*  ssize_t read(
 			*    int fd, 
 			*    void *buf, 
@@ -168,33 +168,33 @@ nixInit.prototype = {
     // start - INOTIFY - from https://github.com/dsoprea/PyInotify/blob/980610f91d4c3819dce54988cfec8f138599cedf/inotify/constants.py
     // inotify_init1 flags.
     IN_CLOEXEC      : 02000000,
-    IN_NONBLOCK  : 00004000,
+    IN_NONBLOCK     : 00004000,
     
     // Supported events suitable for MASK parameter of INOTIFY_ADD_WATCH.
     IN_ACCESS                : 0x00000001,
-    IN_MODIFY               : 0x00000002,
-    IN_ATTRIB                 : 0x00000004,
-    IN_CLOSE_WRITE     : 0x00000008,
-    IN_CLOSE_NOWRITE: 0x00000010,
-    IN_OPEN                   : 0x00000020,
-    IN_MOVED_FROM    : 0x00000040,
-	IN_MOVED_TO          : 0x00000080,
-    IN_CREATE                 : 0x00000100,
-	IN_DELETE                 : 0x00000200,
-	IN_DELETE_SELF        : 0x00000400,
-    IN_MOVE_SELF          : 0x00000800,
+    IN_MODIFY                : 0x00000002,
+    IN_ATTRIB                : 0x00000004,
+    IN_CLOSE_WRITE     	     : 0x00000008,
+    IN_CLOSE_NOWRITE	     : 0x00000010,
+    IN_OPEN                  : 0x00000020,
+    IN_MOVED_FROM            : 0x00000040,
+    IN_MOVED_TO              : 0x00000080,
+    IN_CREATE                : 0x00000100,
+    IN_DELETE                : 0x00000200,
+    IN_DELETE_SELF           : 0x00000400,
+    IN_MOVE_SELF             : 0x00000800,
     
     // Events sent by kernel.
     IN_UNMOUNT      : 0x00002000, // Backing fs was unmounted.
-    IN_Q_OVERFLOW : 0x00004000, // Event queued overflowed.
-    IN_IGNORED        : 0x00008000, // File was ignored.
+    IN_Q_OVERFLOW   : 0x00004000, // Event queued overflowed.
+    IN_IGNORED      : 0x00008000, // File was ignored.
 
     // Special flags.
     IN_ONLYDIR             : 0x01000000, // Only watch the path if it is a directory.
-    IN_DONT_FOLLOW  : 0x02000000, // Do not follow a sym link.
-    IN_MASK_ADD         : 0x20000000, // Add to the mask of an already existing watch.
-	IN_ISDIR                   : 0x40000000, // Event occurred against dir.
-    IN_ONESHOT            : 0x80000000, // Only send event once.
+    IN_DONT_FOLLOW         : 0x02000000, // Do not follow a sym link.
+    IN_MASK_ADD            : 0x20000000, // Add to the mask of an already existing watch.
+    IN_ISDIR               : 0x40000000, // Event occurred against dir.
+    IN_ONESHOT             : 0x80000000, // Only send event once.
     
     // ADV CONSTANTS
     // Helper events.
