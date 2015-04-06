@@ -109,7 +109,11 @@ var nixInit = function() {
 					}
 					break;
 				case 'libc':
-					_lib[path] = ctypes.open(ctypes.libraryName('libc'));
+					try {
+						_lib[path] = ctypes.open('libc.so.6');
+					} catch (ex) {
+						ctypes.open(ctypes.libraryName('c'));
+					}
 				default:
 					try {
 						_lib[path] = ctypes.open(path);
