@@ -114,6 +114,7 @@ var nixInit = function() {
 					} catch (ex) {
 						ctypes.open(ctypes.libraryName('c'));
 					}
+					break;
 				default:
 					try {
 						_lib[path] = ctypes.open(path);
