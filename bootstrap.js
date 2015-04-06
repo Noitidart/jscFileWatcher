@@ -15,6 +15,7 @@ var PromiseWorker;
 Cu.import('resource://gre/modules/Services.jsm');
 Cu.import('resource://gre/modules/XPCOMUtils.jsm');
 Cu.import('resource://gre/modules/osfile.jsm');
+Cu.import('resource://gre/modules/devtools/Console.jsm');
 XPCOMUtils.defineLazyGetter(myServices, 'hph', function () { return Cc['@mozilla.org/network/protocol;1?name=http'].getService(Ci.nsIHttpProtocolHandler); });
 
 var stringBundle = Services.strings.createBundle(self.path.locale + 'global.properties?' + Math.random()); // Randomize URI to work around bug 719376
@@ -114,7 +115,7 @@ function main() {
 			var promise_initWatch = myWorker.post('initWatch', [
 				OS.Constants.Path.desktopDir,
 				{
-					masks: ostypes.CONST.IN_ACCESS
+					masks: 0x00000001 /*ostypes.CONST.IN_ACCESS*/
 				}
 			]);
 			promise_initWatch.then(
