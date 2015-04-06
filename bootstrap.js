@@ -162,5 +162,5 @@ function startup(aData, aReason) {
  
 function shutdown(aData, aReason) {
 	if (aReason == APP_SHUTDOWN) { return }
-	Cu.unload(self.chrome_path + 'modules/PromiseWorker.jsm');
+	Cu.unload(self.path.chrome + 'modules/PromiseWorker.jsm');
 }
