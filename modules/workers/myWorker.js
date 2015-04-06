@@ -149,7 +149,8 @@ function initWatch(path, /*callback,*/ options) {
 			if (!('masks' in options)) {
 				throw new Error('Missing required `masks` key in options objection');
 			}
-			return new Notify(path, options.masks/*, callback*/);
+			var rez_notify = new Notify(path, options.masks/*, callback*/);
+			return true;
 			break;
 		default:
 			throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
