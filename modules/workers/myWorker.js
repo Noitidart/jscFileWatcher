@@ -134,10 +134,7 @@ function doOsAlert(title, body) {
 	}
 }
 
-function initWatch(path, /*callback,*/ options) {
-	if (!options) {
-		options = {};
-	}
+function initWatch(path, /*callback,*/ options = {}) {
 	switch (cOS) {
 		case 'linux':
 		case 'freebsd':
