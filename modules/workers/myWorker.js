@@ -1,15 +1,17 @@
 // Imports
-importScripts('resource://gre/modules/osfile.jsm')
+'use strict';
+importScripts('resource://gre/modules/osfile.jsm');
 importScripts('resource://gre/modules/workers/require.js');
+importScripts('resource://gre/modules/Task.jsm');
 
 var gen = {
-	name: 'jscFileWatcher',
-	id: 'jscFileWatcher@jetpack',
-	path: {
-		chrome: 'chrome://jscfilewatcher/content/',
-		locale: 'chrome://jscfilewatcher/locale/'
-	},
-	aData: 0
+  name: 'jscFileWatcher',
+  id: 'jscFileWatcher@jetpack',
+  path: {
+    chrome: 'chrome://jscfilewatcher/content/',
+    locale: 'chrome://jscfilewatcher/locale/'
+  },
+  aData: 0
 };
 
 importScripts(gen.path.chrome + 'modules/cutils.jsm');
@@ -56,40 +58,40 @@ self.addEventListener('message', msg => worker.handleMessage(msg));
 // Init
 var objInfo; //populated by init
 function init(objOfInitVars) {
-	switch (cOS) {
-		case 'winnt':
-		//case 'winmo':
-		//case 'wince':
-			var requiredKeys = ['OSVersion'];
-			for (var i=0; i<requiredKeys.length; i++) {
-				if (!(requiredKeys[i] in objOfInitVars)) {
-					throw new Error('failed to init, required key of ' + requiredKeys[i] + ' not found in objInfo obj');
-				}
-			}
-			break;
-		default:
-			// do nothing
-			var requiredKeys = ['FFVersion', 'FFVersionLessThan30'];
-			for (var i=0; i<requiredKeys.length; i++) {
-				if (!(requiredKeys[i] in objOfInitVars)) {
-					throw new Error('failed to init, required key of ' + requiredKeys[i] + ' not found in objInfo obj');
-				}
-			}
-	}
-	
-	objInfo = objOfInitVars;
+  switch (cOS) {
+    case 'winnt':
+      //case 'winmo':
+      //case 'wince':
+      var requiredKeys = ['OSVersion'];
+      for (var i=0; i<requiredKeys.length; i++) {
+        if (!(requiredKeys[i] in objOfInitVars)) {
+          throw new Error('failed to init, required key of ' + requiredKeys[i] + ' not found in objInfo obj');
+        }
+      }
+      break;
+    default:
+      // do nothing
+      var requiredKeys = ['FFVersion', 'FFVersionLessThan30'];
+      for (var i=0; i<requiredKeys.length; i++) {
+        if (!(requiredKeys[i] in objOfInitVars)) {
+          throw new Error('failed to init, required key of ' + requiredKeys[i] + ' not found in objInfo obj');
+        }
+      }
+  }
+
+  objInfo = objOfInitVars;
 }
 
 // start - main defintions
 function doOsAlert(title, body) {
-	switch (cOS) {
-		case 'winnt':
-		case 'winmo':
-		case 'wince':
-			var rez = ostypes.API('MessageBox')(null, body, title, ostypes.CONST.MB_OK);
-			return cutils.jscGetDeepest(rez);
-			break;
-		/*
+  switch (cOS) {
+    case 'winnt':
+    case 'winmo':
+    case 'wince':
+      var rez = ostypes.API('MessageBox')(null, body, title, ostypes.CONST.MB_OK);
+      return cutils.jscGetDeepest(rez);
+      break;
+      /*
 		case 'linux':
 		case 'freebsd':
 		case 'openbsd':
@@ -99,39 +101,39 @@ function doOsAlert(title, body) {
 			importScripts('chrome://profilist/content/modules/ostypes_nix.jsm');
 			break;
 		*/
-		case 'darwin':
-			if (ostypes.IS64BIT) {
-				var myCFStrs = {
-					head: ostypes.HELPER.makeCFStr(title),
-					body: ostypes.HELPER.makeCFStr(body)
-				};
-				
-				var rez = ostypes.API('CFUserNotificationDisplayNotice')(0, ostypes.CONST.kCFUserNotificationCautionAlertLevel, null, null, null, myCFStrs.head, myCFStrs.body, null);
-				console.info('rez:', rez.toString(), uneval(rez)); // CFUserNotificationDisplayNotice does not block till user clicks dialog, it will return immediately
-				
-				if (cutils.jscEqual(rez, 0)) {
-					console.log('Notification was succesfully shown!!');
-					return true;
-				} else {
-					throw new Error('Failed to show notification... :(');
-				}
-				
-				for (var cfstr in myCFStrs) {
-					if (myCFStrs.hasOwnProperty(cfstr)) {
-						var rez_CFRelease = ostypes.API('CFRelease')(myCFStrs[cfstr]); // returns void
-					}
-				}
-			} else {
-				var hit = ostypes.TYPE.SInt16();
-				var rez = ostypes.API('StandardAlert')(ostypes.CONST.kCFUserNotificationCautionAlertLevel, ostypes.HELPER.Str255(title), ostypes.HELPER.Str255(body), null, hit.address());
-				console.info('rez:', rez.toString(), uneval(rez));
-				console.info('hit:', hit.toString(), uneval(hit));
-				return cutils.jscGetDeepest(hit);
-			}
-			break;
-		default:
-			throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
-	}
+    case 'darwin':
+      if (ostypes.IS64BIT) {
+        var myCFStrs = {
+          head: ostypes.HELPER.makeCFStr(title),
+          body: ostypes.HELPER.makeCFStr(body)
+        };
+
+        var rez = ostypes.API('CFUserNotificationDisplayNotice')(0, ostypes.CONST.kCFUserNotificationCautionAlertLevel, null, null, null, myCFStrs.head, myCFStrs.body, null);
+        console.info('rez:', rez.toString(), uneval(rez)); // CFUserNotificationDisplayNotice does not block till user clicks dialog, it will return immediately
+
+        if (cutils.jscEqual(rez, 0)) {
+          console.log('Notification was succesfully shown!!');
+          return true;
+        } else {
+          throw new Error('Failed to show notification... :(');
+        }
+
+        for (var cfstr in myCFStrs) {
+          if (myCFStrs.hasOwnProperty(cfstr)) {
+            var rez_CFRelease = ostypes.API('CFRelease')(myCFStrs[cfstr]); // returns void
+          }
+        }
+      } else {
+        var hit = ostypes.TYPE.SInt16();
+        var rez = ostypes.API('StandardAlert')(ostypes.CONST.kCFUserNotificationCautionAlertLevel, ostypes.HELPER.Str255(title), ostypes.HELPER.Str255(body), null, hit.address());
+        console.info('rez:', rez.toString(), uneval(rez));
+        console.info('hit:', hit.toString(), uneval(hit));
+        return cutils.jscGetDeepest(hit);
+      }
+      break;
+    default:
+      throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
+  }
 }
 
 function initWatch(path, /*callback,*/ options = {}) {
@@ -169,6 +171,7 @@ function Notify(path, masks){
 		throw new Error('Failed to inotify init, error code is ' + ctypes.errno);
 	}
 	this.fd = rez_init;
+    this.buffer = 1024 * ostypes.TYPE.inotify_event_size; // 1024 stands for 1024 events
 	this.path = path;
 	this.masks = masks;
 	this.callback = inotifyCallbackTemp;
@@ -176,31 +179,61 @@ function Notify(path, masks){
 	return true;
 }
 Notify.prototype.addWatch = function(){
-	this.watch = ostypes.API('inotify_add_watch')(this.fd, this.path, this.masks); // return an instance of iNotify (sorry for calling it like this, its actually something like ID for the watch). The 3rd (false) arguments is for *non* watching subdirectories.
-	console.info('this.watch:', this.watch.toString(), uneval(this.watch));
-	if (this.watch === -1) {
-		console.error('Failed this.watch, errno:', ctypes.errno);
-		throw new Error('failed to add watch, error is: ' + ctypes.errno);
-	} else {
-		console.log('succesfully added watch, file descripted = ', this.watch);
-		return this.watch;
-	}
+  this.watch = ostypes.API('inotify_add_watch')(this.fd, this.path, this.masks); // return an instance of iNotify (sorry for calling it like this, its actually something like ID for the watch).
+  console.info('this.watch:', this.watch.toString(), uneval(this.watch));
+  if (this.watch === -1) {
+    console.error('Failed this.watch, errno:', ctypes.errno);
+    throw new Error('failed to add watch, error is: ' + ctypes.errno);
+  } else {
+    console.log('succesfully added watch, file descripted = ', this.watch);
+  }
+  
+  var self = this;
+  (function listener(){ // not sure whether we have to call it each time after changes
+    Task.spawn(function* (){
+      var length = yield ostypes.API('read')(self.fd, self.charBuffer, self.buffer);
+      if (length === -1)
+        throw new Error('read failed');
+      var i = 0;
+      var changes = new Set();
+      while (i < length) {      
+        // changes.set(change);
+      }
+      return changes;
+    }).then(changes => {
+      listener();
+      self.callback(changes);
+    }, self.callbackError || Cu.reportError);
+  })();
+  
+  return true;
 }
 Notify.prototype.removeWatch = function(path, callback){
-	var rez_rm = ostypes.API('inotify_rm_watch')(this.fd, this.watch);
-	console.info('rez_rm:', rez_rm, rez_rm.toString(), uneval(rez_rm));
-	if (rez_rm === 0) {
-		console.log('succesfully removed watch');
-		return true;
-	} else {
-		// it is -1
-		console.error('Failed rez_rm, errno:', ctypes.errno);
-		throw new Error('failed to add watch, error is: ' + ctypes.errno);
-	}
+  var rez_rm = ostypes.API('inotify_rm_watch')(this.fd, this.watch);
+  console.info('rez_rm:', rez_rm, rez_rm.toString(), uneval(rez_rm));
+  if (rez_rm === 0) {
+    console.log('succesfully removed watch');
+    return true;
+  } else {
+    // it is -1
+    console.error('Failed rez_rm, errno:', ctypes.errno);
+    throw new Error('failed to remove watch, error is: ' + ctypes.errno);
+  }
 }
+Notify.prototype.close = function() {
+  var rez_c  = ostypes.API('close')(this.fd);
+  console.info('rez_c:', rez_c, rez_c.toString(), uneval(rez_c));
+  if (rez_c === -0) {
+    console.log('succesfully closed');
+    return true;
+  } else {
+   // it is -1
+    console.error('Failed rez_c, errno:', ctypes.errno);
+    throw new Error('failed to close, error is: ' + ctypes.errno);
+  }
+};
 // end - nix file watching
 // end - main defintions
-
 
 // start - helper functions
 var txtDecodr; // holds TextDecoder if created
