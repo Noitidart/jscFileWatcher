@@ -16,11 +16,13 @@ importScripts(core.path.chrome + 'modules/cutils.jsm');
 var cOS = 'linux';
 
 self.onmessage = function (msg) {
+	// msg must be fd
 	pollThis(msg.data);
 }
 
 
 function pollThis(fd, restartAfterChange) {
+	console.log('ok in pollThis of nixPoll');
 	var count = 1024 + ostypes.TYPE.inotify_event.size; //size_t
 	var buf = ctypes.char.array(count)();
       var i = 0;
@@ -39,4 +41,5 @@ function pollThis(fd, restartAfterChange) {
 			}
 		}
       }
+	  console.log('ok loop done of pollThis of nixPoll');
 }

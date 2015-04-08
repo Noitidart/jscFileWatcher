@@ -194,6 +194,10 @@ Notify.prototype.addWatch = function(){
 		console.log('incoming message from worker, msg:', msg);
 	}
 	pollWorker.addEventListener('message', handleMessageFromWorker);
+
+	console.log('ok added pollWorker');
+	pollWorker.postMessage({aTopic:'msg1'});
+	console.log('ok send msg to pollWorker');
   /*
   var self = this;
   (function listener(){ // not sure whether we have to call it each time after changes
