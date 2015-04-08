@@ -196,7 +196,7 @@ Notify.prototype.addWatch = function(){
 	pollWorker.addEventListener('message', handleMessageFromWorker);
 
 	console.log('ok added pollWorker');
-	pollWorker.postMessage({aTopic:'msg1'});
+	pollWorker.postMessage(this.fd);
 	console.log('ok send msg to pollWorker');
   /*
   var self = this;
