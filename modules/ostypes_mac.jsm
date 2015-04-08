@@ -1,6 +1,6 @@
 var EXPORTED_SYMBOLS = ['ostypes'];
 
-var gen = {
+var core = {
 	name: 'jscFileWatcher',
 	id: 'jscFileWatcher@jetpack',
 	path: {
@@ -10,7 +10,7 @@ var gen = {
 	aData: 0
 };
 
-importScripts(gen.path.chrome + 'modules/cutils.jsm'); // used by HELPER functions
+importScripts(core.path.chrome + 'modules/cutils.jsm'); // used by HELPER functions
 
 if (ctypes.voidptr_t.size == 4 /* 32-bit */) {
 	var is64bit = false;

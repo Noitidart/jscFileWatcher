@@ -4,7 +4,7 @@ importScripts('resource://gre/modules/osfile.jsm');
 importScripts('resource://gre/modules/workers/require.js');
 importScripts('resource://gre/modules/Task.jsm');
 
-var gen = {
+var core = {
   name: 'jscFileWatcher',
   id: 'jscFileWatcher@jetpack',
   path: {
@@ -14,7 +14,7 @@ var gen = {
   aData: 0
 };
 
-importScripts(gen.path.chrome + 'modules/cutils.jsm');
+importScripts(core.path.chrome + 'modules/cutils.jsm');
 
 // Globals
 var cOS = OS.Constants.Sys.Name.toLowerCase();
@@ -24,7 +24,7 @@ switch (cOS) {
 	case 'winnt':
 	case 'winmo':
 	case 'wince':
-		importScripts(gen.path.chrome + 'modules/ostypes_win.jsm');
+		importScripts(core.path.chrome + 'modules/ostypes_win.jsm');
 		break;
 	case 'linux':
 	case 'freebsd':
@@ -32,17 +32,17 @@ switch (cOS) {
 	case 'sunos':
 	case 'webos': // Palm Pre
 	case 'android': //profilist doesnt support android (android doesnt have profiles)
-		importScripts(gen.path.chrome + 'modules/ostypes_nix.jsm');
+		importScripts(core.path.chrome + 'modules/ostypes_nix.jsm');
 		break;
 	case 'darwin':
-		importScripts(gen.path.chrome + 'modules/ostypes_mac.jsm');
+		importScripts(core.path.chrome + 'modules/ostypes_mac.jsm');
 		break;
 	default:
 		throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
 }
 
 // PromiseWorker
-var PromiseWorker = require(gen.path.chrome + 'modules/workers/PromiseWorker.js');
+var PromiseWorker = require(core.path.chrome + 'modules/workers/PromiseWorker.js');
 var worker = new PromiseWorker.AbstractWorker();
 worker.dispatch = function(method, args = []) {
 	return self[method](...args);
