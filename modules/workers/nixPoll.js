@@ -12,6 +12,7 @@ var core = {
 };
 
 importScripts(core.path.chrome + 'modules/cutils.jsm');
+importScripts(core.path.chrome + 'modules/ostypes_nix.jsm');
 
 var cOS = 'linux';
 
@@ -26,15 +27,24 @@ function pollThis(fd, restartAfterChange) {
 	var count = 1024 + ostypes.TYPE.inotify_event.size; //size_t
 	var buf = ctypes.char.array(count)();
       var i = 0;
-      while (true) {      
+      console.log('starting the loop');
+      while (true) {
+      		i++;
+      		if (i == 100) {
+      			console.log('got to i 100');
+      		}
+      		if (i == 200) {
+      			console.log('got to i 200');
+      		}
 		var length = ostypes.API('read')(fd, buf.address(), count);
-		if (length === -1) {
+		console.info('length:', length, length.toString())
+		if (length == -1) {
 			throw new Error('read failed');
 		} else if (length > 0) {
 			// something happend, read struct
-			var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
+			//var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
 			//var fname = casted.addressOfField('fname').readString();
-			console.info('casted:', casted.toString());
+			console.info('casted:'/*, casted.toString()*/);
 			self.postMessage('change found');
 			if (!restartAfterChange) {
 				break;

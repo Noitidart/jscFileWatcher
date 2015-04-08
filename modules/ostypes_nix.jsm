@@ -167,9 +167,11 @@ nixInit.prototype = {
   // CONSTANTS
   CONST: {
     // start - INOTIFY - from https://github.com/dsoprea/PyInotify/blob/980610f91d4c3819dce54988cfec8f138599cedf/inotify/constants.py
+	// had to use https://github.com/D-Programming-Language/druntime/blob/61ba4b8d3c0052065c17ffc8eef4f11496f3db3e/src/core/sys/linux/sys/inotify.d#L53
+		// cuz otherwise it would throw SyntaxError: octal literals and octal escape sequences are deprecated
     // inotify_init1 flags.
-    IN_CLOEXEC      : 02000000,
-    IN_NONBLOCK     : 00004000,
+    IN_CLOEXEC      : 0x80000, // octal!2000000 
+    IN_NONBLOCK     : 0x800, // octal!4000
     
     // Supported events suitable for MASK parameter of INOTIFY_ADD_WATCH.
     IN_ACCESS                : 0x00000001,
