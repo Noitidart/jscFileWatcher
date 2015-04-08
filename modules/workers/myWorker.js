@@ -148,6 +148,7 @@ function initWatch(path, /*callback,*/ options = {}) {
 				throw new Error('Missing required `masks` key in options objection');
 			}
 			var rez_notify = new Notify(path, options.masks/*, callback*/);
+			rez_notify.addWatch();
 			return true;
 			break;
 		default:
