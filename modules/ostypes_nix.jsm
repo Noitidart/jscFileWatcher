@@ -110,6 +110,7 @@ var nixInit = function() {
 			 */
 			 return lib('libc').declare('inotify_add_watch', self.TYPE.ABI,
 				ctypes.int,			// return
+				ctypes.int,			// fd
 				ctypes.char.ptr,	// *pathname
 				ctypes.uint32_t		// mask
 			);
