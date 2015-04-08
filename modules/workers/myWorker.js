@@ -171,7 +171,7 @@ function Notify(path, masks){
 		throw new Error('Failed to inotify init, error code is ' + ctypes.errno);
 	}
 	this.fd = rez_init;
-    this.buffer = 1024 * ostypes.TYPE.inotify_event_size; // 1024 stands for 1024 events
+    //this.buffer = 1024 + ostypes.TYPE.inotify_event.size; // 1024 stands for 1024 events
 	this.path = path;
 	this.masks = masks;
 	this.callback = inotifyCallbackTemp;
@@ -188,6 +188,13 @@ Notify.prototype.addWatch = function(){
     console.log('succesfully added watch, file descripted = ', this.watch);
   }
   
+  // based on https://github.com/Noitidart/ChromeWorker
+  var pollWorker = new ChromeWorker(core.path.chrome + 'modules/workers/nixPoll.js');
+	function handleMessageFromWorker(msg) {
+		console.log('incoming message from worker, msg:', msg);
+	}
+	pollWorker.addEventListener('message', handleMessageFromWorker);
+  /*
   var self = this;
   (function listener(){ // not sure whether we have to call it each time after changes
     Task.spawn(function* (){
@@ -205,7 +212,7 @@ Notify.prototype.addWatch = function(){
       self.callback(changes);
     }, self.callbackError || Cu.reportError);
   })();
-  
+  */
   return true;
 }
 Notify.prototype.removeWatch = function(path, callback){

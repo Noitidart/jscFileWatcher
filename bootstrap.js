@@ -1,5 +1,5 @@
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
-const self = {
+const core = {
 	name: 'jscFileWatcher',
 	id: 'jscFileWatcher@jetpack',
 	path: {
@@ -18,13 +18,12 @@ Cu.import('resource://gre/modules/osfile.jsm');
 Cu.import('resource://gre/modules/devtools/Console.jsm');
 XPCOMUtils.defineLazyGetter(myServices, 'hph', function () { return Cc['@mozilla.org/network/protocol;1?name=http'].getService(Ci.nsIHttpProtocolHandler); });
 
-var stringBundle = Services.strings.createBundle(self.path.locale + 'global.properties?' + Math.random()); // Randomize URI to work around bug 719376
+var stringBundle = Services.strings.createBundle(core.path.locale + 'global.properties?' + Math.random()); // Randomize URI to work around bug 719376
 var cOS = OS.Constants.Sys.Name.toLowerCase();
 var myWorker;
 
 function startWorker() {
-	myWorker = new PromiseWorker(self.path.chrome + 'modules/workers/myWorker.js');
-	
+	myWorker = new PromiseWorker(core.path.chrome + 'modules/workers/myWorker.js');
 	
 	var objInfo = {};
 	switch (cOS) {
@@ -147,8 +146,8 @@ function install() {}
 function uninstall() {}
 
 function startup(aData, aReason) {
-	self.aData = aData;
-	PromiseWorker = Cu.import(self.path.chrome + 'modules/PromiseWorker.jsm').BasePromiseWorker;
+	core.aData = aData;
+	PromiseWorker = Cu.import(core.path.chrome + 'modules/PromiseWorker.jsm').BasePromiseWorker;
 	
 	//Services.prompt.alert(null, stringBundle.GetStringFromName('startup_prompt_title'), stringBundle.GetStringFromName('startup_prompt_title'));
 	
@@ -162,5 +161,5 @@ function startup(aData, aReason) {
  
 function shutdown(aData, aReason) {
 	if (aReason == APP_SHUTDOWN) { return }
-	Cu.unload(self.path.chrome + 'modules/PromiseWorker.jsm');
+	Cu.unload(core.path.chrome + 'modules/PromiseWorker.jsm');
 }
