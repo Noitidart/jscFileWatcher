@@ -146,6 +146,7 @@ function install() {}
 function uninstall() {}
 
 function startup(aData, aReason) {
+	console.log('test')
 	core.aData = aData;
 	PromiseWorker = Cu.import(core.path.chrome + 'modules/PromiseWorker.jsm').BasePromiseWorker;
 	
