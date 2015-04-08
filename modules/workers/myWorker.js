@@ -2,7 +2,6 @@
 'use strict';
 importScripts('resource://gre/modules/osfile.jsm');
 importScripts('resource://gre/modules/workers/require.js');
-importScripts('resource://gre/modules/Task.jsm');
 
 var core = {
   name: 'jscFileWatcher',
