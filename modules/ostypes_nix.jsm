@@ -160,7 +160,7 @@ var nixInit = function() {
 			return lib('libc').declare('read', self.TYPE.ABI, 
 				self.TYPE.ssize_t,		// return
 				self.TYPE.int,			// fd
-				self.TYPE['void*'], 	// *buf
+				self.TYPE.char.ptr, 	// *buf
 				self.TYPE.size_t		// count
 			);
 		}

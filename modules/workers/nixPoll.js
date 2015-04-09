@@ -24,7 +24,7 @@ self.onmessage = function (msg) {
 
 function pollThis(fd, restartAfterChange) {
 	console.log('ok in pollThis of nixPoll');
-		  var count = ostypes.TYPE.inotify_event.size; //size_t
+		  var count = 4096; //ostypes.TYPE.inotify_event.size; //size_t
 		  var buf = ctypes.ArrayType(ostypes.TYPE.char, count)();
 		  console.log('starting the loop, fd:', fd, 'count:', count);
 		  var length;
@@ -34,12 +34,13 @@ function pollThis(fd, restartAfterChange) {
 			console.error('read failed with -1 and errno: ' + ctypes.errno);
 			throw new Error('read failed with -1 and errno: ' + ctypes.errno);
 		} else if (!cutils.jscEqual(length, 0)) {
-			// then its > 0 as its not -1
+			// then its > 0 as its not -1 and not 0
 			// something happend, read struct
 		  var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
 		  console.log('casted:', casted.toString());
 		  
 		  var file_name_length = casted.len;
+		  console.info('file_name_length:', file_name_length);
 		  for (var i=file_name_length; i>0; i--) {
 			  try {
 				  var file_name = ctypes.cast(casted.addressOfField('name'), ctypes.ArrayType(ostypes.TYPE.char, i).ptr);
