@@ -40,7 +40,7 @@ nixTypes.prototype = {
 
   
 // SIMPLE STRUCTS
-inotify_event: ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
+nixTypes.prototype.inotify_event = ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
 	{ wd: nixTypes.prototype.int },				       // Watch descriptor
 	{ mask: nixTypes.prototype.uint32_t },		 // Mask describing event
 	{ cookie: nixTypes.prototype.uint32_t },	 // Unique cookie associating related events (for rename(2))
