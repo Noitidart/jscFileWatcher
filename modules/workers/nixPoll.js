@@ -18,33 +18,28 @@ var cOS = 'linux';
 
 self.onmessage = function (msg) {
 	// msg must be fd
-	pollThis(msg.data);
+	pollThis(msg.data, true);
 }
 
 
 function pollThis(fd, restartAfterChange) {
 	console.log('ok in pollThis of nixPoll');
-	var count = 1024 + ostypes.TYPE.inotify_event.size; //size_t
-	var buf = ctypes.char.array(count)();
-      var i = 0;
+		  var count = ostypes.TYPE.inotify_event.size; //size_t
+		  var buf = ctypes.ArrayType(ctypes.char, count)();
+		  console.log('starting the loop, fd:', this.fd, 'count:', count);
+		  var length = ostypes.API('read')(this.fd, buf, count);
       console.log('starting the loop');
       while (true) {
-      		i++;
-      		if (i == 100) {
-      			console.log('got to i 100');
-      		}
-      		if (i == 200) {
-      			console.log('got to i 200');
-      		}
-		var length = ostypes.API('read')(fd, buf.address(), count);
-		console.info('length:', length, length.toString())
-		if (length == -1) {
+		if (cutils.jscEqual(length, -1)) {
 			throw new Error('read failed');
-		} else if (length > 0) {
+		} else if (!cutils.jscEqual(length, 0)) {
+			// then its > 0 as its not -1
 			// something happend, read struct
-			//var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
-			//var fname = casted.addressOfField('fname').readString();
-			console.info('casted:'/*, casted.toString()*/);
+		  var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
+		  console.log('casted:', casted.toString());
+		  
+		  var file_name = casted.addressOfField('name').contents.readString();
+		  console.info('file_name:', file_name);
 			self.postMessage('change found');
 			if (!restartAfterChange) {
 				break;

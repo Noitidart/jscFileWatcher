@@ -200,21 +200,7 @@ Notify.prototype.addWatch = function(){
   } else {
     console.log('succesfully added watch, file descripted = ', this.watch);
   }
-
-
-      var count = ostypes.TYPE.inotify_event.size; //size_t
-      var buf = ctypes.ArrayType(ctypes.char, count)();
-      console.log('starting the loop, fd:', this.fd, 'count:', count);
-      var length = ostypes.API('read')(this.fd, buf, count);
-      console.info('length:', length);
-      
-      var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
-      console.log('casted:', casted.toString());
-      
-      var file_name = casted.addressOfField('name').contents.readString();
-      console.info('file_name:', file_name);
   // based on https://github.com/Noitidart/ChromeWorker
-  /*
   var pollWorker = new ChromeWorker(core.path.chrome + 'modules/workers/nixPoll.js');
 	function handleMessageFromWorker(msg) {
 		console.log('incoming message from worker, msg:', msg);
@@ -224,7 +210,6 @@ Notify.prototype.addWatch = function(){
 	console.log('ok added pollWorker');
 	pollWorker.postMessage(this.fd);
 	console.log('ok send msg to pollWorker');
-	*/
   /*
   var self = this;
   (function listener(){ // not sure whether we have to call it each time after changes
