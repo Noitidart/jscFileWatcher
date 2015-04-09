@@ -29,15 +29,27 @@ nixTypes.prototype = {
   CALLBACK_ABI: ctypes.default_abi,
   ABI: ctypes.default_abi,
   
-  // SIMPLE STRUCTS
-  inotify_event: ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
-    { wd: ctypes.int },				       // Watch descriptor
-    { mask: ctypes.uint32_t },		 // Mask describing event
-    { cookie: ctypes.uint32_t },	 // Unique cookie associating related events (for rename(2))
-    { len: ctypes.uint32_t },		   // Size of name field
-    { name: ctypes.char.ptr }		// Optional null-terminated name
-  ])
+	// SIMPLE TYPES
+	char: ctypes.char,
+	int: ctypes.int,
+	size_t: ctypes.size_t,
+	ssize_t: ctypes.ssize_t,
+	uint32_t: ctypes.uint32_t,
+	'void*': ctypes.voidptr_t
 };
+
+var struct_const = { //these consts need to be defined here too, they will also be found in ostypes.CONST but i need here as structs use them
+	NAME_MAX: 255
+};
+  
+// SIMPLE STRUCTS
+nixTypes.prototype.inotify_event = ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
+	{ wd: nixTypes.prototype.int },				       // Watch descriptor
+	{ mask: nixTypes.prototype.uint32_t },		 // Mask describing event
+	{ cookie: nixTypes.prototype.uint32_t },	 // Unique cookie associating related events (for rename(2))
+	{ len: nixTypes.prototype.uint32_t },		   // Size of name field
+	{ name: ctypes.ArrayType(nixTypes.prototype.char, struct_const.NAME_MAX + 1) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
+])
 
 
 var nixInit = function() {
@@ -109,10 +121,10 @@ var nixInit = function() {
 			 * );
 			 */
 			 return lib('libc').declare('inotify_add_watch', self.TYPE.ABI,
-				ctypes.int,			// return
-				ctypes.int,			// fd
-				ctypes.char.ptr,	// *pathname
-				ctypes.uint32_t		// mask
+				self.TYPE.int,			// return
+				self.TYPE.int,			// fd
+				self.TYPE.char.ptr,	// *pathname
+				self.TYPE.uint32_t		// mask
 			);
 		},
 		inotify_init() {
@@ -123,8 +135,8 @@ var nixInit = function() {
 			 * );
 			 */
 			return lib('libc').declare('inotify_init1', self.TYPE.ABI,
-				ctypes.int,		// return
-				ctypes.int		// flags
+				self.TYPE.int,		// return
+				self.TYPE.int		// flags
 			);
 		},
 		inotify_rm_watch() {
@@ -135,9 +147,9 @@ var nixInit = function() {
 			 * );
 			 */
 			return lib('libc').declare('inotify_rm_watch', self.TYPE.ABI,
-				ctypes.int,		// return
-				ctypes.int,		// fd
-				ctypes.int		// wd
+				self.TYPE.int,		// return
+				self.TYPE.int,		// fd
+				self.TYPE.int		// wd
 			);
 		},
 		read() {
@@ -149,10 +161,10 @@ var nixInit = function() {
 			*  );
 			*/
 			return lib('libc').declare('read', self.TYPE.ABI, 
-				ctypes.ssize_t,		// return
-				ctypes.int,			// fd
-				ctypes.void_t.ptr, 	// *buf
-				ctypes.size_t		// count
+				self.TYPE.ssize_t,		// return
+				self.TYPE.int,			// fd
+				self.TYPE['void*'], 	// *buf
+				self.TYPE.size_t		// count
 			);
 		}
 	};
@@ -201,6 +213,8 @@ nixInit.prototype = {
     IN_ONESHOT             : 0x80000000, // Only send event once.
 
     // end - INOTIFY
+	
+	NAME_MAX: 255 // also in TYPEs as i needed it in a struct
   },
   HELPER: {
     // here
