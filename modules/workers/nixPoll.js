@@ -42,10 +42,11 @@ function pollThis(fd, restartAfterChange) {
 		  var file_name_length = casted.len;
 		  console.info('file_name_length:', file_name_length);
 		  for (var i=file_name_length; i>0; i--) {
+			  let i_hoisted = i;
 			  try {
-				  var file_name = ctypes.cast(casted.addressOfField('name'), ctypes.ArrayType(ostypes.TYPE.char, i).ptr);
+				  var file_name = ctypes.cast(casted.addressOfField('name'), ctypes.ArrayType(ostypes.TYPE.char, i_hoisted).ptr);
 			  } catch (ex) {
-				  console.error('ex caught when casting to length of', i, 'ex is:', ex.message.toString());
+				  console.error('ex caught when casting to length of', i_hoisted, 'ex is:', ex.message.toString());
 			  }
 		  }
 		  
