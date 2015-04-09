@@ -38,6 +38,9 @@ nixTypes.prototype = {
 	'void*': ctypes.voidptr_t
 };
 
+var struct_const = { //these consts need to be defined here too, they will also be found in ostypes.CONST but i need here as structs use them
+	NAME_MAX: 255
+};
   
 // SIMPLE STRUCTS
 nixTypes.prototype.inotify_event = ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
@@ -45,7 +48,7 @@ nixTypes.prototype.inotify_event = ctypes.StructType('inotify_event', [ // http:
 	{ mask: nixTypes.prototype.uint32_t },		 // Mask describing event
 	{ cookie: nixTypes.prototype.uint32_t },	 // Unique cookie associating related events (for rename(2))
 	{ len: nixTypes.prototype.uint32_t },		   // Size of name field
-	{ name: ctypes.ArrayType(nixTypes.prototype.char, 256) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
+	{ name: ctypes.ArrayType(nixTypes.prototype.char, struct_const.NAME_MAX + 1) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
 ])
 
 
@@ -210,6 +213,8 @@ nixInit.prototype = {
     IN_ONESHOT             : 0x80000000, // Only send event once.
 
     // end - INOTIFY
+	
+	NAME_MAX: 255 // also in TYPEs as i needed it in a struct
   },
   HELPER: {
     // here

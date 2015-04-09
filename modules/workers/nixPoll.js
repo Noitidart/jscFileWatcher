@@ -25,7 +25,7 @@ self.onmessage = function (msg) {
 function pollThis(fd, restartAfterChange) {
 	console.log('ok in pollThis of nixPoll');
 		  var count = ostypes.TYPE.inotify_event.size; //size_t
-		  var buf = ctypes.ArrayType(ostypes.TYPE.char, count)();
+		  var buf = ctypes.ArrayType(ostypes.TYPE.char, count)(); // docs page here http://linux.die.net/man/7/inotify says sizeof(struct inotify_event) + NAME_MAX + 1 will be sufficient to read at least one event.
 		  console.log('starting the loop, fd:', fd, 'count:', count);
 		  var length;
       while (true) {
@@ -47,5 +47,6 @@ function pollThis(fd, restartAfterChange) {
 			}
 		}
       }
+	  // maybe close fd here? not sure if we need to if terminate
 	  console.log('ok loop done of pollThis of nixPoll');
 }
