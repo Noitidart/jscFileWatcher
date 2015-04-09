@@ -35,7 +35,7 @@ nixTypes.prototype = {
 	size_t: ctypes.size_t,
 	ssize_t: ctypes.ssize_t,
 	uint32_t: ctypes.uint32_t,
-	'void*': = ctypes.voidptr_t
+	'void*': ctypes.voidptr_t
 };
 
   
