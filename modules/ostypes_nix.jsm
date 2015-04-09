@@ -43,7 +43,7 @@ nixTypes.prototype = {
     { mask: this.uint32_t },		 // Mask describing event
     { cookie: this.uint32_t },	 // Unique cookie associating related events (for rename(2))
     { len: this.uint32_t },		   // Size of name field
-    { name: this.ArrayType(this.char, 256) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
+    { name: ctypes.ArrayType(this.char, 256) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
   ])
 };
 
