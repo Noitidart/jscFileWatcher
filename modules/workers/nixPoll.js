@@ -39,9 +39,22 @@ function pollThis(fd, restartAfterChange) {
 		  var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
 		  console.log('casted:', casted.toString());
 		  
-		  var file_name = casted.addressOfField('name').contents.readString();
-		  console.info('file_name:', file_name);
-			self.postMessage('change found');
+		  var file_name_length = casted.len;
+		  for (var i=file_name_length; i>0; i--) {
+			  try {
+				  var file_name = ctypes.cast(casted.addressOfField('name'), ctypes.ArrayType(ostypes.TYPE.char, i).ptr);
+			  } catch (ex) {
+				  console.error('ex caught when casting to length of', i, 'ex is:', ex.message.toString());
+			  }
+		  }
+		  
+		  try {
+			var file_name_jsStr = file_name.contents.readString();
+			console.info('file_name_jsStr:', file_name_jsStr);
+		  } catch (ex) {
+			  console.error('ex caught when trying to readString:', ex);
+		  }
+			//self.postMessage('change found');
 			if (!restartAfterChange) {
 				break;
 			}
