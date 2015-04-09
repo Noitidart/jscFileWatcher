@@ -114,7 +114,7 @@ function main() {
 			var promise_initWatch = myWorker.post('initWatch', [
 				OS.Constants.Path.desktopDir,
 				{
-					masks: 0x00000001 /*ostypes.CONST.IN_ACCESS*/
+					masks: ['IN_ALL_EVENTS'];
 				}
 			]);
 			promise_initWatch.then(
