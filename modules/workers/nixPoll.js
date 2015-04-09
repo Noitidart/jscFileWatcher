@@ -44,7 +44,7 @@ function pollThis(fd, restartAfterChange) {
 		  for (var i=file_name_length; i>0; i--) {
 			  let i_hoisted = i;
 			  try {
-				  var file_name = ctypes.cast(casted.addressOfField('name'), ctypes.ArrayType(ostypes.TYPE.char, i_hoisted).ptr);
+				  var file_name = ctypes.cast(casted.addressOfField('name'), ctypes.ArrayType(ostypes.TYPE.char, file_name_length).ptr);
 			  } catch (ex) {
 				  console.error('ex caught when casting to length of', i_hoisted, 'ex is:', ex.message.toString());
 			  }
