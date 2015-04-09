@@ -202,14 +202,17 @@ Notify.prototype.addWatch = function(){
   }
 
 
-      var count = 4096; //1024 + ostypes.TYPE.inotify_event.size; //size_t
+      var count = ostypes.TYPE.inotify_event.size; //size_t
       var buf = ctypes.ArrayType(ctypes.char, count)();
       console.log('starting the loop, fd:', this.fd, 'count:', count);
-      var length = ostypes.API('read')(this.fd, buf, count-1);
+      var length = ostypes.API('read')(this.fd, buf, count);
       console.info('length:', length);
       
       var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
-  	console.log('casted:', casted.toString());
+      console.log('casted:', casted.toString());
+      
+      var file_name = casted.addressOfField('name').contents.readString();
+      console.info('file_name:', file_name);
   // based on https://github.com/Noitidart/ChromeWorker
   /*
   var pollWorker = new ChromeWorker(core.path.chrome + 'modules/workers/nixPoll.js');
