@@ -201,14 +201,11 @@ Notify.prototype.addWatch = function(){
     console.log('succesfully added watch, file descripted = ', this.watch);
   }
 
-      console.log('ok just trying to get read working');
-      var libc = ctypes.open('libc.so.6');
-      var read = libc.declare('read', ostypes.TYPE.ABI, ctypes.int, ctypes.int, ctypes.char.ptr, ctypes.int)
-  
+
       var count = 4096; //1024 + ostypes.TYPE.inotify_event.size; //size_t
       var buf = ctypes.ArrayType(ctypes.char, count)();
       console.log('starting the loop, fd:', this.fd, 'count:', count);
-      var length = read(this.fd, buf, count-1);
+      var length = ostypes.API('read')(this.fd, buf, count-1);
       console.info('length:', length);
       
       var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
