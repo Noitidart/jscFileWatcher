@@ -40,7 +40,7 @@ function pollThis(fd, restartAfterChange) {
 		console.log('casted:', casted.toString());
 		let file_name = casted.addressOfField('name').contents.readString();
 		console.info('file_name:', file_name);
-        i += count + (+casted.addressOfField('name').contents.readString());
+        i += count + (+casted.addressOfField('len').contents.readString());
 		self.postMessage('change found');
 		if (!restartAfterChange) {
 		  break;
