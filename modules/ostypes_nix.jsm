@@ -160,6 +160,9 @@ var nixInit = function() {
 	// end - function declares
 };
 nixInit.prototype = {
+
+  var THIS = this;
+  
   IS64BIT: is64bit,
   
   TYPE: new nixTypes(),
@@ -201,11 +204,10 @@ nixInit.prototype = {
     
     // ADV CONSTANTS
     // Helper events.
-    get IN_CLOSE() this.CONST.IN_CLOSE_WRITE | this.CONST.IN_CLOSE_NOWRITE,
-    get IN_MOVE() this.CONST.IN_MOVED_FROM | this.CONST.IN_MOVED_TO,
+    get IN_CLOSE() THIS.CONST.IN_CLOSE_WRITE | THIS.CONST.IN_CLOSE_NOWRITE,
+    get IN_MOVE() THIS.CONST.IN_MOVED_FROM | THIS.CONST.IN_MOVED_TO,
     
     // All events which a program can wait on.
-    get IN_ALL_EVENTS() (this.CONST.IN_ACCESS | this.CONST.IN_MODIFY | this.CONST.IN_ATTRIB | this.CONST.IN_CLOSE_WRITE | this.CONST.IN_CLOSE_NOWRITE | this.CONST.IN_OPEN | this.CONST.IN_MOVED_FROM | this.CONST.IN_MOVED_TO | this.CONST.IN_CREATE | this.CONST.IN_DELETE | this.CONST.IN_DELETE_SELF | this.CONST.IN_MOVE_SELF)
     // end - INOTIFY
   },
   HELPER: {
