@@ -148,7 +148,6 @@ function initWatch(path, /*callback,*/ options = {}) {
 				throw new Error('Missing required `masks` key in options objection');
 			}
 			//masks must be an array of strings
-			options.masks = ostypes.CONST.IN_ALL_EVENTS;
 			if (Object.prototype.toString.call(options.masks) !== '[object Array]') {
 				throw new Error('options.masks must be array of strings');
 			}
@@ -156,10 +155,10 @@ function initWatch(path, /*callback,*/ options = {}) {
 			for (var i=0; i<options.masks.length; i++) {
 				if (typeof options.masks[i] !== 'string') {
 					throw new Error('element at position ' + i + ' in options.masks is not a string');
-				} else if (options.masks[i] in ostypes.CONST) {
+				} else if (!(options.masks[i] in ostypes.CONST)) {
 					throw new Error('"' + options.masks[i] + '" was found at position ' + i + ' in options.masks. It was not found in ostypes.CONST obj, it is likely an invalid constant');
 				}
-				masks |= ostypes.CONST[options.masks[options.masks[i]]];
+				masks |= ostypes.CONST[options.masks[i]];
 			}
 			var rez_notify = new Notify(path, masks/*, callback*/);
 			rez_notify.addWatch();
