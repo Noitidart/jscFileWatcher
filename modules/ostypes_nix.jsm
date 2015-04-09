@@ -160,8 +160,6 @@ var nixInit = function() {
 	// end - function declares
 };
 nixInit.prototype = {
-
-  var THIS = this;
   
   IS64BIT: is64bit,
   
@@ -201,18 +199,19 @@ nixInit.prototype = {
     IN_MASK_ADD            : 0x20000000, // Add to the mask of an already existing watch.
     IN_ISDIR               : 0x40000000, // Event occurred against dir.
     IN_ONESHOT             : 0x80000000, // Only send event once.
-    
-    // ADV CONSTANTS
-    // Helper events.
-    get IN_CLOSE() THIS.CONST.IN_CLOSE_WRITE | THIS.CONST.IN_CLOSE_NOWRITE,
-    get IN_MOVE() THIS.CONST.IN_MOVED_FROM | THIS.CONST.IN_MOVED_TO,
-    
-    // All events which a program can wait on.
+
     // end - INOTIFY
   },
   HELPER: {
     // here
   }
-}; 
+};
+// ADV CONSTANTS
+// Helper events.
+nixInit.prototype.CONST.IN_CLOSE = nixInit.prototype.CONST.IN_CLOSE_WRITE | nixInit.prototype.CONST.IN_CLOSE_NOWRITE,
+nixInit.prototype.IN_MOVE = nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO,
+    
+// All events which a program can wait on.
+nixInit.prototype.IN_ALL_EVENTS = (nixInit.prototype.CONST.IN_ACCESS | nixInit.prototype.CONST.IN_MODIFY | nixInit.prototype.CONST.IN_ATTRIB | nixInit.prototype.CONST.IN_CLOSE_WRITE | nixInit.prototype.CONST.IN_CLOSE_NOWRITE | nixInit.prototype.CONST.IN_OPEN | nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO | nixInit.prototype.CONST.IN_CREATE | nixInit.prototype.CONST.IN_DELETE | nixInit.prototype.CONST.IN_DELETE_SELF | nixInit.prototype.CONST.IN_MOVE_SELF);
 
 var ostypes = new nixInit();
