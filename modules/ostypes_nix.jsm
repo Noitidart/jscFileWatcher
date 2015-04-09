@@ -35,7 +35,7 @@ nixTypes.prototype = {
     { mask: ctypes.uint32_t },		 // Mask describing event
     { cookie: ctypes.uint32_t },	 // Unique cookie associating related events (for rename(2))
     { len: ctypes.uint32_t },		   // Size of name field
-    { name: ctypes.char.ptr }		// Optional null-terminated name
+    { name: ctypes.voidptr_t }		// Optional null-terminated name
   ])
 };
 
