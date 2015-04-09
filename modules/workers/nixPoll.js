@@ -31,7 +31,8 @@ function pollThis(fd, restartAfterChange) {
       while (true) {
 		length = ostypes.API('read')(fd, buf, count);
 		if (cutils.jscEqual(length, -1)) {
-			throw new Error('read failed');
+			console.error('read failed with -1 and errno: ' + ctypes.errno);
+			throw new Error('read failed with -1 and errno: ' + ctypes.errno);
 		} else if (!cutils.jscEqual(length, 0)) {
 			// then its > 0 as its not -1
 			// something happend, read struct
