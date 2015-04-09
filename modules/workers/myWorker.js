@@ -164,13 +164,26 @@ function initWatch(path, /*callback,*/ options = {}) {
 			rez_notify.addWatch();
 			return true;
 			break;
+		case 'darwin':
+			var rez_Kqueue = new Kqueue(path);
+			return true;
+			break;
 		default:
 			throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
 	}
 	
 	
 }
-
+// start - mac file watching
+function Kqueue(path) {
+	var rez_fd = ostypes.API('kqueue')();
+	console.info('rez_fd:', rez_fd.toString(), uneval(rez_fd));
+	if (ctypes.errno != 0) { console.error('Failed rez_fd, errno:', ctypes.errno); throw new Error('Failed rez_fd, errno: ' +  ctypes.errno); }
+	
+	this.fd = rez_fd;
+	this.path = path;
+}
+// end - mac file watching
 // start - nix file watching
 function inotifyCallbackTemp() {
 	console.error('inotifyCallbackTemp triggered!!! this is good!');
