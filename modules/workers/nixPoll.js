@@ -29,7 +29,7 @@ function pollThis(fd, restartAfterChange) {
 		  console.log('starting the loop, fd:', fd, 'count:', count);
 		  var length;
       while (true) {
-		length = ostypes.API('read')(this.fd, buf, count);
+		length = ostypes.API('read')(fd, buf, count);
 		if (cutils.jscEqual(length, -1)) {
 			throw new Error('read failed');
 		} else if (!cutils.jscEqual(length, 0)) {
