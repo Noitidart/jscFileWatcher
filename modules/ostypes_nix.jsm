@@ -209,9 +209,9 @@ nixInit.prototype = {
 // ADV CONSTANTS
 // Helper events.
 nixInit.prototype.CONST.IN_CLOSE = nixInit.prototype.CONST.IN_CLOSE_WRITE | nixInit.prototype.CONST.IN_CLOSE_NOWRITE,
-nixInit.prototype.IN_MOVE = nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO,
+nixInit.prototype.CONST.IN_MOVE = nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO,
     
 // All events which a program can wait on.
-nixInit.prototype.IN_ALL_EVENTS = (nixInit.prototype.CONST.IN_ACCESS | nixInit.prototype.CONST.IN_MODIFY | nixInit.prototype.CONST.IN_ATTRIB | nixInit.prototype.CONST.IN_CLOSE_WRITE | nixInit.prototype.CONST.IN_CLOSE_NOWRITE | nixInit.prototype.CONST.IN_OPEN | nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO | nixInit.prototype.CONST.IN_CREATE | nixInit.prototype.CONST.IN_DELETE | nixInit.prototype.CONST.IN_DELETE_SELF | nixInit.prototype.CONST.IN_MOVE_SELF);
+nixInit.prototype.CONST.IN_ALL_EVENTS = (nixInit.prototype.CONST.IN_ACCESS | nixInit.prototype.CONST.IN_MODIFY | nixInit.prototype.CONST.IN_ATTRIB | nixInit.prototype.CONST.IN_CLOSE_WRITE | nixInit.prototype.CONST.IN_CLOSE_NOWRITE | nixInit.prototype.CONST.IN_OPEN | nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO | nixInit.prototype.CONST.IN_CREATE | nixInit.prototype.CONST.IN_DELETE | nixInit.prototype.CONST.IN_DELETE_SELF | nixInit.prototype.CONST.IN_MOVE_SELF);
 
 var ostypes = new nixInit();
