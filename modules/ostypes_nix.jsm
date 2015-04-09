@@ -23,7 +23,15 @@ if (ctypes.voidptr_t.size === 4 /* 32-bit */) {
 
 var ifdef_UNICODE = true;
 
-var nixTypes = function() {};
+var nixTypes = function() {
+	// SIMPLE TYPES
+	this.char = ctypes.char;
+	this.int = ctypes.int;
+	this.size_t = ctypes.size_t;
+	this.ssize_t = ctypes.ssize_t;
+	this.uint32_t = ctypes.uint32_t;
+	this['void*'] = ctypes.voidptr_t;
+};
 nixTypes.prototype = {
   // ABIs
   CALLBACK_ABI: ctypes.default_abi,
@@ -31,11 +39,11 @@ nixTypes.prototype = {
   
   // SIMPLE STRUCTS
   inotify_event: ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
-    { wd: ctypes.int },				       // Watch descriptor
-    { mask: ctypes.uint32_t },		 // Mask describing event
-    { cookie: ctypes.uint32_t },	 // Unique cookie associating related events (for rename(2))
-    { len: ctypes.uint32_t },		   // Size of name field
-    { name: ctypes.ArrayType(ctypes.char, 256) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
+    { wd: this.int },				       // Watch descriptor
+    { mask: this.uint32_t },		 // Mask describing event
+    { cookie: this.uint32_t },	 // Unique cookie associating related events (for rename(2))
+    { len: this.uint32_t },		   // Size of name field
+    { name: this.ArrayType(this.char, 256) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
   ])
 };
 
@@ -109,10 +117,10 @@ var nixInit = function() {
 			 * );
 			 */
 			 return lib('libc').declare('inotify_add_watch', self.TYPE.ABI,
-				ctypes.int,			// return
-				ctypes.int,			// fd
-				ctypes.char.ptr,	// *pathname
-				ctypes.uint32_t		// mask
+				self.TYPE.int,			// return
+				self.TYPE.int,			// fd
+				self.TYPE.char.ptr,	// *pathname
+				self.TYPE.uint32_t		// mask
 			);
 		},
 		inotify_init() {
@@ -123,8 +131,8 @@ var nixInit = function() {
 			 * );
 			 */
 			return lib('libc').declare('inotify_init1', self.TYPE.ABI,
-				ctypes.int,		// return
-				ctypes.int		// flags
+				self.TYPE.int,		// return
+				self.TYPE.int		// flags
 			);
 		},
 		inotify_rm_watch() {
@@ -135,9 +143,9 @@ var nixInit = function() {
 			 * );
 			 */
 			return lib('libc').declare('inotify_rm_watch', self.TYPE.ABI,
-				ctypes.int,		// return
-				ctypes.int,		// fd
-				ctypes.int		// wd
+				self.TYPE.int,		// return
+				self.TYPE.int,		// fd
+				self.TYPE.int		// wd
 			);
 		},
 		read() {
@@ -149,10 +157,10 @@ var nixInit = function() {
 			*  );
 			*/
 			return lib('libc').declare('read', self.TYPE.ABI, 
-				ctypes.ssize_t,		// return
-				ctypes.int,			// fd
-				ctypes.void_t.ptr, 	// *buf
-				ctypes.size_t		// count
+				self.TYPE.ssize_t,		// return
+				self.TYPE.int,			// fd
+				self.TYPE['void*'], 	// *buf
+				self.TYPE.size_t		// count
 			);
 		}
 	};

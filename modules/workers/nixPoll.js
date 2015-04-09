@@ -25,7 +25,7 @@ self.onmessage = function (msg) {
 function pollThis(fd, restartAfterChange) {
 	console.log('ok in pollThis of nixPoll');
 		  var count = ostypes.TYPE.inotify_event.size; //size_t
-		  var buf = ctypes.ArrayType(ctypes.char, count)();
+		  var buf = ctypes.ArrayType(ostypes.TYPE.char, count)();
 		  console.log('starting the loop, fd:', fd, 'count:', count);
 		  var length;
       while (true) {
