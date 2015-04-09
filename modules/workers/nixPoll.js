@@ -26,10 +26,10 @@ function pollThis(fd, restartAfterChange) {
 	console.log('ok in pollThis of nixPoll');
 		  var count = ostypes.TYPE.inotify_event.size; //size_t
 		  var buf = ctypes.ArrayType(ctypes.char, count)();
-		  console.log('starting the loop, fd:', this.fd, 'count:', count);
-		  var length = ostypes.API('read')(this.fd, buf, count);
-      console.log('starting the loop');
+		  console.log('starting the loop, fd:', fd, 'count:', count);
+		  var length;
       while (true) {
+		length = ostypes.API('read')(this.fd, buf, count);
 		if (cutils.jscEqual(length, -1)) {
 			throw new Error('read failed');
 		} else if (!cutils.jscEqual(length, 0)) {
