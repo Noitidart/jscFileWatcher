@@ -23,29 +23,30 @@ if (ctypes.voidptr_t.size === 4 /* 32-bit */) {
 
 var ifdef_UNICODE = true;
 
-var nixTypes = function() {
-	// SIMPLE TYPES
-	this.char = ctypes.char;
-	this.int = ctypes.int;
-	this.size_t = ctypes.size_t;
-	this.ssize_t = ctypes.ssize_t;
-	this.uint32_t = ctypes.uint32_t;
-	this['void*'] = ctypes.voidptr_t;
-};
+var nixTypes = function() {};
 nixTypes.prototype = {
   // ABIs
   CALLBACK_ABI: ctypes.default_abi,
   ABI: ctypes.default_abi,
   
-  // SIMPLE STRUCTS
-  inotify_event: ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
-    { wd: nixTypes.prototype.int },				       // Watch descriptor
-    { mask: nixTypes.prototype.uint32_t },		 // Mask describing event
-    { cookie: nixTypes.prototype.uint32_t },	 // Unique cookie associating related events (for rename(2))
-    { len: nixTypes.prototype.uint32_t },		   // Size of name field
-    { name: ctypes.ArrayType(nixTypes.prototype.char, 256) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
-  ])
+	// SIMPLE TYPES
+	char: ctypes.char,
+	int: ctypes.int,
+	size_t: ctypes.size_t,
+	ssize_t: ctypes.ssize_t,
+	uint32_t: ctypes.uint32_t,
+	'void*': = ctypes.voidptr_t
 };
+
+  
+// SIMPLE STRUCTS
+inotify_event: ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
+	{ wd: nixTypes.prototype.int },				       // Watch descriptor
+	{ mask: nixTypes.prototype.uint32_t },		 // Mask describing event
+	{ cookie: nixTypes.prototype.uint32_t },	 // Unique cookie associating related events (for rename(2))
+	{ len: nixTypes.prototype.uint32_t },		   // Size of name field
+	{ name: ctypes.ArrayType(nixTypes.prototype.char, 256) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
+])
 
 
 var nixInit = function() {
