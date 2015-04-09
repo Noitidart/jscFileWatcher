@@ -209,7 +209,10 @@ Notify.prototype.addWatch = function(){
       var buf = ctypes.ArrayType(ctypes.char, count)();
       console.log('starting the loop, fd:', this.fd, 'count:', count);
       var length = read(this.fd, buf, count-1);
-      console.info('length:');
+      console.info('length:', length);
+      
+      var casted = ctypes.cast(buf.addressOfElement(0), ostypes.TYPE.inotify_event.ptr).contents;
+  	console.log('casted:', casted.toString());
   // based on https://github.com/Noitidart/ChromeWorker
   /*
   var pollWorker = new ChromeWorker(core.path.chrome + 'modules/workers/nixPoll.js');
