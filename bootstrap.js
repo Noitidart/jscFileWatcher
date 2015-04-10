@@ -110,11 +110,12 @@ function main() {
 		case 'sunos':
 		case 'webos': // Palm Pre
 		case 'android':
+		case 'darwin':
 			//new ostypes.API.;
 			var promise_initWatch = myWorker.post('initWatch', [
 				OS.Constants.Path.desktopDir,
 				{
-					masks: ['IN_ALL_EVENTS']
+					masks: ['IN_ALL_EVENTS'] // has no effect on mac
 				}
 			]);
 			promise_initWatch.then(
