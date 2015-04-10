@@ -29,6 +29,7 @@ var macTypes = function() {
 	this.ABI = ctypes.default_abi;
 	
 	// C TYPES - also simple types but just not really specific to os - i even define these here, in case i want to change everything global. if i had done ctypes.uint32_t in places, i couldn't do a global change, but with ostypes.TYPE.uint32_t i can do global change
+	this.char = ctypes.char;
 	this.int16_t = ctypes.int16_t;
 	this.int64_t = ctypes.int64_t;
 	this.intptr_t = ctypes.intptr_t;
@@ -174,6 +175,19 @@ var macInit = function() {
 		EV_FLAG1: 0x2000,	// filter-specific flag
 		EV_EOF: 0x8000,		// EOF detected
 		EV_ERROR: 0x4000	// error, data contains errno
+		
+		NUM_EVENT_FDS: 1,
+		NUM_EVENT_SLOTS: 1,
+		
+		// https://github.com/jonnybest/taskcoach/blob/f930e55fa895315e9e9688994aa8dbc10b09b1e5/taskcoachlib/filesystem/fs_darwin.py#L35
+		NOTE_DELETE: 0x00000001,
+		NOTE_WRITE: 0x00000002,
+		NOTE_EXTEND: 0x00000004,
+		NOTE_ATTRIB: 0x00000008,
+		NOTE_LINK: 0x00000010,
+		NOTE_RENAME: 0x00000020,
+		NOTE_REVOKE: 0x00000040,
+		
 		// end - kqueue
 	};
 	
@@ -261,6 +275,17 @@ var macInit = function() {
 				self.CFIndex			// numChars
 			);
 		},
+		close: function() {
+			/* https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/close.2.html#//apple_ref/doc/man/2/close
+			 * int close (
+			 *   int fildes
+			 * ); 
+			 */
+			return lib('libc').declare('close', self.TYPE.ABI,
+				self.TYPE.int,	// return
+				self.TYPE.int	// fildes
+			);
+		},
 		kevent; function() {
 			/* https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 			 * int kevent (
@@ -290,6 +315,19 @@ var macInit = function() {
 			 */
 			return lib('libc').declare('kqueue', self.TYPE.ABI,
 				self.TYPE.int	// return
+			);
+		},
+		open: function() {
+			/* https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/open.2.html
+			 * int open (
+			 *   const char *path
+			 *   int oflag
+			 * ); 
+			 */
+			return lib('libc').declare('open', self.TYPE.ABI,
+				self.TYPE.int,		// return
+				self.TYPE.char.ptr,	// *path
+				self.TYPE.int		// oflag
 			);
 		},
 		StandardAlert: function() {
