@@ -54,6 +54,7 @@ var macTypes = function() {
 	this.OpaqueDialogPtr = ctypes.StructType("OpaqueDialogPtr");
 	this.SInt16 = ctypes.short;
 	this.SInt32 = ctypes.long;
+	this.UInt16 = ctypes.unsigned_short;
 	this.UInt32 = ctypes.unsigned_long;
 	this.UniChar = ctypes.jschar;
 	this.void = ctypes.void_t;
@@ -174,7 +175,7 @@ var macInit = function() {
 		EV_FLAG0: 0x1000,	// filter-specific flag
 		EV_FLAG1: 0x2000,	// filter-specific flag
 		EV_EOF: 0x8000,		// EOF detected
-		EV_ERROR: 0x4000	// error, data contains errno
+		EV_ERROR: 0x4000,	// error, data contains errno
 		
 		NUM_EVENT_FDS: 1,
 		NUM_EVENT_SLOTS: 1,
@@ -286,7 +287,7 @@ var macInit = function() {
 				self.TYPE.int	// fildes
 			);
 		},
-		kevent; function() {
+		kevent: function() {
 			/* https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 			 * int kevent (
 			 *   int kq,
