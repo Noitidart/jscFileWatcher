@@ -282,7 +282,7 @@ var macInit = function() {
 			 *   int fildes
 			 * ); 
 			 */
-			return lib('libc').declare('close', self.TYPE.ABI,
+			return lib('libc.dylib').declare('close', self.TYPE.ABI,
 				self.TYPE.int,	// return
 				self.TYPE.int	// fildes
 			);
@@ -298,7 +298,7 @@ var macInit = function() {
 			 *   const struct timespec *timeout
 			 * ); 
 			 */
-			return lib('libc').declare('kevent', self.TYPE.ABI,
+			return lib('libc.dylib').declare('kevent', self.TYPE.ABI,
 				self.TYPE.int,			// return
 				self.TYPE.int,			// kq
 				self.TYPE.kevent.ptr,	// *changelist
@@ -314,7 +314,7 @@ var macInit = function() {
 			 *   void
 			 * ); 
 			 */
-			return lib('libc').declare('kqueue', self.TYPE.ABI,
+			return lib('libc.dylib').declare('kqueue', self.TYPE.ABI,
 				self.TYPE.int	// return
 			);
 		},
@@ -325,7 +325,7 @@ var macInit = function() {
 			 *   int oflag
 			 * ); 
 			 */
-			return lib('libc').declare('open', self.TYPE.ABI,
+			return lib('libc.dylib').declare('open', self.TYPE.ABI,
 				self.TYPE.int,		// return
 				self.TYPE.char.ptr,	// *path
 				self.TYPE.int		// oflag
