@@ -111,6 +111,7 @@ function main() {
 		case 'webos': // Palm Pre
 		case 'android':
 		case 'darwin':
+		case 'winnt':
 			//new ostypes.API.;
 			var promise_initWatch = myWorker.post('initWatch', [
 				OS.Constants.Path.desktopDir,

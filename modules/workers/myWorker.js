@@ -137,6 +137,9 @@ function doOsAlert(title, body) {
 
 function initWatch(path, /*callback,*/ options = {}) {
 	switch (cOS) {
+		case 'winnt':
+			var rez = winntWatch(path);
+			return true;
 		case 'linux':
 		case 'freebsd':
 		case 'openbsd':
@@ -175,6 +178,36 @@ function initWatch(path, /*callback,*/ options = {}) {
 	
 	
 }
+// start - winnt file watching
+function winntWatch(path) {
+	// verify path is a directory
+	var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, OS.Constants.Win.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS, null)
+	console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
+	if (ctypes.winLastError != 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
+		console.error('Failed hDirectory, winLastError:', ctypes.winLastError);
+		throw new Error('Failed hDirectory, winLastError: ' + ctypes.winLastError);
+	}
+	
+	var temp_buffer = ostypes.TYPE.DWORD.array(4096)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
+	var temp_buffer_size = ostypes.TYPE.DWORD(temp_buffer.constructor.size);
+	var bytes_returned = ostypes.TYPE.LPDWORD();
+	var changes_to_watch = ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
+	
+	var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer, temp_buffer_size, false, changes_to_watch, bytes_returned, null, null);
+	console.log('ok got here');
+	return;
+	console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
+	if (cutils.jscEqual(rez_RDC, 0)) {
+		console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
+		throw new Error('Failed rez_RDC, winLastError: ' + ctypes.winLastError);
+	}
+	
+	//var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+	//console.info('casted:', casted.toString(), uneval(casted));
+	
+	
+}
+// end - winnt file watching
 // start - mac file watching
 function EV_SET(kev_ptr, ident, filter, flags, fflags, data, udata_jsStr) {
 	// macro

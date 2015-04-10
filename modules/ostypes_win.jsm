@@ -114,11 +114,23 @@ var winTypes = function() {
 	// STRUCTURES
 	
 	// SIMPLE STRUCTS // based on any of the types above
+	this.FILE_NOTIFY_INFORMATION = ctypes.StructType('FILE_NOTIFY_INFORMATION', [
+		{ NextEntryOffset: this.DWORD },
+		{ Action: this.DWORD },
+		{ FileNameLength: this.DWORD },
+		{ FileName: ctypes.ArrayType(this.WCHAR, 1) }, // not null terminated
+	]);
 	this.GUID = ctypes.StructType('GUID', [
 	  { 'Data1': this.ULONG },
 	  { 'Data2': this.USHORT },
 	  { 'Data3': this.USHORT },
 	  { 'Data4': this.BYTE.array(8) }
+	]);
+	this.OVERLAPPED = ctypes.StructType('_OVERLAPPED', [ // https://msdn.microsoft.com/en-us/library/windows/desktop/ms684342%28v=vs.85%29.aspx
+		{ Internal: this.ULONG_PTR },
+		{ InternalHigh: this.ULONG_PTR },
+		{ Pointer: this.PVOID }, //  union { struct { DWORD Offset; DWORD OffsetHigh; }; PVOID Pointer; };
+		{ hEvent: this.HANDLE },
 	]);
 	this.PROPVARIANT = ctypes.StructType('PROPVARIANT', [ // http://msdn.microsoft.com/en-us/library/windows/desktop/bb773381%28v=vs.85%29.aspx
 		{ 'vt': this.VARTYPE }, // constants for this are available at MSDN: http://msdn.microsoft.com/en-us/library/windows/desktop/aa380072%28v=vs.85%29.aspx
@@ -137,7 +149,14 @@ var winTypes = function() {
 	this.CLSID = this.GUID;
 	this.PGUID = this.GUID.ptr;
 	this.IID = this.GUID;
+	this.LPOVERLAPPED = this.OVERLAPPED.ptr;
 	this.LPSECURITY_ATTRIBUTES = this.SECURITY_ATTRIBUTES.ptr;
+	
+	// FUNCTION TYPES
+	this.FileIOCompletionRoutine = ctypes.FunctionType(this.CALLBACK_ABI, this.VOID, [this.DWORD, this.DWORD, this.LPOVERLAPPED]);
+	
+	// STRUCTS USING FUNC TYPES
+	this.LPOVERLAPPED_COMPLETION_ROUTINE = this.FileIOCompletionRoutine.ptr;
 }
 
 var winInit = function() {
@@ -149,6 +168,25 @@ var winInit = function() {
 
 	// CONSTANTS
 	this.CONST = {
+		FILE_ACTION_ADDED: 0x00000001,
+		FILE_ACTION_REMOVED: 0x00000002,
+		FILE_ACTION_MODIFIED: 0x00000003,
+		FILE_ACTION_RENAMED_OLD_NAME: 0x00000004,
+		FILE_ACTION_RENAMED_NEW_NAME: 0x00000005,
+		FILE_FLAG_BACKUP_SEMANTICS: 33554432,
+		FILE_LIST_DIRECTORY: 0x0001,
+		FILE_NOTIFY_CHANGE_FILE_NAME: 0x00000001,
+		FILE_NOTIFY_CHANGE_DIR_NAME: 0x00000002,
+		FILE_NOTIFY_CHANGE_ATTRIBUTES: 0x00000004,
+		FILE_NOTIFY_CHANGE_SIZE: 0x00000008,
+		FILE_NOTIFY_CHANGE_LAST_WRITE: 0x00000010,
+		FILE_NOTIFY_CHANGE_LAST_ACCESS: 0x00000020,
+		FILE_NOTIFY_CHANGE_CREATION: 0x00000040,
+		FILE_NOTIFY_CHANGE_SECURITY: 0x00000100,
+		FILE_SHARE_DELETE: 4,
+		FILE_SHARE_READ: 1,
+		FILE_SHARE_WRITE: 2,
+		INVALID_HANDLE_VALUE: -1,
 		MB_OK: 0
 	};
 	
@@ -185,6 +223,29 @@ var winInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
+		CreateFile: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858%28v=vs.85%29.aspx
+			 * HANDLE WINAPI CreateFile(
+			 *   __in_      LPCTSTR lpFileName,
+			 *   __in_      DWORD dwDesiredAccess,
+			 *   __in_      DWORD dwShareMode,
+			 *   __in_opt_  LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+			 *   __in_      DWORD dwCreationDisposition,
+			 *   __in_      DWORD dwFlagsAndAttributes,
+			 *   __in_opt_  HANDLE hTemplateFile
+			 * );
+			 */
+			return lib('kernel32').declare('CreateFileW', self.TYPE.WINABI,
+				self.TYPE.HANDLE,					// return
+				self.TYPE.LPCTSTR,					// lpFileName
+				self.TYPE.DWORD,					// dwDesiredAccess
+				self.TYPE.DWORD,					// dwShareMode
+				self.TYPE.LPSECURITY_ATTRIBUTES,	// lpSecurityAttributes
+				self.TYPE.DWORD,					// dwCreationDisposition
+				self.TYPE.DWORD,					// dwFlagsAndAttributes
+				self.TYPE.HANDLE					// hTemplateFile
+			);
+		},
 		MessageBox: function() {
 			/*
 				int WINAPI MessageBox(
@@ -200,6 +261,31 @@ var winInit = function() {
 				self.TYPE.LPCTSTR,		// lpText
 				self.TYPE.LPCTSTR,		// lpCaption
 				self.TYPE.UINT			// uType
+			);
+		},
+		ReadDirectoryChanges: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/aa365465%28v=vs.85%29.aspx
+			 * BOOL WINAPI ReadDirectoryChangesW(
+			 *   __in_         HANDLE hDirectory,
+			 *   __out_        LPVOID lpBuffer,
+			 *   __in_         DWORD nBufferLength,
+			 *   __in_         BOOL bWatchSubtree,
+			 *   __in_         DWORD dwNotifyFilter,
+			 *   __out_opt_    LPDWORD lpBytesReturned,
+			 *   __inout_opt_  LPOVERLAPPED lpOverlapped,
+			 *   __in_opt_     LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+			 * );
+			 */
+			return lib('kernel32').declare('ReadDirectoryChangesW', self.TYPE.WINABI,
+				self.TYPE.BOOL,								// return
+				self.TYPE.HANDLE,							// hDirectory,
+				self.TYPE.LPVOID,							// lpBuffer,
+				self.TYPE.DWORD,							// nBufferLength,
+				self.TYPE.BOOL,								// bWatchSubtree,
+				self.TYPE.DWORD,							// dwNotifyFilter,
+				self.TYPE.LPDWORD,							// lpBytesReturned,
+				self.TYPE.LPOVERLAPPED,						// lpOverlapped,
+				self.TYPE.LPOVERLAPPED_COMPLETION_ROUTINE	// lpCompletionRoutine
 			);
 		}
 	};
