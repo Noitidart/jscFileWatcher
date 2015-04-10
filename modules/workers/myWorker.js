@@ -176,15 +176,15 @@ function initWatch(path, /*callback,*/ options = {}) {
 	
 }
 // start - mac file watching
-function EV_SET(kev_ptr, ident, filter, flags, fflags, data, udata) {
+function EV_SET(kev_ptr, ident, filter, flags, fflags, data, udata_jsStr) {
 	// macro
 	// &kev, ident, filter, flags, fflags, data, udata
-    kev.contents.ident = ident;
-    kev.contents.filter = filter;
-    kev.contents.flags = flags;
-    kev.contents.fflags = fflags;
-    kev.contents.data = data;
-    kev.contents.udata = udata;
+    kev_ptr.contents.ident = ident;
+    kev_ptr.contents.filter = filter;
+    kev_ptr.contents.flags = flags;
+    kev_ptr.contents.fflags = fflags;
+    kev_ptr.contents.data = data;
+    kev_ptr.contents.udata = ostypes.TYPE.char.array()(udata_jsStr);
 }
 function Kqueue(path/*, callback*/) {
 	var rez_fd = ostypes.API('kqueue')();
@@ -206,19 +206,19 @@ Kqueue.prototype.addWatch = function() {
 	var user_data = this.path;
 	
 	// Set the timeout to wake us every half second.
-	timeout = ostypes.TYPE.timespec;
+	var timeout = ostypes.TYPE.timespec();
 	var useSec = 0;
 	var useNsec = 500000000;
 	timeout.tv_sec = useSec;	// 0 seconds
 	timeout.tv_nsec = useNsec;	// 500 milliseconds
 	
 	// Set up a list of events to monitor.
-    var vnode_events = ostyps.CONST.NOTE_DELETE | ostyps.CONST.NOTE_WRITE | ostyps.CONST.NOTE_EXTEND | ostyps.CONST.NOTE_ATTRIB | ostyps.CONST.NOTE_LINK | ostyps.CONST.NOTE_RENAME | ostyps.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
+    var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
 	var events_to_monitor = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_FDS)();
     EV_SET( events_to_monitor.addressOfElement(0), event_fd, ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, vnode_events, 0, user_data);
 
 	// Handle events
-	var event_data = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_SLOTS);
+	var event_data = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_SLOTS)();
 	
 	var num_files = 1; // ostypes.TYPE.int
 	var continue_loop = 40; // Monitor for twenty seconds. // ostypes.TYPE.int
@@ -229,7 +229,7 @@ Kqueue.prototype.addWatch = function() {
 			console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
 			throw new Error('Failed event_count, errno: ' + ctypes.errno + ' and event_count: ' + cutils.jscGetDeepest(event_count));
 		}
-		if (cutils.jscEqual(event_data.addressOfElement(0).addressOfField('flags').contents, ostypes.CONST.EV_ERROR)) {
+		if (cutils.jscEqual(event_data.addressOfElement(0).contents.flags, ostypes.CONST.EV_ERROR)) {
 			console.error('Failed event_count, due to event_data.flags == EV_ERROR, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
 			throw new Error('Failed event_count, due to event_data.flags == EV_ERROR, errno: ' + ctypes.errno + ' and event_count: ' + cutils.jscGetDeepest(event_count));
 		}
