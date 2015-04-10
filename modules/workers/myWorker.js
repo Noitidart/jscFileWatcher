@@ -198,7 +198,7 @@ function Kqueue(path/*, callback*/) {
 Kqueue.prototype.addWatch = function() {
 	
     // Open a file descriptor for the file/directory that you want to monitor.
-	event_fd = ostypes.API('open')(this.path, OS.Constants.libc.O_EVTONLY);
+	var event_fd = ostypes.API('open')(this.path, OS.Constants.libc.O_EVTONLY);
 	console.info('event_fd:', event_fd.toString(), uneval(event_fd));
 	if (ctypes.errno != 0) { console.error('Failed event_fd, errno:', ctypes.errno); throw new Error('Failed event_fd, errno: ' + ctypes.errno); }
 	

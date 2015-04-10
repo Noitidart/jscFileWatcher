@@ -30,6 +30,7 @@ var macTypes = function() {
 	
 	// C TYPES - also simple types but just not really specific to os - i even define these here, in case i want to change everything global. if i had done ctypes.uint32_t in places, i couldn't do a global change, but with ostypes.TYPE.uint32_t i can do global change
 	this.char = ctypes.char;
+	this.int = ctypes.int;
 	this.int16_t = ctypes.int16_t;
 	this.int64_t = ctypes.int64_t;
 	this.intptr_t = ctypes.intptr_t;
