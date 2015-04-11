@@ -274,7 +274,6 @@ Watcher.prototype.addPath = function(aOSPath) {
 		} else {
 			do_addPath();
 		}
-		do_addPath();
 	} else {
 		// watcher is closed
 		deferredMain_Watcher_addPath.reject({
@@ -285,7 +284,64 @@ Watcher.prototype.addPath = function(aOSPath) {
 	
 	return deferredMain_Watcher_addPath.promise;
 }
-Watcher.prototype.removePath = function() {}
+Watcher.prototype.removePath = function() {
+	// must return promise, as removal of path is done by call to myWorker.js to do a c call
+		// resolves to true if sucesfully removed
+	var deferredMain_Watcher_removePath = new Deferred();
+	
+	var aOSPathLower = aOSPath.toLowerCase();
+	
+	if (this.readyState === 0) {
+		// watcher not yet initalized
+		if (aOSPathLower in this.pathsPendingAdd) {
+			delete this.pathsPendingAdd[aOSPathLower];
+			deferredMain_Watcher_removePath.resolve(true);
+		} else {
+			deferredMain_Watcher_removePath.reject({
+				errName: 'path-not-found',
+				message: 'This path was never added, it was not found in watched paths arrays/objects.'
+			});
+		}
+	} else if (this.readyState == 1) {
+		// watcher is ready
+		if (this.paths_watched.indexOf(aOSPathLower) > -1) {
+			var promise_removePath = myWorker.post('removePathFromWatcher', [this.id, aOSPath]);
+			promise_removePath.then(
+			  function(aVal) {
+				console.log('Fullfilled - promise_removePath - ', aVal);
+				// start - do stuff here - promise_removePath
+				this.paths_watched.splice(this.paths_watched.indexOf(aOSPathLower), 1);
+				deferredMain_Watcher_removePath.resolve(true);
+				// end - do stuff here - promise_removePath
+			  },
+			  function(aReason) {
+				var rejObj = {name:'promise_removePath', aReason:aReason};
+				console.warn('Rejected - promise_removePath - ', rejObj);
+				deferredMain_Watcher_removePath.reject(rejObj);
+			  }
+			).catch(
+			  function(aCaught) {
+				var rejObj = {name:'promise_removePath', aCaught:aCaught};
+				console.error('Caught - promise_removePath - ', rejObj);
+				deferredMain_Watcher_removePath.reject(rejObj);
+			  }
+			);
+		} else {
+			deferredMain_Watcher_removePath.reject({
+				errName: 'path-not-found',
+				message: 'This path was never added, it was not found in watched paths arrays/objects.'
+			});
+		}
+	} else {
+		// watcher is closed
+		deferredMain_Watcher_removePath.reject({
+			errName: 'watcher-closed',
+			message: 'No need to remove paths as this Watcher was previously closed with reason ' + this.readState
+		});
+	}
+	
+	return deferredMain_Watcher_removePath.promise;
+}
 Watcher.prototype.close = function() {}
 // end - OS.File.Watcher API
 

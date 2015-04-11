@@ -486,4 +486,7 @@ function removePathFromWatcher(aWatcherID, aOSPath) {
 function initWatcher(aWatcherID) {
 	// _Watcher_cache[aWatcherID] = 
 }
+function closeWatcher(aWatcherID) {
+	// _Watcher_cache[aWatcherID] = 
+}
 // end - OS.File.Watcher API
