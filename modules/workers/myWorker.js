@@ -1,3 +1,4 @@
+/*jshint esnext: true, moz: true, node: true, -W117*/
 // Imports
 'use strict';
 importScripts('resource://gre/modules/osfile.jsm');
@@ -20,24 +21,26 @@ var cOS = OS.Constants.Sys.Name.toLowerCase();
 
 // Some more imports
 switch (cOS) {
-	case 'winnt':
-	case 'winmo':
-	case 'wince':
-		importScripts(core.path.chrome + 'modules/ostypes_win.jsm');
-		break;
-	case 'linux':
-	case 'freebsd':
-	case 'openbsd':
-	case 'sunos':
-	case 'webos': // Palm Pre
-	case 'android': //profilist doesnt support android (android doesnt have profiles)
-		importScripts(core.path.chrome + 'modules/ostypes_nix.jsm');
-		break;
-	case 'darwin':
-		importScripts(core.path.chrome + 'modules/ostypes_mac.jsm');
-		break;
-	default:
-		throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
+  case 'winnt':
+  case 'winmo':
+  case 'wince':
+    importScripts(core.path.chrome + 'modules/ostypes_win.jsm');
+    break;
+  case 'linux':
+  case 'sunos':
+  case 'webos': // Palm Pre
+  case 'android': //profilist doesnt support android (android doesnt have profiles)
+    importScripts(core.path.chrome + 'modules/ostypes_nix.jsm');
+    break;
+  case 'darwin':
+    importScripts(core.path.chrome + 'modules/ostypes_mac.jsm');
+    break;
+  case 'freebsd':
+  case 'openbsd':
+    importScripts(core.path.chrome + 'modules/ostypes_bsd.jsm');
+    break;
+  default:
+    throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
 }
 
 // PromiseWorker
@@ -61,19 +64,23 @@ function init(objOfInitVars) {
     case 'winnt':
       //case 'winmo':
       //case 'wince':
-      var requiredKeys = ['OSVersion'];
-      for (var i=0; i<requiredKeys.length; i++) {
-        if (!(requiredKeys[i] in objOfInitVars)) {
-          throw new Error('failed to init, required key of ' + requiredKeys[i] + ' not found in objInfo obj');
+      {
+        let requiredKeys = ['OSVersion'];
+        for (let i=0; i<requiredKeys.length; i++) {
+          if (!(requiredKeys[i] in objOfInitVars)) {
+            throw new Error('failed to init, required key of ' + requiredKeys[i] + ' not found in objInfo obj');
+          }
         }
       }
       break;
     default:
       // do nothing
-      var requiredKeys = ['FFVersion', 'FFVersionLessThan30'];
-      for (var i=0; i<requiredKeys.length; i++) {
-        if (!(requiredKeys[i] in objOfInitVars)) {
-          throw new Error('failed to init, required key of ' + requiredKeys[i] + ' not found in objInfo obj');
+      {
+        let requiredKeys = ['FFVersion', 'FFVersionLessThan30'];
+        for (let i=0; i<requiredKeys.length; i++) {
+          if (!(requiredKeys[i] in objOfInitVars)) {
+            throw new Error('failed to init, required key of ' + requiredKeys[i] + ' not found in objInfo obj');
+          }
         }
       }
   }
@@ -87,9 +94,10 @@ function doOsAlert(title, body) {
     case 'winnt':
     case 'winmo':
     case 'wince':
-      var rez = ostypes.API('MessageBox')(null, body, title, ostypes.CONST.MB_OK);
-      return cutils.jscGetDeepest(rez);
-      break;
+      {
+        let rez = ostypes.API('MessageBox')(null, body, title, ostypes.CONST.MB_OK);
+        return cutils.jscGetDeepest(rez);
+      }
       /*
 		case 'linux':
 		case 'freebsd':
@@ -107,7 +115,7 @@ function doOsAlert(title, body) {
           body: ostypes.HELPER.makeCFStr(body)
         };
 
-        var rez = ostypes.API('CFUserNotificationDisplayNotice')(0, ostypes.CONST.kCFUserNotificationCautionAlertLevel, null, null, null, myCFStrs.head, myCFStrs.body, null);
+        let rez = ostypes.API('CFUserNotificationDisplayNotice')(0, ostypes.CONST.kCFUserNotificationCautionAlertLevel, null, null, null, myCFStrs.head, myCFStrs.body, null);
         console.info('rez:', rez.toString(), uneval(rez)); // CFUserNotificationDisplayNotice does not block till user clicks dialog, it will return immediately
 
         if (cutils.jscEqual(rez, 0)) {
@@ -141,8 +149,6 @@ function initWatch(path, /*callback,*/ options = {}) {
 			var rez = winntWatch(path);
 			return true;
 		case 'linux':
-		case 'freebsd':
-		case 'openbsd':
 		case 'sunos':
 		case 'webos': // Palm Pre
 		case 'android':
@@ -155,7 +161,7 @@ function initWatch(path, /*callback,*/ options = {}) {
 				throw new Error('options.masks must be array of strings');
 			}
 			var masks = 0;
-			for (var i=0; i<options.masks.length; i++) {
+			for (let i=0; i<options.masks.length; i++) {
 				if (typeof options.masks[i] !== 'string') {
 					throw new Error('element at position ' + i + ' in options.masks is not a string');
 				} else if (!(options.masks[i] in ostypes.CONST)) {
@@ -163,15 +169,15 @@ function initWatch(path, /*callback,*/ options = {}) {
 				}
 				masks |= ostypes.CONST[options.masks[i]];
 			}
-			var rez_notify = new Notify(path, masks/*, callback*/);
+			var rez_notify = new Notify(path, masks, console.log.bind(console, "callback triggered!"));
 			rez_notify.addWatch();
 			return true;
-			break;
 		case 'darwin':
+        case 'freebsd':
+        case 'openbsd':
 			var rez_Kqueue = new Kqueue(path);
 			rez_Kqueue.addWatch();
 			return true;
-			break;
 		default:
 			throw new Error(['os-unsupported', OS.Constants.Sys.Name]);
 	}
@@ -181,9 +187,9 @@ function initWatch(path, /*callback,*/ options = {}) {
 // start - winnt file watching
 function winntWatch(path) {
 	// verify path is a directory
-	var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, OS.Constants.Win.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS, null)
+	var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, OS.Constants.Win.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS, null);
 	console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
-	if (ctypes.winLastError != 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
+	if (ctypes.winLastError !== 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
 		console.error('Failed hDirectory, winLastError:', ctypes.winLastError);
 		throw new Error('Failed hDirectory, winLastError: ' + ctypes.winLastError);
 	}
@@ -220,9 +226,9 @@ function EV_SET(kev_ptr, ident, filter, flags, fflags, data, udata_jsStr) {
     kev_ptr.contents.udata = ostypes.TYPE.char.array()(udata_jsStr);
 }
 function Kqueue(path/*, callback*/) {
-	var rez_fd = ostypes.API('kqueue')();
+	var rez_fd = ostypes.API('kqueue')(0);
 	console.info('rez_fd:', rez_fd.toString(), uneval(rez_fd));
-	if (ctypes.errno != 0) { console.error('Failed rez_fd, errno:', ctypes.errno); throw new Error('Failed rez_fd, errno: ' +  ctypes.errno); }
+	if (ctypes.errno !== 0) { console.error('Failed rez_fd, errno:', ctypes.errno); throw new Error('Failed rez_fd, errno: ' +  ctypes.errno); }
 	
 	this.kq = rez_fd;
 	this.path = path;
@@ -233,7 +239,7 @@ Kqueue.prototype.addWatch = function() {
     // Open a file descriptor for the file/directory that you want to monitor.
 	var event_fd = ostypes.API('open')(this.path, OS.Constants.libc.O_EVTONLY);
 	console.info('event_fd:', event_fd.toString(), uneval(event_fd));
-	if (ctypes.errno != 0) { console.error('Failed event_fd, errno:', ctypes.errno); throw new Error('Failed event_fd, errno: ' + ctypes.errno); }
+	if (ctypes.errno !== 0) { console.error('Failed event_fd, errno:', ctypes.errno); throw new Error('Failed event_fd, errno: ' + ctypes.errno); }
 	
 	// The address in user_data will be copied into a field in the event.If you are monitoring multiple files,you could,for example,pass in different data structure for each file.For this example,the path string is used.
 	var user_data = this.path;
@@ -258,7 +264,7 @@ Kqueue.prototype.addWatch = function() {
 	while (--continue_loop) {
 		var event_count = ostypes.API('kevent')(this.kq, events_to_monitor, ostypes.CONST.NUM_EVENT_SLOTS, event_data, num_files, timeout.address());
 		console.info('event_count:', event_count.toString(), uneval(event_count));
-		if (ctypes.errno != 0) {
+		if (ctypes.errno !== 0) {
 			console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
 			throw new Error('Failed event_count, errno: ' + ctypes.errno + ' and event_count: ' + cutils.jscGetDeepest(event_count));
 		}
@@ -279,26 +285,22 @@ Kqueue.prototype.addWatch = function() {
 	}
 	ostypes.API('close')(event_fd);
 	return 0;
-}
+};
 // end - mac file watching
 // start - nix file watching
-function inotifyCallbackTemp() {
-	console.error('inotifyCallbackTemp triggered!!! this is good!');
-}
-
-function Notify(path, masks){
-	var rez_init = ostypes.API('inotify_init')(0)
-	console.info('rez_init:', rez_init, rez_init.toString(), uneval(rez_init));
-	if (rez_init === -1) {
+function Notify(path, masks, callbackSuccess, callbackError){
+    if (!callbackSuccess) {
+      throw new Error('At least one callback must be specified!');
+    }
+    this.fd = ostypes.API('inotify_init')(0);
+    if (this.fd === -1) {
 		console.error('Failed rez_init, errno:', ctypes.errno);
 		throw new Error('Failed to inotify init, error code is ' + ctypes.errno);
 	}
-	this.fd = rez_init;
-    //this.buffer = 1024 + ostypes.TYPE.inotify_event.size; // 1024 stands for 1024 events
 	this.path = path;
 	this.masks = masks;
-	this.callback = inotifyCallbackTemp;
-	
+    this.callbackSuccess = callbackSuccess;
+    this.callbackEror = callbackError;
 	return true;
 }
 Notify.prototype.addWatch = function(){
@@ -312,51 +314,34 @@ Notify.prototype.addWatch = function(){
   }
   // based on https://github.com/Noitidart/ChromeWorker
   var pollWorker = new ChromeWorker(core.path.chrome + 'modules/workers/nixPoll.js');
-	function handleMessageFromWorker(msg) {
-		console.log('incoming message from worker, msg:', msg);
-	}
-	pollWorker.addEventListener('message', handleMessageFromWorker);
+  function handleMessageFromWorker(msg, data) {
+    console.log('incoming message from worker, msg:', msg, data);
+  }
+  pollWorker.addEventListener('success', handleMessageFromWorker);
+  pollWorker.addEventListener('error', handleMessageFromWorker);
 
-	console.log('ok added pollWorker');
-	pollWorker.postMessage(this.fd);
-	console.log('ok send msg to pollWorker');
-  /*
-  var self = this;
-  (function listener(){ // not sure whether we have to call it each time after changes
-    Task.spawn(function* (){
-      var length = yield ostypes.API('read')(self.fd, self.charBuffer, self.buffer);
-      if (length === -1)
-        throw new Error('read failed');
-      var i = 0;
-      var changes = new Set();
-      while (i < length) {      
-        // changes.set(change);
-      }
-      return changes;
-    }).then(changes => {
-      listener();
-      self.callback(changes);
-    }, self.callbackError || Cu.reportError);
-  })();
-  */
+  console.log('ok added pollWorker');
+  pollWorker.postMessage(this.fd);
   return true;
-}
+};
 Notify.prototype.removeWatch = function(path, callback){
   var rez_rm = ostypes.API('inotify_rm_watch')(this.fd, this.watch);
   console.info('rez_rm:', rez_rm, rez_rm.toString(), uneval(rez_rm));
-  if (rez_rm === 0) {
+  if (rez_rm !== -1) {
     console.log('succesfully removed watch');
+    this.watch = null;
     return true;
   } else {
     // it is -1
     console.error('Failed rez_rm, errno:', ctypes.errno);
     throw new Error('failed to remove watch, error is: ' + ctypes.errno);
   }
-}
+};
 Notify.prototype.close = function() {
   var rez_c  = ostypes.API('close')(this.fd);
   console.info('rez_c:', rez_c, rez_c.toString(), uneval(rez_c));
-  if (rez_c === -0) {
+  if (rez_c !== -1) {
+    this.fd = null;
     console.log('succesfully closed');
     return true;
   } else {
@@ -448,7 +433,7 @@ function tryOsFile_ifDirsNoExistMakeThenRetry(nameOfOsFileFunc, argsOfOsFileFunc
 	// do initial attempt
 	try {
 		var promise_initialAttempt = OS.File[nameOfOsFileFunc].apply(OS.File, argsOfOsFileFunc);
-		return 'initialAttempt succeeded'
+		return 'initialAttempt succeeded';
 	} catch (ex) {
 		if (ex.becauseNoSuchFile) {
 			console.log('make dirs then do secondAttempt');
