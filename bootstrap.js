@@ -144,6 +144,151 @@ function main() {
 	
 }
 
+// start - OS.File.Watcher API
+var _Watcher_nextId = 0; // never decrement this
+function Watcher(aCallback, options = {}) {
+	// returns prototype object, meaning whenever this function is called it should be called like `let watcher = new OS.File.Watcher(callback)`
+	// if user wants to know if it was succesfully initalized they can do this:
+	/*
+		let watcher = new OS.File.Watcher(callback)
+		watcher.promise_initialized.then(onFulfill, onReject).catch(onCatch);
+	*/
+	// dev user can do watcher.addPath/watcher.removePath before waiting for promise_initalized, as they return promises, those promise will just return after execution after initialization
+	
+	if (!aCallback || Object.toString.call(aCallback) != '[object Function]') {
+		throw new Error('aCallback must be a function');
+	}
+	
+	this.id = _Watcher_nextId;
+	_Watcher_nextId++; // so its available to next one
+	
+	this.readState = 0;
+	// readyState's
+		// 0 - uninintialized
+		// 1 - initialized, ready to do addPaths // when i change readyState to 1, i should check if any paths to add are in queue
+		// 2 - closed due to user calling Watcher.prototype.close
+		// 3 - closed due to failed to initialize
+	
+	this.paths_watched = []; // array of lower cased OS paths, these are inputed user passing a os path to addWatch, that are being watched
+	
+	this.pendingAdds = {}; // object with key aOSPath.toLowerCase()
+	
+	var deferred_initialized = new Deferred();
+	this.promise_initialized = deferred_initialized.promise;
+	
+	var promise_initWatcher = myWorker.post('initWatcher', [this.id]);
+	promise_initWatcher.then(
+	  function(aVal) {
+		console.log('Fullfilled - promise_initWatcher - ', aVal);
+		// start - do stuff here - promise_initWatcher
+		this.readState = 1;
+		this.promise_initialized.resolve(true);
+		// add in the paths that are waiting
+		for (var pendingAdd in this.pendingAdds) {
+			this.pendingAdds[pendingAdd]();
+		}
+		// end - do stuff here - promise_initWatcher
+	  },
+	  function(aReason) {
+		var rejObj = {name:'promise_initWatcher', aReason:aReason};
+		console.warn('Rejected - promise_initWatcher - ', rejObj);
+		this.readState = 3;
+		this.promise_initialized.reject(rejObj);
+		// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
+		for (var pendingAdd in this.pendingAdds) {
+			this.pendingAdds[pendingAdd]();
+		}
+	  }
+	).catch(
+	  function(aCaught) {
+		var rejObj = {name:'promise_initWatcher', aCaught:aCaught};
+		console.error('Caught - promise_initWatcher - ', rejObj);
+		this.readState = 3;
+		this.promise_initialized.reject(rejObj);
+		// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
+		for (var pendingAdd in this.pendingAdds) {
+			this.pendingAdds[pendingAdd]();
+		}
+	  }
+	);
+	
+}
+Watcher.prototype.addPath = function(aOSPath) {
+	// returns promise
+		// resolves to true on success
+		// rejects object with keys of name and message, expalining why it failed
+		
+	var deferredMain_Watcher_addPath = new Deferred();
+	
+	var aOSPathLower = aOSPath.toLowerCase();
+	
+	var do_addPath = function() {
+		if (this.readState != 1) {
+			// closed either to failed initialization or user called watcher.close
+			deferredMain_Watcher_addPath.reject({
+				errName: 'watcher-closed',
+				message: 'Cannot add as this Watcher was previously closed with reason ' + this.readState
+			});
+		} else {
+			var promise_addPath = myWorker.post('addPathToWatcher', [this.id, aOSPath]);
+			promise_addPath.then(
+			  function(aVal) {
+				console.log('Fullfilled - promise_addPath - ', aVal);
+				// start - do stuff here - promise_addPath
+				this.paths_watched.push(aOSPathLower);
+				deferredMain_Watcher_addPath.resolve(true);
+				// end - do stuff here - promise_addPath
+			  },
+			  function(aReason) {
+				var rejObj = {name:'promise_addPath', aReason:aReason};
+				console.warn('Rejected - promise_addPath - ', rejObj);
+				deferredMain_Watcher_addPath.reject(rejObj);
+			  }
+			).catch(
+			  function(aCaught) {
+				var rejObj = {name:'promise_addPath', aCaught:aCaught};
+				console.error('Caught - promise_addPath - ', rejObj);
+				deferredMain_Watcher_addPath.reject(rejObj);
+			  }
+			);
+		}
+	};
+	
+	if (this.readyState === 0) {
+		// watcher not yet initalized
+		if (aOSPathLower in this.pathsPendingAdd) {
+			deferredMain_Watcher_addPath.reject({
+				errName: 'duplicate-path',
+				message: 'This path is already waiting to be added. It is waiting as the Watcher has not been initailized yet.'
+			});
+		} else {
+			this.pendingAdds[aOSPathLower] = do_addPath;
+		}
+	} else if (this.readyState == 1) {
+		// watcher is ready
+		if (this.paths_watched.indexOf(aOSPathLower) > -1) {
+			deferredMain_Watcher_addPath.reject({
+				errName: 'duplicate-path',
+				message: 'This path was already succesfully added by a previous call to Watcher.prototype.addPath.'
+			});
+		} else {
+			do_addPath();
+		}
+		do_addPath();
+	} else {
+		// watcher is closed
+		deferredMain_Watcher_addPath.reject({
+			errName: 'watcher-closed',
+			message: 'Cannot add as this Watcher was previously closed with reason ' + this.readState
+		});
+	}
+	
+	return deferredMain_Watcher_addPath.promise;
+}
+Watcher.prototype.removePath = function() {}
+Watcher.prototype.close = function() {}
+// end - OS.File.Watcher API
+
 function install() {}
 function uninstall() {}
 
@@ -159,10 +304,51 @@ function startup(aData, aReason) {
 	
 	
 	
-	main();
+	//main();
+	
+	var 
 }
  
 function shutdown(aData, aReason) {
 	if (aReason == APP_SHUTDOWN) { return }
 	Cu.unload(core.path.chrome + 'modules/PromiseWorker.jsm');
 }
+
+// start - common helper functions
+function Deferred() {
+	if (Promise.defer) {
+		//need import of Promise.jsm for example: Cu.import('resource:/gree/modules/Promise.jsm');
+		return Promise.defer();
+	} else if (PromiseUtils.defer) {
+		//need import of PromiseUtils.jsm for example: Cu.import('resource:/gree/modules/PromiseUtils.jsm');
+		return PromiseUtils.defer();
+	} else {
+		/* A method to resolve the associated Promise with the value passed.
+		 * If the promise is already settled it does nothing.
+		 *
+		 * @param {anything} value : This value is used to resolve the promise
+		 * If the value is a Promise then the associated promise assumes the state
+		 * of Promise passed as value.
+		 */
+		this.resolve = null;
+
+		/* A method to reject the assocaited Promise with the value passed.
+		 * If the promise is already settled it does nothing.
+		 *
+		 * @param {anything} reason: The reason for the rejection of the Promise.
+		 * Generally its an Error object. If however a Promise is passed, then the Promise
+		 * itself will be the reason for rejection no matter the state of the Promise.
+		 */
+		this.reject = null;
+
+		/* A newly created Pomise object.
+		 * Initially in pending state.
+		 */
+		this.promise = new Promise(function(resolve, reject) {
+			this.resolve = resolve;
+			this.reject = reject;
+		}.bind(this));
+		Object.freeze(this);
+	}
+}
+// end - common helper functions

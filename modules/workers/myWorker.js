@@ -473,3 +473,17 @@ function makeDir_Bug934283(path, options) {
 	return makeDirRecurse();
 }
 // end - helper functions
+
+
+// start - OS.File.Watcher API
+var _Watcher_cache = {};
+function addPathToWatcher(aWatcherID, aOSPath) {
+	// aOSPath is a jsStr os path
+}
+function removePathFromWatcher(aWatcherID, aOSPath) {
+	// aOSPath is a jsStr os path
+}
+function initWatcher(aWatcherID) {
+	// _Watcher_cache[aWatcherID] = 
+}
+// end - OS.File.Watcher API
