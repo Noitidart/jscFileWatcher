@@ -144,6 +144,18 @@ function main() {
 	
 }
 
+function mainUsingAPI() {
+	var callback_logPath = function(aOSPath, aEvent) {
+		// aEvent is a string, or if user passed in options.masks and the event that happend is not one of the strings below, then its a number returned by the OS
+			// created
+			// deleted
+			// renamed
+			// contents-modified
+		console.log(
+	};
+	let watcher = 
+}
+
 // start - OS.File.Watcher API
 var _Watcher_nextId = 0; // never decrement this
 function Watcher(aCallback, options = {}) {
@@ -156,7 +168,7 @@ function Watcher(aCallback, options = {}) {
 	// dev user can do watcher.addPath/watcher.removePath before waiting for promise_initalized, as they return promises, those promise will just return after execution after initialization
 	
 	if (!aCallback || Object.toString.call(aCallback) != '[object Function]') {
-		throw new Error('aCallback must be a function');
+		throw new Error('The argument aCallback is not a function. It must be a function, which optionally takes two arguments: first is aOSPath and second is aEvent.');
 	}
 	
 	this.id = _Watcher_nextId;
@@ -226,7 +238,7 @@ Watcher.prototype.addPath = function(aOSPath) {
 		if (this.readState != 1) {
 			// closed either to failed initialization or user called watcher.close
 			deferredMain_Watcher_addPath.reject({
-				errName: 'watcher-closed',
+				name: 'watcher-closed',
 				message: 'Cannot add as this Watcher was previously closed with reason ' + this.readState
 			});
 		} else {
@@ -258,7 +270,7 @@ Watcher.prototype.addPath = function(aOSPath) {
 		// watcher not yet initalized
 		if (aOSPathLower in this.pathsPendingAdd) {
 			deferredMain_Watcher_addPath.reject({
-				errName: 'duplicate-path',
+				name: 'duplicate-path',
 				message: 'This path is already waiting to be added. It is waiting as the Watcher has not been initailized yet.'
 			});
 		} else {
@@ -268,7 +280,7 @@ Watcher.prototype.addPath = function(aOSPath) {
 		// watcher is ready
 		if (this.paths_watched.indexOf(aOSPathLower) > -1) {
 			deferredMain_Watcher_addPath.reject({
-				errName: 'duplicate-path',
+				name: 'duplicate-path',
 				message: 'This path was already succesfully added by a previous call to Watcher.prototype.addPath.'
 			});
 		} else {
@@ -277,7 +289,7 @@ Watcher.prototype.addPath = function(aOSPath) {
 	} else {
 		// watcher is closed
 		deferredMain_Watcher_addPath.reject({
-			errName: 'watcher-closed',
+			name: 'watcher-closed',
 			message: 'Cannot add as this Watcher was previously closed with reason ' + this.readState
 		});
 	}
@@ -298,7 +310,7 @@ Watcher.prototype.removePath = function() {
 			deferredMain_Watcher_removePath.resolve(true);
 		} else {
 			deferredMain_Watcher_removePath.reject({
-				errName: 'path-not-found',
+				name: 'path-not-found',
 				message: 'This path was never added, it was not found in watched paths arrays/objects.'
 			});
 		}
@@ -328,21 +340,56 @@ Watcher.prototype.removePath = function() {
 			);
 		} else {
 			deferredMain_Watcher_removePath.reject({
-				errName: 'path-not-found',
+				name: 'path-not-found',
 				message: 'This path was never added, it was not found in watched paths arrays/objects.'
 			});
 		}
 	} else {
 		// watcher is closed
 		deferredMain_Watcher_removePath.reject({
-			errName: 'watcher-closed',
+			name: 'watcher-closed',
 			message: 'No need to remove paths as this Watcher was previously closed with reason ' + this.readState
 		});
 	}
 	
 	return deferredMain_Watcher_removePath.promise;
 }
-Watcher.prototype.close = function() {}
+Watcher.prototype.close = function() {
+	// returns promise as it has to make a c call
+		// resolves to true on success, else an object explaining why it failed
+	var deferredMain_Watcher_close = new Deferred();
+	
+	if (this.readyState == 2 || this.readyState == 3) {
+		// was already previously closed
+		deferredMain_Watcher_close.reject({
+			name: 'watcher-closed',
+			message: 'Cannot close because Watcher was already previously closed with reason ' + this.readState
+		});
+	} else {
+		var promise_closeWatcher = myWorker.post('removePathFromWatcher', [this.id, aOSPath]);
+		promise_closeWatcher.then(
+		  function(aVal) {
+			console.log('Fullfilled - promise_closeWatcher - ', aVal);
+			// start - do stuff here - promise_closeWatcher
+			deferredMain_Watcher_close.resolve(true);
+			// end - do stuff here - promise_closeWatcher
+		  },
+		  function(aReason) {
+			var rejObj = {name:'promise_closeWatcher', aReason:aReason};
+			console.warn('Rejected - promise_closeWatcher - ', rejObj);
+			deferredMain_Watcher_close.reject(rejObj);
+		  }
+		).catch(
+		  function(aCaught) {
+			var rejObj = {name:'promise_closeWatcher', aCaught:aCaught};
+			console.error('Caught - promise_closeWatcher - ', rejObj);
+			deferredMain_Watcher_close.reject(rejObj);
+		  }
+		);
+	}
+	
+	return deferredMain_Watcher_close.promise;
+}
 // end - OS.File.Watcher API
 
 function install() {}
@@ -362,7 +409,7 @@ function startup(aData, aReason) {
 	
 	//main();
 	
-	var 
+	mainUsingAPI();
 }
  
 function shutdown(aData, aReason) {

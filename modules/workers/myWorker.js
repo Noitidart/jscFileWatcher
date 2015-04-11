@@ -479,14 +479,20 @@ function makeDir_Bug934283(path, options) {
 var _Watcher_cache = {};
 function addPathToWatcher(aWatcherID, aOSPath) {
 	// aOSPath is a jsStr os path
+	throw new Error('in dev0');
+	
+	// for winnt, check if aOSPath is a directory, if its not then throw error
 }
 function removePathFromWatcher(aWatcherID, aOSPath) {
 	// aOSPath is a jsStr os path
+	throw new Error('in dev1');
 }
 function initWatcher(aWatcherID) {
 	// _Watcher_cache[aWatcherID] = 
+	throw new Error('in dev2');
 }
 function closeWatcher(aWatcherID) {
 	// _Watcher_cache[aWatcherID] = 
+	throw new Error('in dev3');
 }
 // end - OS.File.Watcher API
