@@ -41,6 +41,8 @@ function main() {
 	};
 	var watcher1 = new Watcher(callback_logPath);
 	var promise_addAPath = watcher1.addPath(OS.Constants.Path.desktopDir);
+	//var promise_removeSomePath = watcher1.removePath('blah'); //test1
+	var promise_removeSomePath = watcher1.removePath(OS.Constants.Path.desktopDir); //test2
 	
 	// these promises are not required, but its just nice to do it, in case an error hapens, especially as im in dev mode it may be throwing a bunch of .catch
 	// i placed the promise_addAPath .then first because i want to make sure that watcher1.promise_initialized resolves first
@@ -80,6 +82,26 @@ function main() {
 		//deferred_createProfile.reject(rejObj);
 	  }
 	);
+	
+	promise_removeSomePath.then(
+	  function(aVal) {
+		console.log('Fullfilled - promise_removeSomePath - ', aVal);
+		// start - do stuff here - promise_removeSomePath
+		// end - do stuff here - promise_removeSomePath
+	  },
+	  function(aReason) {
+		var rejObj = {name:'promise_removeSomePath', aReason:aReason};
+		console.error('Rejected - promise_removeSomePath - ', rejObj);
+		//deferred_createProfile.reject(rejObj);
+	  }
+	).catch(
+	  function(aCaught) {
+		var rejObj = {name:'promise_removeSomePath', aCaught:aCaught};
+		console.error('Caught - promise_removeSomePath - ', rejObj);
+		//deferred_createProfile.reject(rejObj);
+	  }
+	);
+
 	
 }
 
@@ -194,6 +216,7 @@ function Watcher(aCallback, options = {}) {
 	thisW.paths_watched = []; // array of lower cased OS paths, these are inputed user passing a os path to addWatch, that are being watched
 	
 	thisW.pendingAdds = {}; // object with key aOSPath.toLowerCase()
+	thisW.addingPath_pendingC = {}; // as if user calls removePath while the c is running, it will think that path was never added
 	
 	var deferred_initialized = new Deferred();
 	thisW.promise_initialized = deferred_initialized.promise;
@@ -208,8 +231,10 @@ function Watcher(aCallback, options = {}) {
 			deferred_initialized.resolve(true);
 			// add in the paths that are waiting
 			for (var pendingAdd in thisW.pendingAdds) {
-				thisW.pendingAdds[pendingAdd]();
+				var addIt = thisW.pendingAdds[pendingAdd].addIt();
+				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init
 			}
+			thisW.pendingAdds = null;
 			// end - do stuff here - promise_createWatcher
 		  },
 		  function(aReason) {
@@ -219,8 +244,10 @@ function Watcher(aCallback, options = {}) {
 			deferred_initialized.reject(rejObj);
 			// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
 			for (var pendingAdd in thisW.pendingAdds) {
-				thisW.pendingAdds[pendingAdd]();
+				thisW.pendingAdds[pendingAdd].addIt();
+				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init
 			}
+			thisW.pendingAdds = null;
 		  }
 		).catch(
 		  function(aCaught) {
@@ -230,8 +257,10 @@ function Watcher(aCallback, options = {}) {
 			deferred_initialized.reject(rejObj);
 			// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
 			for (var pendingAdd in thisW.pendingAdds) {
-				thisW.pendingAdds[pendingAdd]();
+				thisW.pendingAdds[pendingAdd].addIt();
+				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init
 			}
+			thisW.pendingAdds = null;
 		  }
 		);
 	};
@@ -279,28 +308,62 @@ Watcher.prototype.addPath = function(aOSPath) {
 		} else if (thisW.readyState == 0) {
 			console.error('what on earth, ready state is 0, it should never have got to this do_addPath');
 		} else {
-			var promise_addPath = myWorker.post('addPathToWatcher', [thisW.id, aOSPath]);
-			promise_addPath.then(
-			  function(aVal) {
-				console.log('Fullfilled - promise_addPath - ', aVal);
-				// start - do stuff here - promise_addPath
-				thisW.paths_watched.push(aOSPathLower);
-				deferredMain_Watcher_addPath.resolve(true);
-				// end - do stuff here - promise_addPath
-			  },
-			  function(aReason) {
-				var rejObj = {name:'promise_addPath', aReason:aReason};
-				console.warn('Rejected - promise_addPath - ', rejObj);
-				deferredMain_Watcher_addPath.reject(rejObj);
-			  }
-			).catch(
-			  function(aCaught) {
-				var rejObj = {name:'promise_addPath', aCaught:aCaught};
-				console.error('Caught - promise_addPath - ', rejObj);
-				deferredMain_Watcher_addPath.reject(rejObj);
-			  }
-			);
+			if (aOSPathLower in thisW.addingPath_pendingC) {
+				if (aOSPathLower in thisW.removes_pendingC) {
+					thisW.removes_pendingC[aOSPathLower].cancelIt();
+				}
+				deferredMain_Watcher_addPath.reject({
+					name: 'duplicate-path',
+					message: 'This path is currently already in process of being added by the jsctypes code.'
+				});
+			} else {
+				thisW.addingPath_pendingC[aOSPathLower] = true;
+				var promise_addPath = myWorker.post('addPathToWatcher', [thisW.id, aOSPath]);
+				promise_addPath.then(
+				  function(aVal) {
+					console.log('Fullfilled - promise_addPath - ', aVal);
+					// start - do stuff here - promise_addPath
+					delete thisW.addingPath_pendingC[aOSPathLower];
+					thisW.paths_watched.push(aOSPathLower);
+					deferredMain_Watcher_addPath.resolve(true);
+					// do the pending remove if it was there
+					if (aOSPathLower in thisW.removes_pendingC) {
+						thisW.removes_pendingC[aOSPathLower].removeIt();
+					}
+					// end - do stuff here - promise_addPath
+				  },
+				  function(aReason) {
+					delete thisW.addingPath_pendingC[aOSPathLower];
+					var rejObj = {name:'promise_addPath', aReason:aReason};
+					console.warn('Rejected - promise_addPath - ', rejObj);
+					deferredMain_Watcher_addPath.reject(rejObj);
+					// reject the pending remove if it was there
+					if (aOSPathLower in thisW.removes_pendingC) {
+						thisW.removes_pendingC[aOSPathLower].removeIt();
+					}
+				  }
+				).catch(
+				  function(aCaught) {
+					delete thisW.addingPath_pendingC[aOSPathLower];
+					var rejObj = {name:'promise_addPath', aCaught:aCaught};
+					console.error('Caught - promise_addPath - ', rejObj);
+					deferredMain_Watcher_addPath.reject(rejObj);
+					// reject the pending remove if it was there
+					if (aOSPathLower in thisW.removes_pendingC) {
+						thisW.removes_pendingC[aOSPathLower].removeIt();
+					}
+				  }
+				);
+			}
 		}
+	};
+	
+	var do_cancelPendingAdd = function() {
+		delete thisW.pendingAdds[aOSPathLower];
+		deferredMain_Watcher_addPath.reject({
+			name: 'add-cancelled',
+			message: 'This path was waiting for initalization to be added, but was removePath\'ed before it got a chance to add.'
+		});
 	};
 	
 	if (thisW.readyState === 0) {
@@ -311,7 +374,7 @@ Watcher.prototype.addPath = function(aOSPath) {
 				message: 'This path is already waiting to be added. It is waiting as the Watcher has not been initailized yet.'
 			});
 		} else {
-			thisW.pendingAdds[aOSPathLower] = do_addPath;
+			thisW.pendingAdds[aOSPathLower] = {addIt: do_addPath, cancelIt: do_cancelPendingAdd};
 		}
 	} else if (thisW.readyState == 1) {
 		// watcher is ready
@@ -333,7 +396,7 @@ Watcher.prototype.addPath = function(aOSPath) {
 	
 	return deferredMain_Watcher_addPath.promise;
 }
-Watcher.prototype.removePath = function() {
+Watcher.prototype.removePath = function(aOSPath) {
 	// must return promise, as removal of path is done by call to myWorker.js to do a c call
 		// resolves to true if sucesfully removed
 	var deferredMain_Watcher_removePath = new Deferred();
@@ -344,7 +407,8 @@ Watcher.prototype.removePath = function() {
 	if (thisW.readyState === 0) {
 		// watcher not yet initalized
 		if (aOSPathLower in thisW.pendingAdds) {
-			delete thisW.pendingAdds[aOSPathLower];
+			thisW.pendingAdds[aOSPathLower].cancelIt();
+			// should also reject the promise in pendingAdds
 			deferredMain_Watcher_removePath.resolve(true);
 		} else {
 			deferredMain_Watcher_removePath.reject({
@@ -354,33 +418,52 @@ Watcher.prototype.removePath = function() {
 		}
 	} else if (thisW.readyState == 1) {
 		// watcher is ready
-		if (thisW.paths_watched.indexOf(aOSPathLower) > -1) {
-			var promise_removePath = myWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
-			promise_removePath.then(
-			  function(aVal) {
-				console.log('Fullfilled - promise_removePath - ', aVal);
-				// start - do stuff here - promise_removePath
-				thisW.paths_watched.splice(thisW.paths_watched.indexOf(aOSPathLower), 1);
-				deferredMain_Watcher_removePath.resolve(true);
-				// end - do stuff here - promise_removePath
-			  },
-			  function(aReason) {
-				var rejObj = {name:'promise_removePath', aReason:aReason};
-				console.warn('Rejected - promise_removePath - ', rejObj);
-				deferredMain_Watcher_removePath.reject(rejObj);
-			  }
-			).catch(
-			  function(aCaught) {
-				var rejObj = {name:'promise_removePath', aCaught:aCaught};
-				console.error('Caught - promise_removePath - ', rejObj);
-				deferredMain_Watcher_removePath.reject(rejObj);
-			  }
-			);
-		} else {
+		var do_removePath = function() {
+			if (thisW.paths_watched.indexOf(aOSPathLower) > -1) { // moved this if block here because removes_pendingC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
+				var promise_removePath = myWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
+				promise_removePath.then(
+				  function(aVal) {
+					console.log('Fullfilled - promise_removePath - ', aVal);
+					// start - do stuff here - promise_removePath
+					thisW.paths_watched.splice(thisW.paths_watched.indexOf(aOSPathLower), 1);
+					deferredMain_Watcher_removePath.resolve(true);
+					// end - do stuff here - promise_removePath
+				  },
+				  function(aReason) {
+					var rejObj = {name:'promise_removePath', aReason:aReason};
+					console.warn('Rejected - promise_removePath - ', rejObj);
+					deferredMain_Watcher_removePath.reject(rejObj);
+				  }
+				).catch(
+				  function(aCaught) {
+					var rejObj = {name:'promise_removePath', aCaught:aCaught};
+					console.error('Caught - promise_removePath - ', rejObj);
+					deferredMain_Watcher_removePath.reject(rejObj);
+				  }
+				);
+			} else {
+				deferredMain_Watcher_removePath.reject({
+					name: 'path-not-found',
+					message: 'This path was never added, it was not found in watched paths arrays/objects. (note: you might have got here because you called .removePath(path) while path was being by the jsctypes code of the .addPath(path), and then that jsctypes code rejected, so it never got added so never had anything to remove)'
+				});
+			}
+		};
+		
+		var do_cancelPendingRemove = function() {
+			delete thisW.removes_pendingC[aOSPathLower];
 			deferredMain_Watcher_removePath.reject({
-				name: 'path-not-found',
-				message: 'This path was never added, it was not found in watched paths arrays/objects.'
+				name: 'remove-cancelled',
+				message: 'This path was waiting for initalization to be added, but was removePath\'ed before it got a chance to add.'
 			});
+		};
+		
+		if (aOSPathLower in thisW.addingPath_pendingC) {
+				thisW.removes_pendingC = { // note: pendingC means its waiting for the call to FSWatcherWorker.addPathToWatcher is in process
+					removeIt: do_removePath,
+					cancelIt: do_cancelPendingRemove
+				};
+		} else {
+			do_removePath();
 		}
 	} else {
 		// watcher is closed
