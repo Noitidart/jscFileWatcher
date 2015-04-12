@@ -35,7 +35,7 @@ function main() {
 		// aEvent is a string, or if user passed in options.masks and the event that happend is not one of the strings below, then its a number returned by the OS
 			// created
 			// deleted
-			// renamed
+			// renamed (renamed-to and renamed-from?)
 			// contents-modified
 		console.log('callback_logPath triggered', 'aEvent:', aEvent, 'aOSPath:', aOSPath);
 	};
@@ -238,7 +238,7 @@ function _FSWatcherWorker_start() {
 }
 var _Watcher_nextId = 0; // never decrement this
 var _Watcher_UnterminatedFSWPollWorkers = {}; // used for termination on shutdown // key is aWatcherId and value is the FSWPollWorker reference
-function Watcher(aCallback, options = {}) {
+function Watcher(aCallback) {
 	// returns prototype object, meaning whenever this function is called it should be called like `let watcher = new OS.File.Watcher(callback)`
 	// if user wants to know if it was succesfully initalized they can do this:
 	/*
@@ -289,6 +289,52 @@ function Watcher(aCallback, options = {}) {
 				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init, and btw i do set thisW.pendingAdds to null at the end of this for loop (i do this as its uneeded stuff, so maybe save like some bytes of memory haha)
 			}
 			thisW.pendingAdds = null;
+			
+			// start - os specific
+			switch (core.os.name) {
+				case 'linux':
+				case 'webos': // Palm Pre
+				case 'android':
+				
+						// start the poll
+						var do_nixPoll = function() {
+							// doesnt return anything
+							if (thisW.readyState == 2 || thisW.readyState == 3) {
+								// watcher was closed so stop polling
+								return; // to prevent deeper exec
+							}
+							var promise_nixPoll = thisW.waitForNextChange();
+							promise_nixPoll.then(
+							  function(aVal) {
+								console.log('Fullfilled - promise_nixPoll - ', aVal);
+								// start - do stuff here - promise_nixPoll
+								do_nixPoll(); // restart poll
+								thisW.cb(aVal.aOSPathLower, aVal.aEvent); // trigger callback
+								// end - do stuff here - promise_nixPoll
+							  },
+							  function(aReason) {
+								var rejObj = {name:'promise_nixPoll', aReason:aReason};
+								console.warn('Rejected - promise_nixPoll - ', rejObj);
+								//deferred_createProfile.reject(rejObj);
+								do_nixPoll();
+							  }
+							).catch(
+							  function(aCaught) {
+								var rejObj = {name:'promise_nixPoll', aCaught:aCaught};
+								console.error('Caught - promise_nixPoll - ', rejObj);
+								//deferred_createProfile.reject(rejObj);
+								do_nixPoll();
+							  }
+							);
+						}
+						do_nixPoll();
+						
+					break;
+				default:
+					// do nothing special
+			}
+			// end - os specific
+			
 			// end - do stuff here - promise_createWatcher
 		  },
 		  function(aReason) {
@@ -341,10 +387,12 @@ function Watcher(aCallback, options = {}) {
 	);
 	
 }
-Watcher.prototype.addPath = function(aOSPath) {
+Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 	// returns promise
 		// resolves to true on success
 		// rejects object with keys of name and message, expalining why it failed
+	// aOptions
+		// for inotify, this supports `masks` key
 		
 	var deferredMain_Watcher_addPath = new Deferred();
 	
@@ -372,7 +420,7 @@ Watcher.prototype.addPath = function(aOSPath) {
 				});
 			} else {
 				thisW.adds_pendingAddC[aOSPathLower] = true;
-				var promise_addPath = myWorker.post('addPathToWatcher', [thisW.id, aOSPath]);
+				var promise_addPath = myWorker.post('addPathToWatcher', [thisW.id, aOSPathLower]);
 				promise_addPath.then(
 				  function(aVal) {
 					console.log('Fullfilled - promise_addPath - ', aVal);

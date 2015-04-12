@@ -160,7 +160,16 @@ function initWatch(path, /*callback,*/ options = {}) {
 			if (Object.prototype.toString.call(options.masks) !== '[object Array]') {
 				throw new Error('options.masks must be array of strings');
 			}
-			var masks = 0;
+			var masks = ostypes.CONST.IN_CLOSE_WRITE | ostypes.CONST.IN_MOVED_FROM | ostypes.CONST.IN_MOVED_TO | ostypes.CONST.IN_CREATE | ostypes.CONST.IN_DELETE_SELF | ostypes.CONST.IN_MOVE_SELF;
+				// reason for flags with respect to aEvent of callback to main thread:
+					// IN_CLOSE_WRITE - aEvent of contents-modified
+					// IN_MOVED_TO - aEvent of renamed (maybe renamed-to?)
+					// IN_MOVED_FROM - aEvent of renamed (maybe renamed-from?)
+					// IN_CREATE - created; file/direcotry created in watched directory
+					// IN_DELETE - deleted; File/directory deleted from watched directory.
+					// IN_DELETE_SELF - deleted; self was deleted
+					// IN_MOVED_SELF - moved; self was moved
+					
 			for (let i=0; i<options.masks.length; i++) {
 				if (typeof options.masks[i] !== 'string') {
 					throw new Error('element at position ' + i + ' in options.masks is not a string');
@@ -473,26 +482,3 @@ function makeDir_Bug934283(path, options) {
 	return makeDirRecurse();
 }
 // end - helper functions
-
-
-// start - OS.File.Watcher API
-var _Watcher_cache = {};
-function addPathToWatcher(aWatcherID, aOSPath) {
-	// aOSPath is a jsStr os path
-	throw new Error('in dev0');
-	
-	// for winnt, check if aOSPath is a directory, if its not then throw error
-}
-function removePathFromWatcher(aWatcherID, aOSPath) {
-	// aOSPath is a jsStr os path
-	throw new Error('in dev1');
-}
-function initWatcher(aWatcherID) {
-	// _Watcher_cache[aWatcherID] = 
-	throw new Error('in dev2');
-}
-function closeWatcher(aWatcherID) {
-	// _Watcher_cache[aWatcherID] = 
-	throw new Error('in dev3');
-}
-// end - OS.File.Watcher API
