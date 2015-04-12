@@ -104,6 +104,10 @@ function poll(aArgs) {
 					ostypes.TYPE.inotify_event.fields[3].len.size + 
 					ostypes.TYPE.inotify_event.fields[4].name.size; // has built in length of MAX_NAME + 1 (the + 1 is for null terminator)
 				var size_inotify_event = ostypes.TYPE.inotify_event.size;
+				var sizeField0 = ostypes.TYPE.inotify_event.fields[0].wd.size;
+				var sizeField1 = ostypes.TYPE.inotify_event.fields[1].mask.size;
+				var sizeField2 = ostypes.TYPE.inotify_event.fields[2].cookie.size;
+				var sizeField3 = ostypes.TYPE.inotify_event.fields[3].len.size;
 				var sizeField4 = ostypes.TYPE.inotify_event.fields[4].name.size;
 				
 				console.info('sizeUnaligned_inotify_event:', sizeUnaligned_inotify_event.toString());
@@ -161,8 +165,8 @@ function poll(aArgs) {
 						if (len == 0) {
 							break;
 						};
-						i += sizeUnaligned_inotify_event - sizeField4 + parseInt(len);
-						console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (sizeUnaligned_inotify_event - sizeField4 + parseInt(len)));
+						i += sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len);
+						console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len)));
 					} while (i < length);
 					
 					console.error('loop ended:', 'numElementsRead:', numElementsRead);

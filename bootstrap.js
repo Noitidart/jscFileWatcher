@@ -339,9 +339,9 @@ function Watcher(aCallback) {
 									var thisWd = cVal.aExtra.aEvent_inotifyWd;
 									console.info('thisWd:', thisWd);
 									delete cVal.aExtra.aEvent_inotifyWd;
-									for (var cOSPath in thisW.paths_watch) {
-										console.log('compareing:', thisW.paths_watch[cOSPath], thisWd);
-										if (thisW.paths_watch[cOSPath] == thisWd) {
+									for (var cOSPath in thisW.paths_watched) {
+										console.log('compareing:', thisW.paths_watched[cOSPath], thisWd);
+										if (thisW.paths_watched[cOSPath] == thisWd) {
 											break;
 										}
 									}
@@ -512,7 +512,8 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 					// start - do stuff here - promise_addPath
 					delete thisW.adds_pendingAddC[aOSPath];
 					//thisW.paths_watched.push(aOSPath);
-					thisW.paths_watched[aOSPath] = aVal-1; // aVal is watch_fd, so i can use this to link triggered callback to aOSPath_parentDir
+					thisW.paths_watched[aOSPath] = aVal; // aVal is watch_fd, so i can use this to link triggered callback to aOSPath_parentDir
+					console.error('post add path, saved to paths_watched with fd val of:', aVal, 'toString of paths_watched:', JSON.stringify(thisW.paths_watched));
 					deferredMain_Watcher_addPath.resolve(true);
 					// do the pending remove if it was there
 					if (aOSPath in thisW.removes_pendingAddC) {
