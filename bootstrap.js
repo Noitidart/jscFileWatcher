@@ -341,7 +341,9 @@ function Watcher(aCallback) {
 										var aExtra_forOldFile = thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie];
 										aVal.aExtra.aFileNameOld = aExtra_forOldFile.aOldFileName;
 										delete aExtra_forOldFile.aOldFileName;
+										aVal.aExtra.aExtraOld = aExtra_forOldFile;
 										delete thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie];
+										aVal.aEvent = 'renamed';
 										thisW.cb(aVal.aFileName, aVal.aEvent, aVal.aExtra);
 									}
 								} else if (aVal.aEvent == 'renamed-from') {
