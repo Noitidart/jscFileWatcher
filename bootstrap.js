@@ -315,7 +315,7 @@ function Watcher(aCallback) {
 							  function(aVal) {
 								console.log('Fullfilled - promise_nixPoll - ', aVal);
 								// start - do stuff here - promise_nixPoll
-								thisW.initWithCallback(thisW.timerEvent_triggerCallback, 0, Ci.nsITimer.TYPE_ONE_SHOT); // trigger callback
+								thisW.timer.initWithCallback(thisW.timerEvent_triggerCallback, 0, Ci.nsITimer.TYPE_ONE_SHOT); // trigger callback
 								do_nixPoll(); // restart poll
 								// end - do stuff here - promise_nixPoll
 							  },

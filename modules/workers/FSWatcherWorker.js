@@ -156,7 +156,7 @@ function createWatcher(aWatcherID) {
 					fd: parseInt(cutils.jscGetDeepest(fd))
 				};
 				
-				return cutils.jscGetDeepest(argsForPoll);
+				return argsForPoll;
 
 			break;
 		default:
