@@ -99,8 +99,6 @@ function poll(aArgs) {
 
 				var count = ostypes.TYPE.inotify_event.size; //size_t
 				var buf = ctypes.ArrayType(ostypes.TYPE.char, count)(); // docs page here http://linux.die.net/man/7/inotify says sizeof(struct inotify_event) + NAME_MAX + 1 will be sufficient to read at least one event.
-
-				
 				
 				console.log('starting the loop, fd:', fd, 'count:', count);
 
@@ -129,7 +127,7 @@ function poll(aArgs) {
 						
 						return {
 							aOSPath: fileName,
-							aEvent: convertFlagsToAEventStr(mask);
+							aEvent: convertFlagsToAEventStr(mask)
 						}
 					}
 				}
@@ -149,7 +147,7 @@ function convertFlagsToAEventStr(flags) {
 		case 'webos': // Palm Pre // im guessng this has inotify, untested
 		case 'android': // im guessng this has inotify, untested
 
-				
+				return 'blah'
 				
 			break;
 		default:

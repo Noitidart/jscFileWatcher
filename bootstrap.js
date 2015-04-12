@@ -632,17 +632,62 @@ Watcher.prototype.close = function() {
 Watcher.prototype.waitForNextChange = function() {
 	// returns promise
 	
-	//var deferredMain_Watcher_waitForNextChange = new Deferred();
+	var deferredMain_Watcher_waitForNextChange = new Deferred();
 	
 	var thisW = this;
+	
+	var do_poll = function() {
+		var promise_poll = thisW.FSWPollWorker.post('poll', [thisW.argsForPoll]);
+		promise_poll.then(
+		  function(aVal) {
+			console.log('Fullfilled - promise_poll - ', aVal);
+			// start - do stuff here - promise_poll
+			deferredMain_Watcher_waitForNextChange.resolve(aVal);
+			// end - do stuff here - promise_poll
+		  },
+		  function(aReason) {
+			var rejObj = {name:'promise_poll', aReason:aReason};
+			console.warn('Rejected - promise_poll - ', rejObj);
+			deferredMain_Watcher_waitForNextChange.reject(rejObj);
+		  }
+		).catch(
+		  function(aCaught) {
+			var rejObj = {name:'promise_poll', aCaught:aCaught};
+			console.error('Caught - promise_poll - ', rejObj);
+			deferredMain_Watcher_waitForNextChange.reject(rejObj);
+		  }
+		);
+	};
+	
 	if (!thisW.FSWPollWorker) {
 		thisW.FSWPollWorker = new PromiseWorker(core.addon.path.content + 'modules/workers/FSWPollWorker.js');
 		_Watcher_UnterminatedFSWPollWorkers[thisW.id] = thisW.FSWPollWorker;
+		
+		var promise_initPollWorker = thisW.FSWPollWorker.post('init', [{}]); // am passing empty obj to init core with, as none of the FSWPollWorker functions use anything from core
+		promise_initPollWorker.then(
+		  function(aVal) {
+			console.log('Fullfilled - promise_initPollWorker - ', aVal);
+			// start - do stuff here - promise_initPollWorker
+			do_poll();
+			// end - do stuff here - promise_initPollWorker
+		  },
+		  function(aReason) {
+			var rejObj = {name:'promise_initPollWorker', aReason:aReason};
+			console.warn('Rejected - promise_initPollWorker - ', rejObj);
+			deferredMain_Watcher_waitForNextChange.reject(rejObj);
+		  }
+		).catch(
+		  function(aCaught) {
+			var rejObj = {name:'promise_initPollWorker', aCaught:aCaught};
+			console.error('Caught - promise_initPollWorker - ', rejObj);
+			deferredMain_Watcher_waitForNextChange.reject(rejObj);
+		  }
+		);
+	} else {
+		do_poll();
 	}
 	
-	return thisW.FSWPollWorker.post('poll', [thisW.argsForPoll]);
-	
-	//return deferredMain_Watcher_waitForNextChange.promise;
+	return deferredMain_Watcher_waitForNextChange.promise;
 	
 	// for winnt, if ReadDirectoryChangesW only supports one path per, this func should do a promise for each path to FSWPollWorker. a FSWPollWorker must be created for each callback as when want to close, to abort all of the promises i can terminate the worker, then itterate through the promises and reject them for reason of Watcher closed.
 	// actually i think for all OS'es each callback should get its own FSWPollWorker
