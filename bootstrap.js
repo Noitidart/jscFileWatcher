@@ -260,8 +260,14 @@ function Watcher(aCallback) {
 		// 1 - initialized, ready to do addPaths // when i change readyState to 1, i should check if any paths to add are in queue
 		// 2 - closed due to user calling Watcher.prototype.close
 		// 3 - closed due to failed to initialize
+		
+	thisW.timerEvent_triggerCallback = {
+		notify: function() {
+			aCallback(aVal.aOSPathLower, aVal.aEvent); // trigger callback
+		}
+	};
+	thisW.timer = Cc['@mozilla.org/timer;1'].createInstance(Ci.nsITimer);
 	
-	thisW.cb = aCallback;
 	
 	//thisW.paths_watched = []; // array of lower cased OS paths that are being watched (i do lower case because these are inputed by user passing as args to addPath/removePath, and devuser might do different casings as devusers can be stupid)
 	thisW.paths_watched = {}; // changed to obj as its easier to delete
@@ -298,7 +304,7 @@ function Watcher(aCallback) {
 				
 						// start the poll
 						var do_nixPoll = function() {
-							// doesnt return anything
+							
 							if (thisW.readyState == 2 || thisW.readyState == 3) {
 								// watcher was closed so stop polling
 								return; // to prevent deeper exec
@@ -308,8 +314,8 @@ function Watcher(aCallback) {
 							  function(aVal) {
 								console.log('Fullfilled - promise_nixPoll - ', aVal);
 								// start - do stuff here - promise_nixPoll
+								thisW.initWithCallback(thisW.timerEvent_triggerCallback, 0, Ci.nsITimer.TYPE_ONE_SHOT); // trigger callback
 								do_nixPoll(); // restart poll
-								thisW.cb(aVal.aOSPathLower, aVal.aEvent); // trigger callback
 								// end - do stuff here - promise_nixPoll
 							  },
 							  function(aReason) {
