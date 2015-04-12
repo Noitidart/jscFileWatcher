@@ -338,17 +338,19 @@ function Watcher(aCallback) {
 											message: 'Could not find the renamed-from cookie in thisW.aExtra_of_renamedFrom cache'
 										});
 									} else {
-										var aExtra_forOldFile = thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie];
+										var aExtraOld = thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie];
 										aVal.aExtra.aFileNameOld = aExtra_forOldFile.aOldFileName;
-										delete aExtra_forOldFile.aOldFileName;
-										aVal.aExtra.aExtraOld = aExtra_forOldFile;
+										delete aExtraOld.aOldFileName;
+										aVal.aExtra.aExtraOld = aExtraOld.aExtra_forOldFile;
 										delete thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie];
 										aVal.aEvent = 'renamed';
+										delete aVal.aExtra.aEvent_inotifyCookie;
 										thisW.cb(aVal.aFileName, aVal.aEvent, aVal.aExtra);
 									}
 								} else if (aVal.aEvent == 'renamed-from') {
 									console.log('got renamed-from event, so saving its info, and will not trigger callback now, will trigger callback when get renamed-to but will add this info to that');
 									thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie] = {
+										delete aVal.aExtra.aEvent_inotifyCookie;
 										aOldFileName: aVal.aFileName,
 										aExtra_forOldFile: aVal.aExtra
 									}
