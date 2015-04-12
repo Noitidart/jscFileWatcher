@@ -146,7 +146,7 @@ function poll(aArgs) {
 						let mask = casted.addressOfField('mask').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
 						let len = casted.addressOfField('len').contents; // need to iterate to next item that was read in // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
 						let cookie = casted.addressOfField('cookie').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-						let wd = casted.addressOfField('cookie').contents; // ostypes.TYPE.int which is ctypes.int so no need to get deepest, its already a number
+						let wd = casted.addressOfField('wd').contents; // ostypes.TYPE.int which is ctypes.int so no need to get deepest, its already a number
 						
 						console.info('aFileName:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
 						let rezObj = {

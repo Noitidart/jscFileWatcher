@@ -339,34 +339,33 @@ function Watcher(aCallback) {
 									var thisWd = cVal.aExtra.aEvent_inotifyWd;
 									console.info('thisWd:', thisWd);
 									delete cVal.aExtra.aEvent_inotifyWd;
+									cVal.aExtra.aOSPath_parentDir = undefined;
 									for (var cOSPath in thisW.paths_watched) {
 										console.log('compareing:', thisW.paths_watched[cOSPath], thisWd);
 										if (thisW.paths_watched[cOSPath] == thisWd) {
+											cVal.aExtra.aOSPath_parentDir = cOSPath;
 											break;
 										}
 									}
-									cVal.aExtra.aOSPath_parentDir = cOSPath;
 									if (cVal.aEvent == 'renamed-to') {
 										var cArgsObj = cVal;
 										var cCookie = cArgsObj.aExtra.aEvent_inotifyCookie;
 										delete cArgsObj.aExtra.aEvent_inotifyCookie;
-										if (!(cVal.aExtra.aEvent_inotifyCookie in thisW._cache_aRenamed_callbackArgsObj)) {
+										if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
 											// renamed-to message came first (before the related renamed-from)
-											console.log('got renamed-from event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-to event');
+											console.log('got renamed-to event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-from event');
 											thisW._cache_aRenamed_callbackArgsObj[cCookie] = cArgsObj; // cached rename-to
 										} else {
 											// renamed-to message came second (after the related renamed-from)
 											console.log('got renamed-to event, this is the related event, the renamed-from event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
 											
 											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-from
-											var aExtraOld = cachedArgsObj;
-											cArgsObj.aExtraOld = aExtraOld;
+											var aOld = cachedArgsObj; // aOld should be set to renamed-from
+											delete aOld.aEvent; // deleting renamed-from
 											
-											cArgsObj.aFileNameOld = aExtraOld.aFileName;
-											delete aExtraOld.aFileName;
-											cArgsObj.aExtra.aExtraOld = aExtraOld;
+											cArgsObj.aExtra.aOld = aOld;
 											
-											thisW.cb(cArgsObj.aFileName, cArgsObj.aEvent, cArgsObj.aExtra);
+											thisW.cb(cArgsObj.aFileName, 'renamed', cArgsObj.aExtra);
 										}
 									} else if (cVal.aEvent == 'renamed-from') {
 										var cArgsObj = cVal;
@@ -381,16 +380,12 @@ function Watcher(aCallback) {
 											console.log('got renamed-from event, this is the related event, the renamed-to event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
 											
 											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-to
-											var aExtraOld = cArgsObj; // set aExtraOld to renamed-from
+											var aOld = cArgsObj; // aOld should be set to renamed-from
+											delete aOld.aEvent; // deleting renamed-from
 											
-											cArgsObj = cachedArgsObj; // set cArgsObj to renamed-to
-											cArgsObj.aExtraOld = aExtraOld;
+											cArgsObj.aExtra.aOld = aOld;
 											
-											aExtraOld.aFileNameOld = aExtraOld.aFileName;
-											delete aExtraOld.aFileName;
-											cArgsObj.aExtra.aExtraOld = aExtraOld;
-											
-											thisW.cb(cachedArgsObj.aFileName, cachedArgsObj.aEvent, cachedArgsObj.aExtra);
+											thisW.cb(cArgsObj.aFileName, 'renamed', cArgsObj.aExtra);
 										}
 									} else {
 										thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
@@ -513,7 +508,7 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 					delete thisW.adds_pendingAddC[aOSPath];
 					//thisW.paths_watched.push(aOSPath);
 					thisW.paths_watched[aOSPath] = aVal; // aVal is watch_fd, so i can use this to link triggered callback to aOSPath_parentDir
-					console.error('post add path, saved to paths_watched with fd val of:', aVal, 'toString of paths_watched:', JSON.stringify(thisW.paths_watched));
+					console.info('post add path, saved to paths_watched with fd val of:', aVal, 'toString of paths_watched:', JSON.stringify(thisW.paths_watched));
 					deferredMain_Watcher_addPath.resolve(true);
 					// do the pending remove if it was there
 					if (aOSPath in thisW.removes_pendingAddC) {
