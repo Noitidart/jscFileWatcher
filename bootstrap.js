@@ -336,7 +336,7 @@ function Watcher(aCallback) {
 								for (var i=0; i<aVal.length; i++) {
 									let iHoisted = i;
 									var cVal = aVal[iHoisted];
-									var thisWd = cVal.aExtra.nixinotifyWd;
+									var thisWd = cVal.aExtra.nixInotifyWd;
 									console.info('thisWd:', thisWd);
 									delete cVal.aExtra.nixInotifyWd;
 									cVal.aExtra.aOSPath_parentDir = undefined;
