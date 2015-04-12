@@ -338,10 +338,16 @@ function Watcher(aCallback) {
 									var cVal = aVal[iHoisted];
 									var thisWd = cVal.aExtra.aEvent_inotifyWd;
 									delete cVal.aExtra.aEvent_inotifyWd;
-									cVal.aExtra.aOSPath_parentDir = thisW.paths_watched[thisWd];
+									for (var cOSPath in thisW.paths_watch) {
+										if (thisW.paths_watch[cOSPath] == thisWd) {
+											break;
+										}
+									}
+									cVal.aExtra.aOSPath_parentDir = cOSPath;
 									if (cVal.aEvent == 'renamed-to') {
 										var cArgsObj = cVal;
-										var cCookie = cArgsObj.aExtra.aEvent_inotifyCookie;;
+										var cCookie = cArgsObj.aExtra.aEvent_inotifyCookie;
+										delete cArgsObj.aExtra.aEvent_inotifyCookie;
 										if (!(cVal.aExtra.aEvent_inotifyCookie in thisW._cache_aRenamed_callbackArgsObj)) {
 											// renamed-to message came first (before the related renamed-from)
 											console.log('got renamed-from event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-to event');
@@ -349,14 +355,14 @@ function Watcher(aCallback) {
 										} else {
 											// renamed-to message came second (after the related renamed-from)
 											console.log('got renamed-to event, this is the related event, the renamed-from event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
-											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-from
 											
-											var aExtraOld = cachedArgsObj; // is renamed-to
+											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-from
+											var aExtraOld = cachedArgsObj;
 											cArgsObj.aExtraOld = aExtraOld;
 											
-											aExtraOld.aFileNameOld = aExtraOld.aFileName;
+											cArgsObj.aFileNameOld = aExtraOld.aFileName;
 											delete aExtraOld.aFileName
-											cArgsObj.aEvent.aExtra.aExtraOld = aExtraOld;
+											cArgsObj.aExtra.aExtraOld = aExtraOld;
 											
 											thisW.cb(cArgsObj.aFileName, cArgsObj.aEvent, cArgsObj.aExtra);
 										}
@@ -371,16 +377,18 @@ function Watcher(aCallback) {
 										} else {
 											// renamed-from message came second (after the related renamed-to)
 											console.log('got renamed-from event, this is the related event, the renamed-to event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
-											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-to
 											
-											var aExtraOld = cachedArgsObj; // is renamed-from
+											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-to
+											var aExtraOld = cArgsObj; // set aExtraOld to renamed-from
+											
+											cArgsObj = cachedArgsObj; // set cArgsObj to renamed-to
 											cArgsObj.aExtraOld = aExtraOld;
 											
 											aExtraOld.aFileNameOld = aExtraOld.aFileName;
 											delete aExtraOld.aFileName
-											cArgsObj.aEvent.aExtra.aExtraOld = aExtraOld;
+											cArgsObj.aExtra.aExtraOld = aExtraOld;
 											
-											thisW.cb(cArgsObj.aFileName, cArgsObj.aEvent, cArgsObj.aExtra);
+											thisW.cb(cachedArgsObj.aFileName, cachedArgsObj.aEvent, cachedArgsObj.aExtra);
 										}
 									} else {
 										thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
