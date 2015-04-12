@@ -120,7 +120,7 @@ function poll(aArgs) {
 						console.log('casted:', casted.toString());
 						var fileName = casted.addressOfField('name').contents.readString();
 						var mask = casted.addressOfField('mask').contents;
-						var len = casted.addressOfField('len').contents; // only needed if we want to cast the ptr of casted.addressOfField('name') but i didnt make it a .ptr i made it an buffer (.array) of char at OS.Constants.libc.MAX_NAME
+						//var len = casted.addressOfField('len').contents; // only needed if we want to cast the ptr of casted.addressOfField('name') but i didnt make it a .ptr i made it an buffer (.array) of char at OS.Constants.libc.MAX_NAME
 						var cookie = casted.addressOfField('cookie').contents;
 						
 						console.info('aOSPath:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
