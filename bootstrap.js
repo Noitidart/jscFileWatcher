@@ -42,7 +42,55 @@ function main() {
 	var watcher1 = new Watcher(callback_logPath);
 	var promise_addAPath = watcher1.addPath(OS.Constants.Path.desktopDir);
 	//var promise_removeSomePath = watcher1.removePath('blah'); //test1
-	var promise_removeSomePath = watcher1.removePath(OS.Constants.Path.desktopDir); //test2
+	//var promise_removeSomePath = watcher1.removePath(OS.Constants.Path.desktopDir); //test2
+	/*
+	//start test3
+	Services.wm.getMostRecentWindow(null).setTimeout(function() {
+		var promise_removeSomePath = watcher1.removePath(OS.Constants.Path.desktopDir);
+		promise_removeSomePath.then(
+		  function(aVal) {
+			console.log('Fullfilled - promise_removeSomePath - ', aVal);
+			// start - do stuff here - promise_removeSomePath
+			// end - do stuff here - promise_removeSomePath
+		  },
+		  function(aReason) {
+			var rejObj = {name:'promise_removeSomePath', aReason:aReason};
+			console.error('Rejected - promise_removeSomePath - ', rejObj);
+			//deferred_createProfile.reject(rejObj);
+		  }
+		).catch(
+		  function(aCaught) {
+			var rejObj = {name:'promise_removeSomePath', aCaught:aCaught};
+			console.error('Caught - promise_removeSomePath - ', rejObj);
+			//deferred_createProfile.reject(rejObj);
+		  }
+		);
+	}, 1000);
+	//end test3
+	*/
+	//start test4 - remove a non-existing path after watcher close
+	Services.wm.getMostRecentWindow(null).setTimeout(function() {
+		var promise_removeSomePath = watcher1.removePath('blah');
+		promise_removeSomePath.then(
+		  function(aVal) {
+			console.log('Fullfilled - promise_removeSomePath - ', aVal);
+			// start - do stuff here - promise_removeSomePath
+			// end - do stuff here - promise_removeSomePath
+		  },
+		  function(aReason) {
+			var rejObj = {name:'promise_removeSomePath', aReason:aReason};
+			console.error('Rejected - promise_removeSomePath - ', rejObj);
+			//deferred_createProfile.reject(rejObj);
+		  }
+		).catch(
+		  function(aCaught) {
+			var rejObj = {name:'promise_removeSomePath', aCaught:aCaught};
+			console.error('Caught - promise_removeSomePath - ', rejObj);
+			//deferred_createProfile.reject(rejObj);
+		  }
+		);
+	}, 1000);
+	//end test4
 	
 	// these promises are not required, but its just nice to do it, in case an error hapens, especially as im in dev mode it may be throwing a bunch of .catch
 	// i placed the promise_addAPath .then first because i want to make sure that watcher1.promise_initialized resolves first
@@ -82,7 +130,7 @@ function main() {
 		//deferred_createProfile.reject(rejObj);
 	  }
 	);
-	
+	/* for test1 and test2
 	promise_removeSomePath.then(
 	  function(aVal) {
 		console.log('Fullfilled - promise_removeSomePath - ', aVal);
@@ -101,7 +149,7 @@ function main() {
 		//deferred_createProfile.reject(rejObj);
 	  }
 	);
-
+	*/
 	
 }
 
