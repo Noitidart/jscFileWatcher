@@ -40,9 +40,28 @@ function main() {
 		console.log('callback_logPath triggered', 'aEvent:', aEvent, 'aOSPath:', aOSPath);
 	};
 	var watcher1 = new Watcher(callback_logPath);
-	//var addAPath = watcher1.addPath(OS.Constants.desktopDir);
+	var promise_addAPath = watcher1.addPath(OS.Constants.Path.desktopDir);
 	
 	// these promises are not required, but its just nice to do it, in case an error hapens, especially as im in dev mode it may be throwing a bunch of .catch
+	// i placed the promise_addAPath .then first because i want to make sure that watcher1.promise_initialized resolves first
+	promise_addAPath.then(
+	  function(aVal) {
+		console.log('Fullfilled - promise_addAPath - ', aVal);
+		// start - do stuff here - promise_addAPath
+		// end - do stuff here - promise_addAPath
+	  },
+	  function(aReason) {
+		var rejObj = {name:'promise_addAPath', aReason:aReason};
+		console.error('Rejected - promise_addAPath - ', rejObj);
+		//deferred_createProfile.reject(rejObj);
+	  }
+	).catch(
+	  function(aCaught) {
+		var rejObj = {name:'promise_addAPath', aCaught:aCaught};
+		console.error('Caught - promise_addAPath - ', rejObj);
+		//deferred_createProfile.reject(rejObj);
+	  }
+	);
 	watcher1.promise_initialized.then(
 	  function(aVal) {
 		console.log('Fullfilled - watcher1.promise_initialized - ', aVal);
@@ -61,26 +80,7 @@ function main() {
 		//deferred_createProfile.reject(rejObj);
 	  }
 	);
-	/*
-	addAPath.then(
-	  function(aVal) {
-		console.log('Fullfilled - addAPath - ', aVal);
-		// start - do stuff here - addAPath
-		// end - do stuff here - addAPath
-	  },
-	  function(aReason) {
-		var rejObj = {name:'addAPath', aReason:aReason};
-		console.error('Rejected - addAPath - ', rejObj);
-		//deferred_createProfile.reject(rejObj);
-	  }
-	).catch(
-	  function(aCaught) {
-		var rejObj = {name:'addAPath', aCaught:aCaught};
-		console.error('Caught - addAPath - ', rejObj);
-		//deferred_createProfile.reject(rejObj);
-	  }
-	);
-	*/
+	
 }
 
 // start - OS.File.Watcher API
@@ -182,7 +182,7 @@ function Watcher(aCallback, options = {}) {
 	thisW.id = _Watcher_nextId;
 	_Watcher_nextId++; // so its available to next one
 	
-	thisW.readState = 0;
+	thisW.readyState = 0;
 	// readyState's
 		// 0 - uninintialized
 		// 1 - initialized, ready to do addPaths // when i change readyState to 1, i should check if any paths to add are in queue
@@ -204,7 +204,7 @@ function Watcher(aCallback, options = {}) {
 		  function(aVal) {
 			console.log('Fullfilled - promise_createWatcher - ', aVal);
 			// start - do stuff here - promise_createWatcher
-			thisW.readState = 1;
+			thisW.readyState = 1;
 			deferred_initialized.resolve(true);
 			// add in the paths that are waiting
 			for (var pendingAdd in thisW.pendingAdds) {
@@ -215,7 +215,7 @@ function Watcher(aCallback, options = {}) {
 		  function(aReason) {
 			var rejObj = {name:'promise_createWatcher', aReason:aReason};
 			console.warn('Rejected - promise_createWatcher - ', rejObj);
-			thisW.readState = 3;
+			thisW.readyState = 3;
 			deferred_initialized.reject(rejObj);
 			// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
 			for (var pendingAdd in thisW.pendingAdds) {
@@ -226,7 +226,7 @@ function Watcher(aCallback, options = {}) {
 		  function(aCaught) {
 			var rejObj = {name:'promise_createWatcher', aCaught:aCaught};
 			console.error('Caught - promise_createWatcher - ', rejObj);
-			thisW.readState = 3;
+			thisW.readyState = 3;
 			deferred_initialized.reject(rejObj);
 			// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
 			for (var pendingAdd in thisW.pendingAdds) {
@@ -270,12 +270,14 @@ Watcher.prototype.addPath = function(aOSPath) {
 	var thisW = this;
 	
 	var do_addPath = function() {
-		if (thisW.readState != 1) {
+		if (thisW.readyState == 2 || thisW.readyState == 3) {
 			// closed either to failed initialization or user called watcher.close
 			deferredMain_Watcher_addPath.reject({
 				name: 'watcher-closed',
-				message: 'Cannot add as this Watcher was previously closed with reason ' + thisW.readState
+				message: 'Cannot add as this Watcher was previously closed with reason ' + thisW.readyState
 			});
+		} else if (thisW.readyState == 0) {
+			console.error('what on earth, ready state is 0, it should never have got to this do_addPath');
 		} else {
 			var promise_addPath = myWorker.post('addPathToWatcher', [thisW.id, aOSPath]);
 			promise_addPath.then(
@@ -303,7 +305,7 @@ Watcher.prototype.addPath = function(aOSPath) {
 	
 	if (thisW.readyState === 0) {
 		// watcher not yet initalized
-		if (aOSPathLower in thisW.pathsPendingAdd) {
+		if (aOSPathLower in thisW.pendingAdds) {
 			deferredMain_Watcher_addPath.reject({
 				name: 'duplicate-path',
 				message: 'This path is already waiting to be added. It is waiting as the Watcher has not been initailized yet.'
@@ -325,7 +327,7 @@ Watcher.prototype.addPath = function(aOSPath) {
 		// watcher is closed
 		deferredMain_Watcher_addPath.reject({
 			name: 'watcher-closed',
-			message: 'Cannot add as this Watcher was previously closed with reason ' + thisW.readState
+			message: 'Cannot add as this Watcher was previously closed with reason ' + thisW.readyState
 		});
 	}
 	
@@ -341,8 +343,8 @@ Watcher.prototype.removePath = function() {
 	
 	if (thisW.readyState === 0) {
 		// watcher not yet initalized
-		if (aOSPathLower in thisW.pathsPendingAdd) {
-			delete thisW.pathsPendingAdd[aOSPathLower];
+		if (aOSPathLower in thisW.pendingAdds) {
+			delete thisW.pendingAdds[aOSPathLower];
 			deferredMain_Watcher_removePath.resolve(true);
 		} else {
 			deferredMain_Watcher_removePath.reject({
@@ -384,7 +386,7 @@ Watcher.prototype.removePath = function() {
 		// watcher is closed
 		deferredMain_Watcher_removePath.reject({
 			name: 'watcher-closed',
-			message: 'No need to remove paths as this Watcher was previously closed with reason ' + thisW.readState
+			message: 'No need to remove paths as this Watcher was previously closed with reason ' + thisW.readyState
 		});
 	}
 	
@@ -400,7 +402,7 @@ Watcher.prototype.close = function() {
 		// was already previously closed
 		deferredMain_Watcher_close.reject({
 			name: 'watcher-closed',
-			message: 'Cannot close because Watcher was already previously closed with reason ' + thisW.readState
+			message: 'Cannot close because Watcher was already previously closed with reason ' + thisW.readyState
 		});
 	} else {
 		var promise_closeWatcher = myWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);

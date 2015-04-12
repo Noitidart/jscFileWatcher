@@ -1,20 +1,6 @@
 var EXPORTED_SYMBOLS = ['ostypes'];
-/* no need to define core, as it takes core from the worker who imported this
-var core = {
-	name: 'jscFileWatcher',
-	id: 'jscFileWatcher@jetpack',
-	path: {
-		chrome: 'chrome://jscfilewatcher/content/',
-		locale: 'chrome://jscfilewatcher/locale/'
-	},
-	aData: 0
-};
-*/
-// console.log('from ostypes_win.jsm logging core, as i suspect its taking core from FSWatcherWorker.js which is the one who imported this jsm, core:', core);
 
-//importScripts(core.path.chrome + 'modules/cutils.jsm'); // used by HELPER functions // im guessing no need to import cutils.jsm either as the worker imports that already
-
-// console.log('testing if cutils exists here without import:', cutils); // nice yes it does, so no need for these imports
+// no need to define core or import cutils as all the globals of the worker who importScripts'ed it are availble here
 
 if (ctypes.voidptr_t.size == 4 /* 32-bit */) {
 	var is64bit = false;
@@ -31,10 +17,10 @@ var winTypes = function() {
 	// ABIs
 	if (is64bit) {
 	  this.CALLBACK_ABI = ctypes.default_abi;
-	  this.WINABI = ctypes.default_abi;
+	  this.ABI = ctypes.default_abi;
 	} else {
 	  this.CALLBACK_ABI = ctypes.stdcall_abi;
-	  this.WINABI = ctypes.winapi_abi;
+	  this.ABI = ctypes.winapi_abi;
 	}
 	
 	// SIMPLE TYPES // based on ctypes.BLAH // as per WinNT.h etc
@@ -238,7 +224,7 @@ var winInit = function() {
 			 *   __in_opt_  HANDLE hTemplateFile
 			 * );
 			 */
-			return lib('kernel32').declare('CreateFileW', self.TYPE.WINABI,
+			return lib('kernel32').declare('CreateFileW', self.TYPE.ABI,
 				self.TYPE.HANDLE,					// return
 				self.TYPE.LPCTSTR,					// lpFileName
 				self.TYPE.DWORD,					// dwDesiredAccess
@@ -258,7 +244,7 @@ var winInit = function() {
 				  _In_      UINT uType
 				);
 			*/
-			return lib('user32').declare('MessageBoxW', self.TYPE.WINABI,
+			return lib('user32').declare('MessageBoxW', self.TYPE.ABI,
 				self.TYPE.INT,			// return
 				self.TYPE.HWND,			// hWnd
 				self.TYPE.LPCTSTR,		// lpText
@@ -279,7 +265,7 @@ var winInit = function() {
 			 *   __in_opt_     LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
 			 * );
 			 */
-			return lib('kernel32').declare('ReadDirectoryChangesW', self.TYPE.WINABI,
+			return lib('kernel32').declare('ReadDirectoryChangesW', self.TYPE.ABI,
 				self.TYPE.BOOL,								// return
 				self.TYPE.HANDLE,							// hDirectory,
 				self.TYPE.LPVOID,							// lpBuffer,

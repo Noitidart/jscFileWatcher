@@ -1,17 +1,6 @@
-/*jshint esnext: true, moz: true*/
 var EXPORTED_SYMBOLS = ['ostypes'];
 
-var core = {
-	name: 'jscFileWatcher',
-	id: 'jscFileWatcher@jetpack',
-	path: {
-		chrome: 'chrome://jscfilewatcher/content/',
-		locale: 'chrome://jscfilewatcher/locale/'
-	},
-	aData: 0
-};
-
-importScripts(core.path.chrome + 'modules/cutils.jsm'); // used by HELPER functions
+// no need to define core or import cutils as all the globals of the worker who importScripts'ed it are availble here
 
 if (ctypes.voidptr_t.size === 4 /* 32-bit */) {
 	var is64bit = false;
