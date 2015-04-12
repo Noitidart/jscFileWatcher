@@ -40,9 +40,9 @@ function main() {
 		console.log('callback_logPath triggered', 'aEvent:', aEvent, 'aOSPath:', aOSPath);
 	};
 	var watcher1 = new Watcher(callback_logPath);
-	//var promise_removeSomePath = watcher1.removePath('blah'); //test1 - remove non-added path before Watcher closes
+	var promise_removeSomePath = watcher1.removePath('blah'); //test1 - remove non-added path before Watcher closes
 	var promise_addAPath = watcher1.addPath(OS.Constants.Path.desktopDir);
-	var promise_removeSomePath = watcher1.removePath(OS.Constants.Path.desktopDir); //test2 - remove existing path before Watcher closes
+	//var promise_removeSomePath = watcher1.removePath(OS.Constants.Path.desktopDir); //test2 - remove existing path before Watcher closes
 	/*
 	//start test3 - remove existing path after watcher closes
 	Services.wm.getMostRecentWindow(null).setTimeout(function() {
@@ -267,8 +267,10 @@ function Watcher(aCallback, options = {}) {
 	thisW.paths_watched = {}; // changed to obj as its easier to delete
 	
 	thisW.pendingAdds = {}; // object with key aOSPath.toLowerCase()
-	thisW.adds_pendingC = {}; // as if user calls removePath while the c is running, it will think that path was never added
-	thisW.removes_pendingC = {};
+	thisW.adds_pendingAddC = {}; // as if user calls removePath while the c is running, it will think that path was never added
+	thisW.removes_pendingAddC = {};
+	
+	// todo: work on handling pendingRemoveC ie: thisW.adds_pendingRemoveC and thisW.removes_pendingRemoveC
 	
 	var deferred_initialized = new Deferred();
 	thisW.promise_initialized = deferred_initialized.promise;
@@ -360,50 +362,50 @@ Watcher.prototype.addPath = function(aOSPath) {
 		} else if (thisW.readyState == 0) {
 			console.error('what on earth, ready state is 0, it should never have got to this do_addPath');
 		} else {
-			if (aOSPathLower in thisW.adds_pendingC) {
-				if (aOSPathLower in thisW.removes_pendingC) {
-					thisW.removes_pendingC[aOSPathLower].cancelIt();
+			if (aOSPathLower in thisW.adds_pendingAddC) {
+				if (aOSPathLower in thisW.removes_pendingAddC) {
+					thisW.removes_pendingAddC[aOSPathLower].cancelIt();
 				}
 				deferredMain_Watcher_addPath.reject({
 					name: 'duplicate-path',
 					message: 'This path is currently already in process of being added by the jsctypes code.'
 				});
 			} else {
-				thisW.adds_pendingC[aOSPathLower] = true;
+				thisW.adds_pendingAddC[aOSPathLower] = true;
 				var promise_addPath = myWorker.post('addPathToWatcher', [thisW.id, aOSPath]);
 				promise_addPath.then(
 				  function(aVal) {
 					console.log('Fullfilled - promise_addPath - ', aVal);
 					// start - do stuff here - promise_addPath
-					delete thisW.adds_pendingC[aOSPathLower];
+					delete thisW.adds_pendingAddC[aOSPathLower];
 					//thisW.paths_watched.push(aOSPathLower);
 					thisW.paths_watched[aOSPathLower] = true;
 					deferredMain_Watcher_addPath.resolve(true);
 					// do the pending remove if it was there
-					if (aOSPathLower in thisW.removes_pendingC) {
-						thisW.removes_pendingC[aOSPathLower].removeIt();
+					if (aOSPathLower in thisW.removes_pendingAddC) {
+						thisW.removes_pendingAddC[aOSPathLower].removeIt();
 					}
 					// end - do stuff here - promise_addPath
 				  },
 				  function(aReason) {
-					delete thisW.adds_pendingC[aOSPathLower];
+					delete thisW.adds_pendingAddC[aOSPathLower];
 					var rejObj = {name:'promise_addPath', aReason:aReason};
 					console.warn('Rejected - promise_addPath - ', rejObj);
 					deferredMain_Watcher_addPath.reject(rejObj);
 					// reject the pending remove if it was there
-					if (aOSPathLower in thisW.removes_pendingC) {
-						thisW.removes_pendingC[aOSPathLower].removeIt();
+					if (aOSPathLower in thisW.removes_pendingAddC) {
+						thisW.removes_pendingAddC[aOSPathLower].removeIt();
 					}
 				  }
 				).catch(
 				  function(aCaught) {
-					delete thisW.adds_pendingC[aOSPathLower];
+					delete thisW.adds_pendingAddC[aOSPathLower];
 					var rejObj = {name:'promise_addPath', aCaught:aCaught};
 					console.error('Caught - promise_addPath - ', rejObj);
 					deferredMain_Watcher_addPath.reject(rejObj);
 					// reject the pending remove if it was there
-					if (aOSPathLower in thisW.removes_pendingC) {
-						thisW.removes_pendingC[aOSPathLower].removeIt();
+					if (aOSPathLower in thisW.removes_pendingAddC) {
+						thisW.removes_pendingAddC[aOSPathLower].removeIt();
 					}
 				  }
 				);
@@ -473,8 +475,8 @@ Watcher.prototype.removePath = function(aOSPath) {
 	} else if (thisW.readyState == 1) {
 		// watcher is ready
 		var do_removePath = function() {
-			//if (thisW.paths_watched.indexOf(aOSPathLower) > -1) { // moved this if block here because removes_pendingC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
-			if (aOSPathLower in thisW.paths_watched) { // moved this if block here because removes_pendingC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
+			//if (thisW.paths_watched.indexOf(aOSPathLower) > -1) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
+			if (aOSPathLower in thisW.paths_watched) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
 				var promise_removePath = myWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
 				promise_removePath.then(
 				  function(aVal) {
@@ -506,15 +508,15 @@ Watcher.prototype.removePath = function(aOSPath) {
 		};
 		
 		var do_cancelPendingRemove = function() {
-			delete thisW.removes_pendingC[aOSPathLower];
+			delete thisW.removes_pendingAddC[aOSPathLower];
 			deferredMain_Watcher_removePath.reject({
 				name: 'remove-cancelled',
 				message: 'This path was waiting for initalization to be added, but was removePath\'ed before it got a chance to add.'
 			});
 		};
 		
-		if (aOSPathLower in thisW.adds_pendingC) {
-				thisW.removes_pendingC = { // note: pendingC means its waiting for the call to FSWatcherWorker.addPathToWatcher is in process
+		if (aOSPathLower in thisW.adds_pendingAddC) {
+				thisW.removes_pendingAddC = { // note: pendingC means its waiting for the call to FSWatcherWorker.addPathToWatcher is in process
 					removeIt: do_removePath,
 					cancelIt: do_cancelPendingRemove
 				};
