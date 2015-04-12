@@ -84,7 +84,7 @@ function init(objCore) {
 		default:
 			throw new Error({
 				name: 'jscfilewatcher-api-error',
-				message: 'Your operating system, "' + OS.Constants.Sys.Name + '" is not supported'
+				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
 			});
 	}
 	//console.log('done importing ostypes_*.jsm');
@@ -97,6 +97,8 @@ var _Watcher_cache = {};
 function createWatcher(aWatcherID) {
 	// _Watcher_cache[aWatcherID] = 
 
+	// returns object which should  be passed to FSWPollWorker.poll
+	
 	switch (core.os.name) {
 		//	case 'winnt':
 		//	case 'winmo': // untested, im guessing it has ReadDirectoryChangesW
@@ -150,13 +152,17 @@ function createWatcher(aWatcherID) {
 				Watcher.paths_watched = {}; // lower cased OS paths that are being watched (i do lower case because these are inputed by user passing as args to addPath/removePath, and devuser might do different casings as devusers can be stupid)
 				// in the worker, paths_watched keyval is aOSPathLower just like in mainthread but the value is the watch_fd
 				
-				return cutils.jscGetDeepest(fd);
+				var argsForPoll = {
+					fd: parseInt(cutils.jscGetDeepest(fd))
+				};
+				
+				return cutils.jscGetDeepest(argsForPoll);
 
 			break;
 		default:
 			throw new Error({
 				name: 'jscfilewatcher-api-error',
-				message: 'Your operating system, "' + OS.Constants.Sys.Name + '" is not supported'
+				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
 			});
 	}
 	
@@ -222,7 +228,7 @@ function addPathToWatcher(aWatcherID, aOSPathLower, aOptions) {
 		default:
 			throw new Error({
 				name: 'jscfilewatcher-api-error',
-				message: 'Your operating system, "' + OS.Constants.Sys.Name + '" is not supported'
+				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
 			});
 	}
 	

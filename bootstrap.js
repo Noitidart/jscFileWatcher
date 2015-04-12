@@ -288,6 +288,7 @@ function Watcher(aCallback) {
 			console.log('Fullfilled - promise_createWatcher - ', aVal);
 			// start - do stuff here - promise_createWatcher
 			thisW.readyState = 1;
+			thisW.argsForPoll = aVal;
 			deferred_initialized.resolve(true);
 			// add in the paths that are waiting
 			for (var pendingAdd in thisW.pendingAdds) {
@@ -426,7 +427,7 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 				});
 			} else {
 				thisW.adds_pendingAddC[aOSPathLower] = true;
-				var promise_addPath = myWorker.post('addPathToWatcher', [thisW.id, aOSPathLower]);
+				var promise_addPath = FSWatcherWorker.post('addPathToWatcher', [thisW.id, aOSPathLower]);
 				promise_addPath.then(
 				  function(aVal) {
 					console.log('Fullfilled - promise_addPath - ', aVal);
@@ -534,7 +535,7 @@ Watcher.prototype.removePath = function(aOSPath) {
 				delete thisW.removes_pendingAddC[aOSPathLower];
 			}
 			if (aOSPathLower in thisW.paths_watched) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
-				var promise_removePath = myWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
+				var promise_removePath = FSWatcherWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
 				promise_removePath.then(
 				  function(aVal) {
 					console.log('Fullfilled - promise_removePath - ', aVal);
@@ -603,7 +604,7 @@ Watcher.prototype.close = function() {
 			message: 'Cannot close because Watcher was already previously closed with reason ' + thisW.readyState
 		});
 	} else {
-		var promise_closeWatcher = myWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
+		var promise_closeWatcher = FSWatcherWorker.post('close', [thisW.id, aOSPath]);
 		promise_closeWatcher.then(
 		  function(aVal) {
 			console.log('Fullfilled - promise_closeWatcher - ', aVal);
@@ -631,12 +632,17 @@ Watcher.prototype.close = function() {
 Watcher.prototype.waitForNextChange = function() {
 	// returns promise
 	
+	//var deferredMain_Watcher_waitForNextChange = new Deferred();
+	
 	var thisW = this;
 	if (!thisW.FSWPollWorker) {
 		thisW.FSWPollWorker = new PromiseWorker(core.addon.path.content + 'modules/workers/FSWPollWorker.js');
 		_Watcher_UnterminatedFSWPollWorkers[thisW.id] = thisW.FSWPollWorker;
 	}
 	
+	return thisW.FSWPollWorker.post('poll', [thisW.argsForPoll]);
+	
+	//return deferredMain_Watcher_waitForNextChange.promise;
 	
 	// for winnt, if ReadDirectoryChangesW only supports one path per, this func should do a promise for each path to FSWPollWorker. a FSWPollWorker must be created for each callback as when want to close, to abort all of the promises i can terminate the worker, then itterate through the promises and reject them for reason of Watcher closed.
 	// actually i think for all OS'es each callback should get its own FSWPollWorker
