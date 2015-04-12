@@ -336,9 +336,9 @@ function Watcher(aCallback) {
 								for (var i=0; i<aVal.length; i++) {
 									let iHoisted = i;
 									var cVal = aVal[iHoisted];
-									var thisWd = cVal.aExtra.aEvent_inotifyWd;
+									var thisWd = cVal.aExtra.nixinotifyWd;
 									console.info('thisWd:', thisWd);
-									delete cVal.aExtra.aEvent_inotifyWd;
+									delete cVal.aExtra.nixInotifyWd;
 									cVal.aExtra.aOSPath_parentDir = undefined;
 									for (var cOSPath in thisW.paths_watched) {
 										console.log('compareing:', thisW.paths_watched[cOSPath], thisWd);
@@ -349,8 +349,8 @@ function Watcher(aCallback) {
 									}
 									if (cVal.aEvent == 'renamed-to') {
 										var cArgsObj = cVal;
-										var cCookie = cArgsObj.aExtra.aEvent_inotifyCookie;
-										delete cArgsObj.aExtra.aEvent_inotifyCookie;
+										var cCookie = cArgsObj.aExtra.nixInotifyCookie;
+										delete cArgsObj.aExtra.nixInotifyCookie;
 										if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
 											// renamed-to message came first (before the related renamed-from)
 											console.log('got renamed-to event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-from event');
@@ -369,8 +369,8 @@ function Watcher(aCallback) {
 										}
 									} else if (cVal.aEvent == 'renamed-from') {
 										var cArgsObj = cVal;
-										var cCookie = cArgsObj.aExtra.aEvent_inotifyCookie;
-										delete cArgsObj.aExtra.aEvent_inotifyCookie;
+										var cCookie = cArgsObj.aExtra.nixInotifyCookie;
+										delete cArgsObj.aExtra.nixInotifyCookie;
 										if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
 											// renamed-from message came first (before the related renamed-to)
 											console.log('got renamed-from event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-to event');

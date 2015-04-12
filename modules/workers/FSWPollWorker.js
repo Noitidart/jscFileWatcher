@@ -153,13 +153,13 @@ function poll(aArgs) {
 							aFileName: fileName,
 							aEvent: convertFlagsToAEventStr(mask),
 							aExtra: {
-								aEvent_inotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
-								aEvent_inotifyWd: wd
+								nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+								nixInotifyWd: wd
 							}
 						}
 
 						if (cookie !== 0) {
-							rezObj.aExtra.aEvent_inotifyCookie = cookie;
+							rezObj.aExtra.nixInotifyCookie = cookie;
 						}
 						changes.push(rezObj);
 						if (len == 0) {
