@@ -337,8 +337,10 @@ function Watcher(aCallback) {
 									let iHoisted = i;
 									var cVal = aVal[iHoisted];
 									var thisWd = cVal.aExtra.aEvent_inotifyWd;
+									console.info('thisWd:', thisWd);
 									delete cVal.aExtra.aEvent_inotifyWd;
 									for (var cOSPath in thisW.paths_watch) {
+										console.log('compareing:', thisW.paths_watch[cOSPath], thisWd);
 										if (thisW.paths_watch[cOSPath] == thisWd) {
 											break;
 										}

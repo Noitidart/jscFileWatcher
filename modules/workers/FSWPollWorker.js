@@ -117,7 +117,8 @@ function poll(aArgs) {
 				count = ostypes.TYPE.size_t(count); // for use with read
 				let length = ostypes.API('read')(fd, buf, count);
 
-				console.info('length read:', length.toString());
+				length = parseInt(cutils.jscGetDeepest(length));
+				console.info('length read:', length, length.toString(), uneval(length));
 				
 				if (cutils.jscEqual(length, -1)) {
 					throw new Error({
@@ -132,6 +133,7 @@ function poll(aArgs) {
 					let i = 0;
 					var numElementsRead = 0;
 					console.error('starting loop');
+					length = parseInt(cutils.jscGetDeepest(length));
 					do {
 						numElementsRead++;
 						let casted = ctypes.cast(buf.addressOfElement(i), ostypes.TYPE.inotify_event.ptr).contents;
@@ -156,7 +158,11 @@ function poll(aArgs) {
 							rezObj.aExtra.aEvent_inotifyCookie = cookie;
 						}
 						changes.push(rezObj);
-						i += len;
+						if (len == 0) {
+							break;
+						};
+						i += parseInt(len);
+						console.info('incremented i is now:', i, 'length:', length);
 					} while (i < length);
 					
 					console.error('loop ended:', 'numElementsRead:', numElementsRead);
