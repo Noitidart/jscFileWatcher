@@ -204,7 +204,7 @@ function addPathToWatcher(aWatcherID, aOSPathLower, aOptions={}) {
 
 				var watch_fd = ostypes.API('inotify_add_watch')(Watcher.fd, aOSPathLower, masks);
 				//console.info('watch_fd:', watch_fd.toString(), uneval(watch_fd));
-				if (!cutils.jscEqual(watch_fd, -1)) {
+				if (cutils.jscEqual(watch_fd, -1)) {
 					console.error('Failed watch_fd, errno:', ctypes.errno);
 					throw new Error({
 						name: 'os-api-error',

@@ -41,7 +41,7 @@ function main() {
 	};
 	var watcher1 = new Watcher(callback_logPath);
 	var promise_removeSomePath = watcher1.removePath('blah'); //test1 - remove non-added path before Watcher closes
-	var promise_addAPath = watcher1.addPath(OS.Constants.Path.desktopDir);
+	var promise_watcher1_addpath = watcher1.addPath(OS.Constants.Path.desktopDir);
 	//var promise_removeSomePath = watcher1.removePath(OS.Constants.Path.desktopDir); //test2 - remove existing path before Watcher closes
 	/*
 	//start test3 - remove existing path after watcher closes
@@ -95,22 +95,22 @@ function main() {
 	*/
 	
 	// these promises are not required, but its just nice to do it, in case an error hapens, especially as im in dev mode it may be throwing a bunch of .catch
-	// i placed the promise_addAPath .then first because i want to make sure that watcher1.promise_initialized resolves first
-	promise_addAPath.then(
+	// i placed the promise_watcher1_addpath .then first because i want to make sure that watcher1.promise_initialized resolves first
+	promise_watcher1_addpath.then(
 	  function(aVal) {
-		console.log('Fullfilled - promise_addAPath - ', aVal);
-		// start - do stuff here - promise_addAPath
-		// end - do stuff here - promise_addAPath
+		console.log('Fullfilled - promise_watcher1_addpath - ', aVal);
+		// start - do stuff here - promise_watcher1_addpath
+		// end - do stuff here - promise_watcher1_addpath
 	  },
 	  function(aReason) {
-		var rejObj = {name:'promise_addAPath', aReason:aReason};
-		console.error('Rejected - promise_addAPath - ', rejObj);
+		var rejObj = {name:'promise_watcher1_addpath', aReason:aReason};
+		console.error('Rejected - promise_watcher1_addpath - ', rejObj);
 		//deferred_createProfile.reject(rejObj);
 	  }
 	).catch(
 	  function(aCaught) {
-		var rejObj = {name:'promise_addAPath', aCaught:aCaught};
-		console.error('Caught - promise_addAPath - ', rejObj);
+		var rejObj = {name:'promise_watcher1_addpath', aCaught:aCaught};
+		console.error('Caught - promise_watcher1_addpath - ', rejObj);
 		//deferred_createProfile.reject(rejObj);
 	  }
 	);
@@ -260,10 +260,12 @@ function Watcher(aCallback) {
 		// 1 - initialized, ready to do addPaths // when i change readyState to 1, i should check if any paths to add are in queue
 		// 2 - closed due to user calling Watcher.prototype.close
 		// 3 - closed due to failed to initialize
-		
+	this.cb = aCallback;
+	thisW.cbQueue = []; //array of functions that pass the args from worker to the aCallback
+	
 	thisW.timerEvent_triggerCallback = {
 		notify: function() {
-			aCallback(aVal.aOSPathLower, aVal.aEvent); // trigger callback
+			thisW.cbQueue.shift()();
 		}
 	};
 	thisW.timer = Cc['@mozilla.org/timer;1'].createInstance(Ci.nsITimer);
@@ -315,6 +317,9 @@ function Watcher(aCallback) {
 							  function(aVal) {
 								console.log('Fullfilled - promise_nixPoll - ', aVal);
 								// start - do stuff here - promise_nixPoll
+								thisW.cbQueue.push(function() {
+									thisW.cb(aVal.aOSPathLower, aVal.aEvent);
+								});
 								thisW.timer.initWithCallback(thisW.timerEvent_triggerCallback, 0, Ci.nsITimer.TYPE_ONE_SHOT); // trigger callback
 								do_nixPoll(); // restart poll
 								// end - do stuff here - promise_nixPoll
