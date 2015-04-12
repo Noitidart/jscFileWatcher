@@ -156,7 +156,7 @@ function poll(aArgs) {
 							rezObj.aExtra.aEvent_inotifyCookie = cookie;
 						}
 						changes.push(rezObj);
-						i += ostypes.TYPE.inotify_event.size + (+casted.addressOfField('len').contents);
+						i += len;
 					} while (i < length);
 					
 					console.error('loop ended:', 'numElementsRead:', numElementsRead);

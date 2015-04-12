@@ -361,7 +361,7 @@ function Watcher(aCallback) {
 											cArgsObj.aExtraOld = aExtraOld;
 											
 											cArgsObj.aFileNameOld = aExtraOld.aFileName;
-											delete aExtraOld.aFileName
+											delete aExtraOld.aFileName;
 											cArgsObj.aExtra.aExtraOld = aExtraOld;
 											
 											thisW.cb(cArgsObj.aFileName, cArgsObj.aEvent, cArgsObj.aExtra);
@@ -385,7 +385,7 @@ function Watcher(aCallback) {
 											cArgsObj.aExtraOld = aExtraOld;
 											
 											aExtraOld.aFileNameOld = aExtraOld.aFileName;
-											delete aExtraOld.aFileName
+											delete aExtraOld.aFileName;
 											cArgsObj.aExtra.aExtraOld = aExtraOld;
 											
 											thisW.cb(cachedArgsObj.aFileName, cachedArgsObj.aEvent, cachedArgsObj.aExtra);
