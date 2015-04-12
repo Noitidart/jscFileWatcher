@@ -349,8 +349,9 @@ function Watcher(aCallback) {
 									}
 								} else if (aVal.aEvent == 'renamed-from') {
 									console.log('got renamed-from event, so saving its info, and will not trigger callback now, will trigger callback when get renamed-to but will add this info to that');
-									thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie] = {
-										delete aVal.aExtra.aEvent_inotifyCookie;
+									var cCookie = aVal.aExtra.aEvent_inotifyCookie;
+									delete aVal.aExtra.aEvent_inotifyCookie;
+									thisW._cache_aExtraRenamedFrom[cCookie] = {
 										aOldFileName: aVal.aFileName,
 										aExtra_forOldFile: aVal.aExtra
 									}
