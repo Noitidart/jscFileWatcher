@@ -96,12 +96,29 @@ function poll(aArgs) {
 				// uses inotify
 				console.log('ok in pollThis of nixPoll');
 				let fd = aArgs.fd;
-				let count = ostypes.TYPE.inotify_event.size + 1024; //size_t + size of name
+				
+				var sizeUnaligned_inotify_event = 
+					ostypes.TYPE.inotify_event.fields[0].wd.size + 
+					ostypes.TYPE.inotify_event.fields[1].mask.size + 
+					ostypes.TYPE.inotify_event.fields[2].cookie.size + 
+					ostypes.TYPE.inotify_event.fields[3].len.size + 
+					ostypes.TYPE.inotify_event.fields[4].name.size; // has built in length of MAX_NAME + 1 (the + 1 is for null terminator)
+				var size_inotify_event = ostypes.TYPE.inotify_event.size;
+				var sizeField4 = ostypes.TYPE.inotify_event.fields[4].name.size;
+				
+				console.info('sizeUnaligned_inotify_event:', sizeUnaligned_inotify_event.toString());
+				console.info('size_inotify_event:', sizeUnaligned_inotify_event.toString());
+				console.info('sizeField4:', sizeField4.toString());
+				
+				let count = size_inotify_event * 10; // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
 				let buf = ctypes.ArrayType(ostypes.TYPE.char, count)(); // docs page here http://linux.die.net/man/7/inotify says sizeof(struct inotify_event) + NAME_MAX + 1 will be sufficient to read at least one event.
+				
 				console.log('starting the loop, fd:', fd, 'count:', count);
 				count = ostypes.TYPE.size_t(count); // for use with read
 				let length = ostypes.API('read')(fd, buf, count);
 
+				console.info('length read:', length.toString());
+				
 				if (cutils.jscEqual(length, -1)) {
 					throw new Error({
 						name: 'os-api-error',
@@ -111,31 +128,39 @@ function poll(aArgs) {
 				} else if (!cutils.jscEqual(length, 0)) {
 					// then its > 0 as its not -1
 					// something happend, read struct
-					let changes = new Set();
+					let changes = [];
 					let i = 0;
+					var numElementsRead = 0;
+					console.error('starting loop');
 					do {
+						numElementsRead++;
 						let casted = ctypes.cast(buf.addressOfElement(i), ostypes.TYPE.inotify_event.ptr).contents;
 						console.log('casted:', casted.toString());
 						let fileName = casted.addressOfField('name').contents.readString();
-						let mask = casted.addressOfField('mask').contents;
-						let len = casted.addressOfField('len').contents; // only needed if we want to cast the ptr of casted.addressOfField('name') but i didnt make it a .ptr i made it an buffer (.array) of char at OS.Constants.libc.MAX_NAME
-						let cookie = casted.addressOfField('cookie').contents;
-
-						console.info('aOSPath:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
+						let mask = casted.addressOfField('mask').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+						let len = casted.addressOfField('len').contents; // need to iterate to next item that was read in // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+						let cookie = casted.addressOfField('cookie').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+						let wd = casted.addressOfField('cookie').contents; // ostypes.TYPE.int which is ctypes.int so no need to get deepest, its already a number
+						
+						console.info('aFileName:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
 						let rezObj = {
 							aFileName: fileName,
 							aEvent: convertFlagsToAEventStr(mask),
 							aExtra: {
 								aEvent_inotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+								aEvent_inotifyWd: wd
 							}
 						}
 
 						if (cookie !== 0) {
 							rezObj.aExtra.aEvent_inotifyCookie = cookie;
 						}
-						changes.add(rezObj);
+						changes.push(rezObj);
 						i += ostypes.TYPE.inotify_event.size + (+casted.addressOfField('len').contents);
 					} while (i < length);
+					
+					console.error('loop ended:', 'numElementsRead:', numElementsRead);
+					
 					return changes;
 				}
 			}

@@ -210,10 +210,10 @@ function addPathToWatcher(aWatcherID, aOSPathLower, aOptions={}) {
 						errno: ctypes.errno
 					});
 				} else {
-					Watcher.paths_watched[aOSPathLower] = watch_fd;
+					Watcher.paths_watched[aOSPathLower] = watch_fd; // is ostypes.TYPE.int which is ctypes.int so no need to jscGetDeepest
 				}
 				
-				return true;
+				return watch_fd;
 			break;
 		default:
 			throw new Error({

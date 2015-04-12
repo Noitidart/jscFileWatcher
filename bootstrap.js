@@ -27,6 +27,7 @@ const core = {
 };
 
 var PromiseWorker;
+var pathsSplitterStr = '/////////'; // i use this as joiner as `/////////` is disallowed on winnt, linux, and darwin, in file names, im pretty sure
 
 ////// end of imports and definitions
 
@@ -265,7 +266,7 @@ function Watcher(aCallback) {
 		// 2 - closed due to user calling Watcher.prototype.close
 		// 3 - closed due to failed to initialize
 	thisW.cb = aCallback;
-	thisW._cache_aExtraRenamedFrom = {}; // key is cookie and val is aExtra of rename-from, and on reanmed-to, it finds the cookie and deletes it and triggers callback with renamed-to with aExtra holding oldFileName
+	thisW._cache_aRenamed_callbackArgsObj = {}; // key is cookie and val is aExtra of rename-from, and on reanmed-to, it finds the cookie and deletes it and triggers callback with renamed-to with aExtra holding oldFileName
 	/*
 	thisW.cbQueue = []; //array of functions that pass the args from worker to the aCallback
 	
@@ -277,10 +278,10 @@ function Watcher(aCallback) {
 	thisW.timer = Cc['@mozilla.org/timer;1'].createInstance(Ci.nsITimer);
 	*/
 	
-	//thisW.paths_watched = []; // array of lower cased OS paths that are being watched (i do lower case because these are inputed by user passing as args to addPath/removePath, and devuser might do different casings as devusers can be stupid)
-	thisW.paths_watched = {}; // changed to obj as its easier to delete
+	//thisW.paths_watched = []; // array of cased OS paths (as inputed by devuser) that are being watched
+	thisW.paths_watched = {}; // changed to obj as its easier to delete // also for linux/inotify i use this to link a callback to aOSPath_parentDir, as value is set to the watched_fd
 	
-	thisW.pendingAdds = {}; // object with key aOSPath.toLowerCase()
+	thisW.pendingAdds = {}; // object with key aOSPath
 	thisW.adds_pendingAddC = {}; // as if user calls removePath while the c is running, it will think that path was never added
 	thisW.removes_pendingAddC = {};
 	
@@ -331,32 +332,59 @@ function Watcher(aCallback) {
 								*/
 								// i was doing timer event because i didnt want body of aCallback to finish before next poll because i was worried it would miss a change, but it doesnt miss any change, as changes are fed to the file, and its their waiting when i start the next poll
 								// when renamed, renamed-from fires first, then renamed-to
-								if (aVal.aEvent == 'renamed-to') {
-									if (!(aVal.aExtra.aEvent_inotifyCookie in thisW._cache_aExtraRenamedFrom)) {
-										throw new Error({
-											name: 'jscfilewatcher-api-error',
-											message: 'Could not find the renamed-from cookie in thisW.aExtra_of_renamedFrom cache'
-										});
+								// aVal is an array of rezObj's
+								for (var i=0; i<aVal.length; i++) {
+									let iHoisted = i;
+									var cVal = aVal[iHoisted];
+									var thisWd = cVal.aExtra.aEvent_inotifyWd;
+									delete cVal.aExtra.aEvent_inotifyWd;
+									cVal.aExtra.aOSPath_parentDir = thisW.paths_watched[thisWd];
+									if (cVal.aEvent == 'renamed-to') {
+										var cArgsObj = cVal;
+										var cCookie = cArgsObj.aExtra.aEvent_inotifyCookie;;
+										if (!(cVal.aExtra.aEvent_inotifyCookie in thisW._cache_aRenamed_callbackArgsObj)) {
+											// renamed-to message came first (before the related renamed-from)
+											console.log('got renamed-from event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-to event');
+											thisW._cache_aRenamed_callbackArgsObj[cCookie] = cArgsObj; // cached rename-to
+										} else {
+											// renamed-to message came second (after the related renamed-from)
+											console.log('got renamed-to event, this is the related event, the renamed-from event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
+											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-from
+											
+											var aExtraOld = cachedArgsObj; // is renamed-to
+											cArgsObj.aExtraOld = aExtraOld;
+											
+											aExtraOld.aFileNameOld = aExtraOld.aFileName;
+											delete aExtraOld.aFileName
+											cArgsObj.aEvent.aExtra.aExtraOld = aExtraOld;
+											
+											thisW.cb(cArgsObj.aFileName, cArgsObj.aEvent, cArgsObj.aExtra);
+										}
+									} else if (cVal.aEvent == 'renamed-from') {
+										var cArgsObj = cVal;
+										var cCookie = cArgsObj.aExtra.aEvent_inotifyCookie;
+										delete cArgsObj.aExtra.aEvent_inotifyCookie;
+										if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
+											// renamed-from message came first (before the related renamed-to)
+											console.log('got renamed-from event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-to event');
+											thisW._cache_aRenamed_callbackArgsObj[cCookie] = cArgsObj; // cached rename-from
+										} else {
+											// renamed-from message came second (after the related renamed-to)
+											console.log('got renamed-from event, this is the related event, the renamed-to event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
+											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-to
+											
+											var aExtraOld = cachedArgsObj; // is renamed-from
+											cArgsObj.aExtraOld = aExtraOld;
+											
+											aExtraOld.aFileNameOld = aExtraOld.aFileName;
+											delete aExtraOld.aFileName
+											cArgsObj.aEvent.aExtra.aExtraOld = aExtraOld;
+											
+											thisW.cb(cArgsObj.aFileName, cArgsObj.aEvent, cArgsObj.aExtra);
+										}
 									} else {
-										var aExtraOld = thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie];
-										aVal.aExtra.aFileNameOld = aExtra_forOldFile.aOldFileName;
-										delete aExtraOld.aOldFileName;
-										aVal.aExtra.aExtraOld = aExtraOld.aExtra_forOldFile;
-										delete thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie];
-										aVal.aEvent = 'renamed';
-										delete aVal.aExtra.aEvent_inotifyCookie;
-										thisW.cb(aVal.aFileName, aVal.aEvent, aVal.aExtra);
+										thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
 									}
-								} else if (aVal.aEvent == 'renamed-from') {
-									console.log('got renamed-from event, so saving its info, and will not trigger callback now, will trigger callback when get renamed-to but will add this info to that');
-									var cCookie = aVal.aExtra.aEvent_inotifyCookie;
-									delete aVal.aExtra.aEvent_inotifyCookie;
-									thisW._cache_aExtraRenamedFrom[cCookie] = {
-										aOldFileName: aVal.aFileName,
-										aExtra_forOldFile: aVal.aExtra
-									}
-								} else {
-									thisW.cb(aVal.aFileName, aVal.aEvent, aVal.aExtra);
 								}
 								do_nixPoll(); // restart poll
 								// end - do stuff here - promise_nixPoll
@@ -445,8 +473,6 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 		
 	var deferredMain_Watcher_addPath = new Deferred();
 	
-	var aOSPathLower = aOSPath.toLowerCase();
-	
 	var thisW = this;
 	
 	var do_addPath = function() {
@@ -459,50 +485,50 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 		} else if (thisW.readyState == 0) {
 			console.error('what on earth, ready state is 0, it should never have got to this do_addPath');
 		} else {
-			if (aOSPathLower in thisW.adds_pendingAddC) {
-				if (aOSPathLower in thisW.removes_pendingAddC) {
-					thisW.removes_pendingAddC[aOSPathLower].cancelIt();
+			if (aOSPath in thisW.adds_pendingAddC) {
+				if (aOSPath in thisW.removes_pendingAddC) {
+					thisW.removes_pendingAddC[aOSPath].cancelIt();
 				}
 				deferredMain_Watcher_addPath.reject({
 					name: 'duplicate-path',
 					message: 'This path is currently already in process of being added by the jsctypes code.'
 				});
 			} else {
-				thisW.adds_pendingAddC[aOSPathLower] = true;
+				thisW.adds_pendingAddC[aOSPath] = true;
 				var promise_addPath = FSWatcherWorker.post('addPathToWatcher', [thisW.id, aOSPath]);
 				promise_addPath.then(
 				  function(aVal) {
 					console.log('Fullfilled - promise_addPath - ', aVal);
 					// start - do stuff here - promise_addPath
-					delete thisW.adds_pendingAddC[aOSPathLower];
-					//thisW.paths_watched.push(aOSPathLower);
-					thisW.paths_watched[aOSPathLower] = true;
+					delete thisW.adds_pendingAddC[aOSPath];
+					//thisW.paths_watched.push(aOSPath);
+					thisW.paths_watched[aOSPath] = aVal; // aVal is watch_fd, so i can use this to link triggered callback to aOSPath_parentDir
 					deferredMain_Watcher_addPath.resolve(true);
 					// do the pending remove if it was there
-					if (aOSPathLower in thisW.removes_pendingAddC) {
-						thisW.removes_pendingAddC[aOSPathLower].removeIt();
+					if (aOSPath in thisW.removes_pendingAddC) {
+						thisW.removes_pendingAddC[aOSPath].removeIt();
 					}
 					// end - do stuff here - promise_addPath
 				  },
 				  function(aReason) {
-					delete thisW.adds_pendingAddC[aOSPathLower];
+					delete thisW.adds_pendingAddC[aOSPath];
 					var rejObj = {name:'promise_addPath', aReason:aReason};
 					console.warn('Rejected - promise_addPath - ', rejObj);
 					deferredMain_Watcher_addPath.reject(rejObj);
 					// reject the pending remove if it was there
-					if (aOSPathLower in thisW.removes_pendingAddC) {
-						thisW.removes_pendingAddC[aOSPathLower].removeIt();
+					if (aOSPath in thisW.removes_pendingAddC) {
+						thisW.removes_pendingAddC[aOSPath].removeIt();
 					}
 				  }
 				).catch(
 				  function(aCaught) {
-					delete thisW.adds_pendingAddC[aOSPathLower];
+					delete thisW.adds_pendingAddC[aOSPath];
 					var rejObj = {name:'promise_addPath', aCaught:aCaught};
 					console.error('Caught - promise_addPath - ', rejObj);
 					deferredMain_Watcher_addPath.reject(rejObj);
 					// reject the pending remove if it was there
-					if (aOSPathLower in thisW.removes_pendingAddC) {
-						thisW.removes_pendingAddC[aOSPathLower].removeIt();
+					if (aOSPath in thisW.removes_pendingAddC) {
+						thisW.removes_pendingAddC[aOSPath].removeIt();
 					}
 				  }
 				);
@@ -511,7 +537,7 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 	};
 	
 	var do_cancelPendingAdd = function() {
-		delete thisW.pendingAdds[aOSPathLower];
+		delete thisW.pendingAdds[aOSPath];
 		deferredMain_Watcher_addPath.reject({
 			name: 'add-cancelled',
 			message: 'This path was waiting for initalization to be added, but was removePath\'ed before it got a chance to add.'
@@ -520,23 +546,41 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 	
 	if (thisW.readyState === 0) {
 		// watcher not yet initalized
-		if (aOSPathLower in thisW.pendingAdds) {
+		if (aOSPath in thisW.pendingAdds) {
 			deferredMain_Watcher_addPath.reject({
 				name: 'duplicate-path',
 				message: 'This path is already waiting to be added. It is waiting as the Watcher has not been initailized yet.'
 			});
 		} else {
-			thisW.pendingAdds[aOSPathLower] = {addIt: do_addPath, cancelIt: do_cancelPendingAdd};
+			// start - case insensitive check to throw warning
+			var aOSPathLower_forCaseInsensTest = aOSPath.toLowerCase();
+			for (var cOSPath in thisW.pendingAdds) {
+				if (cOSPath.toLowerCase() == aOSPathLower_forCaseInsensTest) {
+					console.warn('WARNING: This is a note to the developer using this jscFileWatcher API - You are adding a path that already exists in the add queue but with different casing, casing MAY NOT MATTER on an operating systems filesystem, in which case this would be a duplicate path. The path you are trying to add is: "' + aOSPath + '" and the pre-existing path with different casing is: "' + cOSPath + '".');
+					break;
+				}
+			}
+			// end - case insensitive check to throw warning
+			thisW.pendingAdds[aOSPath] = {addIt: do_addPath, cancelIt: do_cancelPendingAdd};
 		}
 	} else if (thisW.readyState == 1) {
 		// watcher is ready
-		//if (thisW.paths_watched.indexOf(aOSPathLower) > -1) {
-		if (aOSPathLower in thisW.paths_watched) {
+		//if (thisW.paths_watched.indexOf(aOSPath) > -1) {
+		if (aOSPath in thisW.paths_watched) {
 			deferredMain_Watcher_addPath.reject({
 				name: 'duplicate-path',
 				message: 'This path was already succesfully added by a previous call to Watcher.prototype.addPath.'
 			});
 		} else {
+			// start - case insensitive check to throw warning
+			var aOSPathLower_forCaseInsensTest = aOSPath.toLowerCase();
+			for (var cOSPath in thisW.paths_watched) {
+				if (cOSPath.toLowerCase() == aOSPathLower_forCaseInsensTest) {
+					console.warn('WARNING: This is a note to the developer using this jscFileWatcher API - You are adding a path that was already previoulsy added but with different casing, casing MAY NOT MATTER on an operating systems filesystem, in which case this would be a duplicate path. The path you are trying to add is: "' + aOSPath + '" and the pre-existing path with different casing is: "' + cOSPath + '".');
+					break;
+				}
+			}
+			// end - case insensitive check to throw warning
 			do_addPath();
 		}
 	} else {
@@ -555,12 +599,11 @@ Watcher.prototype.removePath = function(aOSPath) {
 	var deferredMain_Watcher_removePath = new Deferred();
 	
 	var thisW = this;
-	var aOSPathLower = aOSPath.toLowerCase();
 	
 	if (thisW.readyState === 0) {
 		// watcher not yet initalized
-		if (aOSPathLower in thisW.pendingAdds) {
-			thisW.pendingAdds[aOSPathLower].cancelIt();
+		if (aOSPath in thisW.pendingAdds) {
+			thisW.pendingAdds[aOSPath].cancelIt();
 			// should also reject the promise in pendingAdds
 			deferredMain_Watcher_removePath.resolve(true);
 		} else {
@@ -572,18 +615,18 @@ Watcher.prototype.removePath = function(aOSPath) {
 	} else if (thisW.readyState == 1) {
 		// watcher is ready
 		var do_removePath = function() {
-			//if (thisW.paths_watched.indexOf(aOSPathLower) > -1) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
-			if (aOSPathLower in thisW.removes_pendingAddC) {
-				delete thisW.removes_pendingAddC[aOSPathLower];
+			//if (thisW.paths_watched.indexOf(aOSPath) > -1) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
+			if (aOSPath in thisW.removes_pendingAddC) {
+				delete thisW.removes_pendingAddC[aOSPath];
 			}
-			if (aOSPathLower in thisW.paths_watched) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
+			if (aOSPath in thisW.paths_watched) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
 				var promise_removePath = FSWatcherWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
 				promise_removePath.then(
 				  function(aVal) {
 					console.log('Fullfilled - promise_removePath - ', aVal);
 					// start - do stuff here - promise_removePath
-					//thisW.paths_watched.splice(thisW.paths_watched.indexOf(aOSPathLower), 1);
-					delete thisW.paths_watched[aOSPathLower];
+					//thisW.paths_watched.splice(thisW.paths_watched.indexOf(aOSPath), 1);
+					delete thisW.paths_watched[aOSPath];
 					deferredMain_Watcher_removePath.resolve(true);
 					// end - do stuff here - promise_removePath
 				  },
@@ -608,15 +651,15 @@ Watcher.prototype.removePath = function(aOSPath) {
 		};
 		
 		var do_cancelPendingRemove = function() {
-			delete thisW.removes_pendingAddC[aOSPathLower];
+			delete thisW.removes_pendingAddC[aOSPath];
 			deferredMain_Watcher_removePath.reject({
 				name: 'remove-cancelled',
 				message: 'This path was waiting for initalization to be added, but was removePath\'ed before it got a chance to add.'
 			});
 		};
 		
-		if (aOSPathLower in thisW.adds_pendingAddC) {
-				thisW.removes_pendingAddC[aOSPathLower] = { // note: pendingC means its waiting for the call to FSWatcherWorker.addPathToWatcher is in process
+		if (aOSPath in thisW.adds_pendingAddC) {
+				thisW.removes_pendingAddC[aOSPath] = { // note: pendingC means its waiting for the call to FSWatcherWorker.addPathToWatcher is in process
 					removeIt: do_removePath,
 					cancelIt: do_cancelPendingRemove
 				};
