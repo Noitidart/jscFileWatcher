@@ -1,5 +1,5 @@
 var EXPORTED_SYMBOLS = ['ostypes'];
-
+/* no need to define core, as it takes core from the worker who imported this
 var core = {
 	name: 'jscFileWatcher',
 	id: 'jscFileWatcher@jetpack',
@@ -9,9 +9,12 @@ var core = {
 	},
 	aData: 0
 };
+*/
+// console.log('from ostypes_win.jsm logging core, as i suspect its taking core from FSWatcherWorker.js which is the one who imported this jsm, core:', core);
 
-importScripts(core.path.chrome + 'modules/cutils.jsm'); // used by HELPER functions
+//importScripts(core.path.chrome + 'modules/cutils.jsm'); // used by HELPER functions // im guessing no need to import cutils.jsm either as the worker imports that already
 
+// console.log('testing if cutils exists here without import:', cutils); // nice yes it does, so no need for these imports
 
 if (ctypes.voidptr_t.size == 4 /* 32-bit */) {
 	var is64bit = false;
