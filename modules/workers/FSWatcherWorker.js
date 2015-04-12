@@ -189,20 +189,18 @@ function addPathToWatcher(aWatcherID, aOSPathLower, aOptions={}) {
 				// check if path is a directory? i dont know, maybe inotify supports watching non-directories too
 				
 				//masks must be integer that can get |'ed with existing masks, like if devuser wants to not watch for IN_CLOSE_WRITE they should pass in negative ostypes.CONST.IN_CLOSE_WRITE
-				var masks = ostypes.CONST.IN_CLOSE_WRITE | ostypes.CONST.IN_MOVED_FROM | ostypes.CONST.IN_MOVED_TO | ostypes.CONST.IN_CREATE | ostypes.CONST.IN_DELETE_SELF | ostypes.CONST.IN_MOVE_SELF;
+				var default_flags = ostypes.CONST.IN_CLOSE_WRITE | ostypes.CONST.IN_MOVED_FROM | ostypes.CONST.IN_MOVED_TO | ostypes.CONST.IN_CREATE; // note: whatever goes here should go in FSWPollWorker.js convertFlagsToAEventStr function
 				// reason for flags with respect to aEvent of callback to main thread:
 					// IN_CLOSE_WRITE - aEvent of contents-modified; File opened for writing was closed.; i dont think this gurantees a change in the contents happend
 					// IN_MOVED_TO - aEvent of renamed (maybe renamed-to?)
 					// IN_MOVED_FROM - aEvent of renamed (maybe renamed-from?)
 					// IN_CREATE - created; file/direcotry created in watched directory
 					// IN_DELETE - deleted; File/directory deleted from watched directory.
-					// IN_DELETE_SELF - deleted; self was deleted
-					// IN_MOVED_SELF - moved; self was moved
 				if ('masks' in aOptions) {
-						masks |= aOptions.masks;
+						default_flags |= aOptions.masks;
 				}
 
-				var watch_fd = ostypes.API('inotify_add_watch')(Watcher.fd, aOSPathLower, masks);
+				var watch_fd = ostypes.API('inotify_add_watch')(Watcher.fd, aOSPathLower, default_flags);
 				//console.info('watch_fd:', watch_fd.toString(), uneval(watch_fd));
 				if (cutils.jscEqual(watch_fd, -1)) {
 					console.error('Failed watch_fd, errno:', ctypes.errno);

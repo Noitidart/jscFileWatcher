@@ -126,8 +126,11 @@ function poll(aArgs) {
 						console.info('aOSPath:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
 						
 						return {
-							aOSPath: fileName,
-							aEvent: convertFlagsToAEventStr(mask)
+							aFileName: fileName,
+							aEvent: convertFlagsToAEventStr(mask),
+							aExtra: {
+								aEvent_inotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+							}
 						}
 					}
 				}
@@ -146,7 +149,18 @@ function convertFlagsToAEventStr(flags) {
 		case 'linux':
 		case 'webos': // Palm Pre // im guessng this has inotify, untested
 		case 'android': // im guessng this has inotify, untested
-
+				var default_flags = { // shoud be whatever is passed in FSWatcherWorker.js addPathToWatcher function
+				  'IN_CLOSE_WRITE': 'contents-modified',
+				  'IN_MOVED_TO': 'renamed-to',
+				  'IN_MOVED_FROM': 'renamed-from',
+				  'IN_CREATE': 'created',
+				  'IN_DELETE': 'deleted'
+				};
+				for (var f in default_flags) {
+					if (flags & ostypes.CONST[f]) {
+						return default_flags[f];
+					}
+				}
 				return 'blah'
 				
 			break;

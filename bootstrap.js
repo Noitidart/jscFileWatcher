@@ -31,13 +31,17 @@ var PromiseWorker;
 ////// end of imports and definitions
 
 function main() {
-	var callback_logPath = function(aOSPath, aEvent) {
+	var callback_logPath = function(aFileName, aEvent, aExtra) {
+		// aExtra, on all os'es should hold:
+			// oldName when aEvent is renamed :todo:
+			// aOSPath_parentDir - OS path of the directory containing aFileName // this is needed because what if user added multiple directories to one Watcher :todo:
+		// aExtra can container other os specific stuff
 		// aEvent is a string, or if user passed in options.masks and the event that happend is not one of the strings below, then its a number returned by the OS
 			// created
 			// deleted
 			// renamed (renamed-to and renamed-from?)
 			// contents-modified
-		console.log('callback_logPath triggered', 'aEvent:', aEvent, 'aOSPath:', aOSPath);
+		console.log('callback_logPath triggered', 'aEvent:', aEvent, 'aFileName:', aFileName, 'aExtra:', aExtra);
 	};
 	var watcher1 = new Watcher(callback_logPath);
 	var promise_removeSomePath = watcher1.removePath('blah'); //test1 - remove non-added path before Watcher closes
@@ -248,7 +252,7 @@ function Watcher(aCallback) {
 	// dev user can do watcher.addPath/watcher.removePath before waiting for promise_initialized, as they return promises, those promise will just return after execution after initialization
 	var thisW = this;
 	if (!aCallback || typeof aCallback != 'function') {
-		throw new Error('The argument aCallback is not a function. It must be a function, which optionally takes two arguments: first is aOSPath and second is aEvent.');
+		throw new Error('The argument aCallback is not a function. It must be a function, which optionally takes three arguments: first is aOSPath, second is aEvent, and thrid is aExtra which has some os specific stuff.');
 	}
 	
 	thisW.id = _Watcher_nextId;
@@ -261,6 +265,7 @@ function Watcher(aCallback) {
 		// 2 - closed due to user calling Watcher.prototype.close
 		// 3 - closed due to failed to initialize
 	this.cb = aCallback;
+	/*
 	thisW.cbQueue = []; //array of functions that pass the args from worker to the aCallback
 	
 	thisW.timerEvent_triggerCallback = {
@@ -269,7 +274,7 @@ function Watcher(aCallback) {
 		}
 	};
 	thisW.timer = Cc['@mozilla.org/timer;1'].createInstance(Ci.nsITimer);
-	
+	*/
 	
 	//thisW.paths_watched = []; // array of lower cased OS paths that are being watched (i do lower case because these are inputed by user passing as args to addPath/removePath, and devuser might do different casings as devusers can be stupid)
 	thisW.paths_watched = {}; // changed to obj as its easier to delete
@@ -317,10 +322,14 @@ function Watcher(aCallback) {
 							  function(aVal) {
 								console.log('Fullfilled - promise_nixPoll - ', aVal);
 								// start - do stuff here - promise_nixPoll
+								/*
 								thisW.cbQueue.push(function() {
-									thisW.cb(aVal.aOSPathLower, aVal.aEvent);
+									thisW.cb(aVal.aFileName, aVal.aEvent);
 								});
 								thisW.timer.initWithCallback(thisW.timerEvent_triggerCallback, 0, Ci.nsITimer.TYPE_ONE_SHOT); // trigger callback
+								*/
+								// i was doing timer event because i didnt want body of aCallback to finish before next poll because i was worried it would miss a change, but it doesnt miss any change, as changes are fed to the file, and its their waiting when i start the next poll
+								thisW.cb(aVal.aFileName, aVal.aEvent);
 								do_nixPoll(); // restart poll
 								// end - do stuff here - promise_nixPoll
 							  },
