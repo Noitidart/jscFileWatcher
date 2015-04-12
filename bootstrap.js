@@ -427,7 +427,7 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 				});
 			} else {
 				thisW.adds_pendingAddC[aOSPathLower] = true;
-				var promise_addPath = FSWatcherWorker.post('addPathToWatcher', [thisW.id, aOSPathLower]);
+				var promise_addPath = FSWatcherWorker.post('addPathToWatcher', [thisW.id, aOSPath]);
 				promise_addPath.then(
 				  function(aVal) {
 					console.log('Fullfilled - promise_addPath - ', aVal);

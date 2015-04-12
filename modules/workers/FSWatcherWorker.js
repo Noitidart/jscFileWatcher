@@ -186,17 +186,10 @@ function addPathToWatcher(aWatcherID, aOSPathLower, aOptions={}) {
 					});
 				}
 				
-				if (aOSPathLower in Watcher.paths_watched) {
-					throw new Error({
-						name: 'duplicate-path',
-						message: 'This path is already being watched so will not be added. Path is "' + aOSPathLower + '"'
-					});
-				}
-				
 				// check if path is a directory? i dont know, maybe inotify supports watching non-directories too
 				
 				//masks must be integer that can get |'ed with existing masks, like if devuser wants to not watch for IN_CLOSE_WRITE they should pass in negative ostypes.CONST.IN_CLOSE_WRITE
-				var masks = (ostypes.CONST.IN_CLOSE_WRITE | ostypes.CONST.IN_MOVED_FROM | ostypes.CONST.IN_MOVED_TO | ostypes.CONST.IN_CREATE | ostypes.CONST.IN_DELETE_SELF | ostypes.CONST.IN_MOVE_SELF);
+				var masks = ostypes.CONST.IN_CLOSE_WRITE | ostypes.CONST.IN_MOVED_FROM | ostypes.CONST.IN_MOVED_TO | ostypes.CONST.IN_CREATE | ostypes.CONST.IN_DELETE_SELF | ostypes.CONST.IN_MOVE_SELF;
 				// reason for flags with respect to aEvent of callback to main thread:
 					// IN_CLOSE_WRITE - aEvent of contents-modified; File opened for writing was closed.; i dont think this gurantees a change in the contents happend
 					// IN_MOVED_TO - aEvent of renamed (maybe renamed-to?)
