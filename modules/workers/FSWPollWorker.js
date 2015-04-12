@@ -125,13 +125,19 @@ function poll(aArgs) {
 						
 						console.info('aOSPath:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
 						
-						return {
+						var rezObj = {
 							aFileName: fileName,
 							aEvent: convertFlagsToAEventStr(mask),
 							aExtra: {
 								aEvent_inotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
 							}
+						};
+						
+						if (cookie != 0) {
+							rezObj.aExtra.aEvent_inotifyCookie = cookie;
 						}
+						
+						return rezObj;
 					}
 				}
 				

@@ -33,7 +33,7 @@ var PromiseWorker;
 function main() {
 	var callback_logPath = function(aFileName, aEvent, aExtra) {
 		// aExtra, on all os'es should hold:
-			// oldName when aEvent is renamed :todo:
+			// aFileNameOld when aEvent is renamed :todo:
 			// aOSPath_parentDir - OS path of the directory containing aFileName // this is needed because what if user added multiple directories to one Watcher :todo:
 		// aExtra can container other os specific stuff
 		// aEvent is a string, or if user passed in options.masks and the event that happend is not one of the strings below, then its a number returned by the OS
@@ -264,7 +264,8 @@ function Watcher(aCallback) {
 		// 1 - initialized, ready to do addPaths // when i change readyState to 1, i should check if any paths to add are in queue
 		// 2 - closed due to user calling Watcher.prototype.close
 		// 3 - closed due to failed to initialize
-	this.cb = aCallback;
+	thisW.cb = aCallback;
+	thisW._cache_aExtraRenamedFrom = {}; // key is cookie and val is aExtra of rename-from, and on reanmed-to, it finds the cookie and deletes it and triggers callback with renamed-to with aExtra holding oldFileName
 	/*
 	thisW.cbQueue = []; //array of functions that pass the args from worker to the aCallback
 	
@@ -329,7 +330,29 @@ function Watcher(aCallback) {
 								thisW.timer.initWithCallback(thisW.timerEvent_triggerCallback, 0, Ci.nsITimer.TYPE_ONE_SHOT); // trigger callback
 								*/
 								// i was doing timer event because i didnt want body of aCallback to finish before next poll because i was worried it would miss a change, but it doesnt miss any change, as changes are fed to the file, and its their waiting when i start the next poll
-								thisW.cb(aVal.aFileName, aVal.aEvent);
+								// when renamed, renamed-from fires first, then renamed-to
+								if (aVal.aEvent == 'renamed-to') {
+									if (!(aVal.aExtra.aEvent_inotifyCookie in thisW._cache_aExtraRenamedFrom)) {
+										throw new Error({
+											name: 'jscfilewatcher-api-error',
+											message: 'Could not find the renamed-from cookie in thisW.aExtra_of_renamedFrom cache'
+										});
+									} else {
+										var aExtra_forOldFile = thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie];
+										aVal.aExtra.aFileNameOld = aExtra_forOldFile.aOldFileName;
+										delete aExtra_forOldFile.aOldFileName;
+										delete thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie];
+										thisW.cb(aVal.aFileName, aVal.aEvent, aVal.aExtra);
+									}
+								} else if (aVal.aEvent == 'renamed-from') {
+									console.log('got renamed-from event, so saving its info, and will not trigger callback now, will trigger callback when get renamed-to but will add this info to that');
+									thisW._cache_aExtraRenamedFrom[aVal.aExtra.aEvent_inotifyCookie] = {
+										aOldFileName: aVal.aFileName,
+										aExtra_forOldFile: aVal.aExtra
+									}
+								} else {
+									thisW.cb(aVal.aFileName, aVal.aEvent, aVal.aExtra);
+								}
 								do_nixPoll(); // restart poll
 								// end - do stuff here - promise_nixPoll
 							  },
