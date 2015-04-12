@@ -286,7 +286,7 @@ function Watcher(aCallback, options = {}) {
 			// add in the paths that are waiting
 			for (var pendingAdd in thisW.pendingAdds) {
 				var addIt = thisW.pendingAdds[pendingAdd].addIt();
-				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init
+				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init, and btw i do set thisW.pendingAdds to null at the end of this for loop (i do this as its uneeded stuff, so maybe save like some bytes of memory haha)
 			}
 			thisW.pendingAdds = null;
 			// end - do stuff here - promise_createWatcher
@@ -299,7 +299,7 @@ function Watcher(aCallback, options = {}) {
 			// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
 			for (var pendingAdd in thisW.pendingAdds) {
 				thisW.pendingAdds[pendingAdd].addIt();
-				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init
+				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init, and btw i do set thisW.pendingAdds to null at the end of this for loop (i do this as its uneeded stuff, so maybe save like some bytes of memory haha)
 			}
 			thisW.pendingAdds = null;
 		  }
@@ -312,7 +312,7 @@ function Watcher(aCallback, options = {}) {
 			// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
 			for (var pendingAdd in thisW.pendingAdds) {
 				thisW.pendingAdds[pendingAdd].addIt();
-				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init
+				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init, and btw i do set thisW.pendingAdds to null at the end of this for loop (i do this as its uneeded stuff, so maybe save like some bytes of memory haha)
 			}
 			thisW.pendingAdds = null;
 		  }
@@ -476,6 +476,9 @@ Watcher.prototype.removePath = function(aOSPath) {
 		// watcher is ready
 		var do_removePath = function() {
 			//if (thisW.paths_watched.indexOf(aOSPathLower) > -1) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
+			if (aOSPathLower in thisW.removes_pendingAddC) {
+				delete thisW.removes_pendingAddC[aOSPathLower];
+			}
 			if (aOSPathLower in thisW.paths_watched) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
 				var promise_removePath = myWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
 				promise_removePath.then(
@@ -516,7 +519,7 @@ Watcher.prototype.removePath = function(aOSPath) {
 		};
 		
 		if (aOSPathLower in thisW.adds_pendingAddC) {
-				thisW.removes_pendingAddC = { // note: pendingC means its waiting for the call to FSWatcherWorker.addPathToWatcher is in process
+				thisW.removes_pendingAddC[aOSPathLower] = { // note: pendingC means its waiting for the call to FSWatcherWorker.addPathToWatcher is in process
 					removeIt: do_removePath,
 					cancelIt: do_cancelPendingRemove
 				};
