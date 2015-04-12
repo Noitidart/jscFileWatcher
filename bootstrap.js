@@ -512,7 +512,7 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 					// start - do stuff here - promise_addPath
 					delete thisW.adds_pendingAddC[aOSPath];
 					//thisW.paths_watched.push(aOSPath);
-					thisW.paths_watched[aOSPath] = aVal; // aVal is watch_fd, so i can use this to link triggered callback to aOSPath_parentDir
+					thisW.paths_watched[aOSPath] = aVal-1; // aVal is watch_fd, so i can use this to link triggered callback to aOSPath_parentDir
 					deferredMain_Watcher_addPath.resolve(true);
 					// do the pending remove if it was there
 					if (aOSPath in thisW.removes_pendingAddC) {

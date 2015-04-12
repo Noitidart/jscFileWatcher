@@ -161,8 +161,8 @@ function poll(aArgs) {
 						if (len == 0) {
 							break;
 						};
-						i += parseInt(len);
-						console.info('incremented i is now:', i, 'length:', length);
+						i += sizeUnaligned_inotify_event - sizeField4 + parseInt(len);
+						console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (sizeUnaligned_inotify_event - sizeField4 + parseInt(len)));
 					} while (i < length);
 					
 					console.error('loop ended:', 'numElementsRead:', numElementsRead);
