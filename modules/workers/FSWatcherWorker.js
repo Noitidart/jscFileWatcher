@@ -76,6 +76,8 @@ function init(objCore) {
 			break;
 		case 'darwin':
 			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
+			// note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
+			core.os.verison = 10.6.9;
 			break;
 		case 'freebsd':
 		case 'openbsd':
@@ -94,7 +96,7 @@ function init(objCore) {
 
 // start - OS.File.Watcher API
 var _Watcher_cache = {};
-function createWatcher(aWatcherID) {
+function createWatcher(aWatcherID, aOptions={}) {
 	// _Watcher_cache[aWatcherID] = 
 
 	// returns object which should  be passed to FSWPollWorker.poll
@@ -119,18 +121,43 @@ function createWatcher(aWatcherID) {
 		// 			// inotify equivalent for SunOS => The best you can get is use FAM for Solaris, have a look at: http://savannah.nongnu.org/task/?2058
 		// 	
 		// 	break;
-		// case 'darwin':
-		// 	
-		// 		// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
-		// 	
-		//		if (core.os.version < 10.7) {
-		//			// use kqueue
-		//		} else {
-		//			// os.version is >= 10.7
-		//			// use FSEventFramework
-		//		}
-		//
-		// 	break;
+		case 'darwin':
+
+			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
+
+			if (core.os.version < 10.7) {
+				// use kqueue
+				
+				var rez_kq = ostypes.API('kqueue')(0);
+				if (ctypes.errno != 0) {
+					console.error('Failed rez_kq, errno:', ctypes.errno);
+					throw new Error({
+						name: 'os-api-error',
+						message: 'Failed to kqueue',
+						errno: ctypes.errno
+					});
+				}
+				
+				var Watcher = {};
+				_Watcher_cache[aWatcherID] = Watcher;
+				Watcher.kq = rez_kq;
+				Watcher.paths_watched = {}; // casing is whatever devuser passed in, key is aOSPath and value is fd of the watched file
+				
+				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
+				
+				var argsForPoll = {
+					kq: parseInt(cutils.jscGetDeepest(rez_kq))
+				};
+				
+				return argsForPoll;
+				
+			// end kqueue
+			} else {
+				// os.version is >= 10.7
+				// use FSEventFramework
+			}
+
+		break;
 		case 'linux':
 		case 'webos': // Palm Pre // im guessng this has inotify, untested
 		case 'android': // im guessng this has inotify, untested
@@ -149,8 +176,7 @@ function createWatcher(aWatcherID) {
 				var Watcher = {};
 				_Watcher_cache[aWatcherID] = Watcher;
 				Watcher.fd = fd;
-				Watcher.paths_watched = {}; // lower cased OS paths that are being watched (i do lower case because these are inputed by user passing as args to addPath/removePath, and devuser might do different casings as devusers can be stupid)
-				// in the worker, paths_watched keyval is aOSPathLower just like in mainthread but the value is the watch_fd
+				Watcher.paths_watched = {}; // casing is whatever devuser passed in, key is aOSPath, and value is watch_fd
 				
 				var argsForPoll = {
 					fd: parseInt(cutils.jscGetDeepest(fd))
@@ -168,10 +194,48 @@ function createWatcher(aWatcherID) {
 	
 }
 
-function addPathToWatcher(aWatcherID, aOSPathLower, aOptions={}) {
+function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 	// aOSPath is a jsStr os path
 	
 	switch (core.os.name) {
+		case 'darwin':
+
+			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
+
+			if (core.os.version < 10.7) {
+				// use kqueue
+				
+				var Watcher = _Watcher_cache[aWatcherID];
+				if (!Watcher) {
+					throw new Error({
+						name: 'jscfilewatcher-api-error',
+						message: 'Watcher not found in cache'
+					});
+				}
+				
+				// Open a file descriptor for the file/directory that you want to monitor.
+				var event_fd = ostypes.API('open')(aOSPath, OS.Constants.libc.O_EVTONLY);
+				console.info('event_fd:', event_fd.toString(), uneval(event_fd));
+				if (ctypes.errno != 0) {
+					console.error('Failed event_fd, errno:', ctypes.errno);
+					throw new Error({
+						name: 'os-api-error',
+						message: 'Failed to open path of "' + aOSPath + '"',
+						errno: ctypes.errno
+					});
+				}
+
+				Watcher.paths_watched[aOSPath] = event_fd; // safe as is ostypes.TYPE.int which is ctypes.int
+				
+
+				
+				// end kqueue
+			} else {
+				// os.version is >= 10.7
+				// use FSEventFramework
+			}
+
+		break;
 		case 'linux':
 		case 'webos': // Palm Pre // im guessng this has inotify, untested
 		case 'android': // im guessng this has inotify, untested
@@ -200,7 +264,7 @@ function addPathToWatcher(aWatcherID, aOSPathLower, aOptions={}) {
 						default_flags |= aOptions.masks;
 				}
 
-				var watch_fd = ostypes.API('inotify_add_watch')(Watcher.fd, aOSPathLower, default_flags);
+				var watch_fd = ostypes.API('inotify_add_watch')(Watcher.fd, aOSPath, default_flags);
 				//console.info('watch_fd:', watch_fd.toString(), uneval(watch_fd));
 				if (cutils.jscEqual(watch_fd, -1)) {
 					console.error('Failed watch_fd, errno:', ctypes.errno);
@@ -210,10 +274,11 @@ function addPathToWatcher(aWatcherID, aOSPathLower, aOptions={}) {
 						errno: ctypes.errno
 					});
 				} else {
-					Watcher.paths_watched[aOSPathLower] = watch_fd; // is ostypes.TYPE.int which is ctypes.int so no need to jscGetDeepest
+					Watcher.paths_watched[aOSPath] = watch_fd; // is ostypes.TYPE.int which is ctypes.int so no need to jscGetDeepest
 				}
 				
 				return watch_fd;
+				
 			break;
 		default:
 			throw new Error({

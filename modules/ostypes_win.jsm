@@ -163,6 +163,7 @@ var winInit = function() {
 		FILE_ACTION_RENAMED_OLD_NAME: 0x00000004,
 		FILE_ACTION_RENAMED_NEW_NAME: 0x00000005,
 		FILE_FLAG_BACKUP_SEMANTICS: 33554432,
+		FILE_FLAG_OVERLAPPED: 0x40000000,
 		FILE_LIST_DIRECTORY: 0x0001,
 		FILE_NOTIFY_CHANGE_FILE_NAME: 0x00000001,
 		FILE_NOTIFY_CHANGE_DIR_NAME: 0x00000002,
@@ -233,6 +234,40 @@ var winInit = function() {
 				self.TYPE.DWORD,					// dwCreationDisposition
 				self.TYPE.DWORD,					// dwFlagsAndAttributes
 				self.TYPE.HANDLE					// hTemplateFile
+			);
+		},
+		CreateEvent: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/ms682396%28v=vs.85%29.aspx
+			 * HANDLE WINAPI CreateEvent(
+			 *  __in_opt_  LPSECURITY_ATTRIBUTES lpEventAttributes,
+			 *  __in_      BOOL bManualReset,
+			 *  __in_      BOOL bInitialState,
+			 *  __in_opt_  LPCTSTR lpName
+			 * );
+			 */
+			return lib('kernel32').declare(ifdef_UNICODE ? 'CreateEventW' : 'CreateEventA', self.TYPE.ABI,
+				self.TYPE.HANDLE,					// return
+				self.TYPE.LPSECURITY_ATTRIBUTES,	// hFile
+				self.TYPE.BOOL,						// lpOverlapped
+				self.TYPE.BOOL,						// lpNumberOfBytesTransferred
+				self.TYPE.LPCTSTR					// bWait
+			);
+		},
+		GetOverlappedResult: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/ms683209%28v=vs.85%29.aspx
+			 * BOOL WINAPI GetOverlappedResult(
+			 *  __in_   HANDLE hFile,
+			 *  __in_   LPOVERLAPPED lpOverlapped,
+			 *  __out_  LPDWORD lpNumberOfBytesTransferred,
+			 *  __in_   BOOL bWait
+			 * );
+			 */
+			return lib('kernel32').declare('GetOverlappedResult', self.TYPE.ABI,
+				self.TYPE.BOOL,			// return
+				self.TYPE.HANDLE,		// hFile
+				self.TYPE.LPOVERLAPPED,	// lpOverlapped
+				self.TYPE.LPDWORD,		// lpNumberOfBytesTransferred
+				self.TYPE.BOOL			// bWait
 			);
 		},
 		MessageBox: function() {

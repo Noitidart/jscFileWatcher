@@ -89,6 +89,69 @@ function init(objCore) {
 
 function poll(aArgs) {
 	switch (core.os.name) {
+		case 'darwin':
+
+			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
+
+			if (core.os.version < 10.7) {
+				// use kqueue
+				
+				var kq = aArgs.kq;
+				var vnode_events = aArgs.vnode_events;
+				
+				
+				// The address in user_data will be copied into a field in the event. If you are monitoring multiple files,you could,for example,pass in different data structure for each file.For this example,the path string is used.
+				var user_data = aOSPath;
+
+				// Set the timeout to wake us every half second.
+				var timeout = ostypes.TYPE.timespec();
+				var useSec = 0;
+				var useNsec = 500000000;
+				timeout.tv_sec = useSec; // 0 seconds
+				timeout.tv_nsec = useNsec; // 500 milliseconds
+
+				// Set up a list of events to monitor.
+				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
+				var events_to_monitor = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_FDS)();
+				EV_SET(events_to_monitor.addressOfElement(0), event_fd, ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, vnode_events, 0, user_data);
+
+				// Handle events
+				var event_data = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_SLOTS)();
+
+				var num_files = 1; // ostypes.TYPE.int
+				var continue_loop = 40; // Monitor for twenty seconds. // ostypes.TYPE.int
+				while (--continue_loop) {
+					var event_count = ostypes.API('kevent')(Watcher.kq, events_to_monitor, ostypes.CONST.NUM_EVENT_SLOTS, event_data, num_files, timeout.address());
+					console.info('event_count:', event_count.toString(), uneval(event_count));
+					if (ctypes.errno !== 0) {
+						console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
+						throw new Error('Failed event_count, errno: ' + ctypes.errno + ' and event_count: ' + cutils.jscGetDeepest(event_count));
+					}
+					if (cutils.jscEqual(event_data.addressOfElement(0).contents.flags, ostypes.CONST.EV_ERROR)) {
+						console.error('Failed event_count, due to event_data.flags == EV_ERROR, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
+						throw new Error('Failed event_count, due to event_data.flags == EV_ERROR, errno: ' + ctypes.errno + ' and event_count: ' + cutils.jscGetDeepest(event_count));
+					}
+
+					if (!cutils.jscEqual(event_count, '0')) {
+						console.log('Event ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.filter) + ', flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.flags) + ', filter flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.fflags) + ', filter data ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.data) + ', path ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.udata /*.contents.readString()*/ ));
+					} else {
+						// No event
+					}
+
+					// Reset the timeout. In case of a signal interrruption, the values may change.
+					timeout.tv_sec = useSec; // 0 seconds
+					timeout.tv_nsec = useNsec; // 500 milliseconds
+				}
+				ostypes.API('close')(event_fd);
+				return 0;
+				
+			// end kqueue
+			} else {
+				// os.version is >= 10.7
+				// use FSEventFramework
+			}
+
+		break;
 		case 'linux':
 		case 'webos': // Palm Pre // im guessng this has inotify, untested
 		case 'android': // im guessng this has inotify, untested

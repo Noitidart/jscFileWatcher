@@ -196,19 +196,34 @@ function initWatch(path, /*callback,*/ options = {}) {
 // start - winnt file watching
 function winntWatch(path) {
 	// verify path is a directory
-	var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, OS.Constants.Win.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS, null);
+	var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, OS.Constants.Win.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
 	console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
 	if (ctypes.winLastError !== 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
 		console.error('Failed hDirectory, winLastError:', ctypes.winLastError);
 		throw new Error('Failed hDirectory, winLastError: ' + ctypes.winLastError);
 	}
 	
-	var temp_buffer = ostypes.TYPE.DWORD.array(4096)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
+	/*
+	var o = new ostypes.TYPE.OVERLAPPED;
+	o.hEvent = ostypes.API('CreateEvent')(null, null, null, null);
+	console.info('o.hEvent:', o.hEvent.toString(), uneval(o.hEvent));
+	if (o.hEvent.isNull()) { // ctypes.winLastError != 0
+		console.error('Failed o.hEvent, winLastError:', ctypes.winLastError);
+		throw new Error('Failed o.hEvent, winLastError: ' + ctypes.winLastError);
+	}
+	*/
+	var WATCHED_RES_MAXIMUM_NOTIFICATIONS = 100;
+	var NOTIFICATION_BUFFER_SIZE = WATCHED_RES_MAXIMUM_NOTIFICATIONS * ostypes.TYPE.FILE_NOTIFY_INFORMATION.size;
+	
+	var temp_buffer = ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
 	var temp_buffer_size = ostypes.TYPE.DWORD(temp_buffer.constructor.size);
 	var bytes_returned = ostypes.TYPE.LPDWORD();
 	var changes_to_watch = ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
+
+	var o = ostypes.TYPE.LPOVERLAPPED();
 	
-	var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer, temp_buffer_size, false, changes_to_watch, bytes_returned, null, null);
+	var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer, temp_buffer_size, false, changes_to_watch, bytes_returned, o, null);
+	
 	console.log('ok got here');
 	return;
 	console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
@@ -220,7 +235,22 @@ function winntWatch(path) {
 	//var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
 	//console.info('casted:', casted.toString(), uneval(casted));
 	
+	return;
 	
+	var rez_GOR = ostypes.API('GetOverlappedResult')(hDirectory, o, b, false);
+	console.info('rez_GOR:', rez_GOR.toString(), uneval(rez_GOR));
+	if (ctypes.winLastError != 0) { // can also do cutils.jscEqual(rez_GOR, 0)
+		console.error('Failed rez_GOR, winLastError:', ctypes.winLastError);
+		throw new Error('Failed rez_GOR, winLastError: ' + ctypes.winLastError);
+	}
+	
+    if (cutils.jscEqual(casted.addressOfElement(0).contents.addressOfField('Action').contents, 0) == false) {
+        wprintf(L"action %d, b: %d, %s\n", fni.i.Action, b, fni.i.FileName);
+		console.info('something happend:', casted.addressOfElement(0).contents.addressOfField('Action').contents, casted.addressOfElement(0).contents.addressOfField('FileNameLength').contents);
+        casted.addressOfElement(0).contents.addressOfField('Action').contents = 0;
+    }
+	
+	return true;
 }
 // end - winnt file watching
 // start - mac file watching
