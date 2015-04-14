@@ -99,10 +99,7 @@ function poll(aArgs) {
 				
 				// use kqueue
 				console.error('poll kq');
-				var kq = aArgs.kq;				
-				
-				// The address in user_data will be copied into a field in the event. If you are monitoring multiple files,you could,for example,pass in different data structure for each file.For this example,the path string is used.
-				var user_data = aOSPath;
+				var kq = aArgs.kq;
 
 				// Set the timeout to wake us every half second.
 				var timeout = ostypes.TYPE.timespec();
