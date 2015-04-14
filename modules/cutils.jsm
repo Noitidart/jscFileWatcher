@@ -207,9 +207,13 @@ function utilsInit() {
 		 *   readIntPtr // CData { contents: 5 }
 		 */
 		 
-		var ptrStr = ptr.toString().match(/.*"(.*?)"/)[1]; // can alternatively do `'0x' + ctypes.cast(num_files.address(), ctypes.uintptr_t).value.toString(16)`
+		var ptrStr = ptr.toString().match(/.*"(.*?)"/); // can alternatively do `'0x' + ctypes.cast(num_files.address(), ctypes.uintptr_t).value.toString(16)`
 		
-		return ptrStr;
+		if (!ptrStr) {
+			throw new Error('Could not find address string, make sure you passed a .address()');
+		}
+		
+		return ptrStr[1];
 	};
 	
 	this.modifyCStr =  function(ctypesCharArr, newStr_js) {
