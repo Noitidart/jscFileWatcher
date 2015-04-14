@@ -346,6 +346,7 @@ var macInit = function() {
 			// macro
 			// docs say args are: &kev, ident, filter, flags, fflags, data, udata // docs are here: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 			console.info('kev_address:', kev_address.toString(), uneval(kev_address));
+			console.info('kev_address.contents:', kev_address.contents.toString(), uneval(kev_address.contents));
 			kev_address.contents.ident = ident;
 			kev_address.contents.filter = filter;
 			kev_address.contents.flags = flags;
