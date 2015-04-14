@@ -119,7 +119,7 @@ function poll(aArgs) {
 				
 				var continue_loop = Infinity; // monitor forever // 40; // Monitor for twenty seconds. // ostypes.TYPE.int
 				while (--continue_loop) {
-					var check_eventsToMonitorPtrStr = ctypes.char.array(50).ptr(aArgs.ptStr_cStringOfPtrStrToEventsToMonitorArr).contents.readString(); // using ctypes.char and NOT ostypes.TYPE.char as this is depending on cutils.modifyCStr (which says use ctypes.char) // link87354 50 cuz thats what i set it to
+					var check_eventsToMonitorPtrStr = ctypes.char.array(50).ptr(ctypes.UInt64(aArgs.ptStr_cStringOfPtrStrToEventsToMonitorArr)).contents.readString(); // using ctypes.char and NOT ostypes.TYPE.char as this is depending on cutils.modifyCStr (which says use ctypes.char) // link87354 50 cuz thats what i set it to
 					if (check_eventsToMonitorPtrStr != last_eventsToMonitorPtrStr) { // link584732
 						// so paths were added or removed OR added and remove you get what im trying to say
 						console.info('CHANGE ON last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr, 'old one was:', last_eventsToMonitorPtrStr);
