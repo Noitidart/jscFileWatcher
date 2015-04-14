@@ -327,7 +327,7 @@ function Watcher(aCallback) {
 				case 'openbsd':
 				
 						// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
-						console.error('core.os.version:', core.os.version, 'core.os.version < 10.7', core.os.version < 10.7);
+						console.error('core.os.version:', core.os.version, 'core.os.version < 10.7', core.os.version < 7);
 						if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
 							// kqueue
 							
@@ -890,6 +890,8 @@ function addToCore() {
 					// this makes it so that 10.10.0 becomes 10.100
 					// 10.10.1 => 10.101
 					// so can compare numerically, as 10.100 is less then 10.101
+					
+					core.os.verison = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 				}
 				break;
 			default:
