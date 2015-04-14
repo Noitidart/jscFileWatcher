@@ -336,7 +336,7 @@ var macInit = function() {
 			kev_address.contents.addressOfField('flags').contents = flags;
 			kev_address.contents.addressOfField('fflags').contents = fflags;
 			kev_address.contents.addressOfField('data').contents = data;
-			kev_address.contents.addressOfField('udata').contents = udata_jsStr; //ostypes.TYPE.char.array()(udata_jsStr);
+			kev_address.contents.addressOfField('udata').contents = ostypes.TYPE.char.array()(udata_jsStr).address();
 		}
 	};
 }
