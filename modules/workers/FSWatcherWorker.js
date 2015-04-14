@@ -76,7 +76,7 @@ function init(objCore) {
 			break;
 		case 'darwin':
 			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
-			core.os.verison = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
+			core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 			break;
 		case 'freebsd':
 		case 'openbsd':
