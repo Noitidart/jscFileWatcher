@@ -208,6 +208,39 @@ function utilsInit() {
 		var ptrStr = ptr.toString().match(/.*"(.*?)"/)[1]; // can alternatively do `'0x' + ctypes.cast(num_files.address(), ctypes.uintptr_t).value.toString(16)`
 		
 		return ptrStr;
+	},
+	this.modifyCStr: function(ctypesCharArr, newStr_js) {
+		// changes contents of a c string without changing the .address() of it
+		// ctypesCharArr must be at least newStr_js.length + 1 (+1 for null terminator)
+		// returns nothing, this acts on the ctypesCharArr itself
+		
+		/* EXAMPLE
+		var cstr = ctypes.char.array(100)('hi');
+		cstr.address().toString(); // "ctypes.char.array(100).ptr(ctypes.UInt64("0x1440ad60"))"
+		cstr.readString(); // "hi"
+		
+		cutils.modifyCStr(cstr, 'bye');
+		cstr.address().toString(); // "ctypes.char.array(100).ptr(ctypes.UInt64("0x1440ad60"))"
+		cstr.readString(); "bye"
+		*/
+		
+		if (newStr_js.length+1 >= ctypesCharArr.length) {
+			throw new Error('not enough room in ctypesCharArr for the newStr_js and its null terminator');
+		}
+		
+		for (var i=0; i<ctypesCharArr.length; i++) {
+			var charCodeAtCurrentPosition = ctypesCharArr.addressOfElement(i).contents;
+			if (charCodeAtCurrentPosition != 0)
+				ctypesCharArr.addressOfElement(i).contents = 0;
+			} else {
+				// hit null terminator so break
+				break;
+			}
+			
+			for (var i=0; i<newStr_js.length; i++) {
+				ctypesCharArr.addressOfElement(i).contents = newStr_js.charCodeAt(i);
+			}
+		}
 	}
 }
 
