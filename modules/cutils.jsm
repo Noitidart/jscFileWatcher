@@ -94,7 +94,8 @@ function utilsInit() {
 		for (var i = 0; i < size; ++i) {
 			dst[i] = src[i];
 		}
-	},
+	};
+	
 	this.comparePointers = function(a, b) {
 		/* https://gist.github.com/nmaier/ab4bfe59e8c8fcdc5b90
 		 */
@@ -102,7 +103,8 @@ function utilsInit() {
 			ctypes.cast(a, ctypes.uintptr_t).value,
 			ctypes.cast(b, ctypes.uintptr_t).value
 		);
-	},
+	};
+	
 	this.memmove = function(dst, src, size) {
 		/* https://gist.github.com/nmaier/ab4bfe59e8c8fcdc5b90
 		 * by @nmaier
@@ -126,7 +128,7 @@ function utilsInit() {
 		for (var i = 0; i < size; ++i) {
 			dst[i] = src[i];
 		}
-	},
+	};
 	// end - mem stuff mimicking
 	
 	// start - my alternative to .readStringReplaceMalformed
@@ -178,7 +180,7 @@ function utilsInit() {
 		} else {
 			return readJSCharString();
 		}
-	},
+	};
 	// end - my alternative to .readStringReplaceMalformed
 	
 	this.strOfPtr = function(ptr) {
@@ -208,8 +210,9 @@ function utilsInit() {
 		var ptrStr = ptr.toString().match(/.*"(.*?)"/)[1]; // can alternatively do `'0x' + ctypes.cast(num_files.address(), ctypes.uintptr_t).value.toString(16)`
 		
 		return ptrStr;
-	},
-	this.modifyCStr: function(ctypesCharArr, newStr_js) {
+	};
+	
+	this.modifyCStr =  function(ctypesCharArr, newStr_js) {
 		// changes contents of a c string without changing the .address() of it
 		// ctypesCharArr must be at least newStr_js.length + 1 (+1 for null terminator)
 		// returns nothing, this acts on the ctypesCharArr itself
@@ -241,7 +244,7 @@ function utilsInit() {
 				ctypesCharArr.addressOfElement(i).contents = newStr_js.charCodeAt(i);
 			}
 		}
-	}
+	};
 }
 
 var cutils = new utilsInit();
