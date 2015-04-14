@@ -233,7 +233,7 @@ function utilsInit() {
 		
 		for (var i=0; i<ctypesCharArr.length; i++) {
 			var charCodeAtCurrentPosition = ctypesCharArr.addressOfElement(i).contents;
-			if (charCodeAtCurrentPosition != 0)
+			if (charCodeAtCurrentPosition != 0) {
 				ctypesCharArr.addressOfElement(i).contents = 0;
 			} else {
 				// hit null terminator so break
