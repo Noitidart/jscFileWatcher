@@ -125,15 +125,15 @@ function poll(aArgs) {
 						console.info('CHANGE ON last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr, 'new one is:', check_eventsToMonitorPtrStr);
 						last_eventsToMonitorPtrStr = check_eventsToMonitorPtrStr;
 						
-						console.info('num_files.value BEFORE re reading ptr:', num_files); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
-						num_files = ostypes.TYPE.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr));
-						console.info('num_files.value AFTER re reading ptr:', num_files.value);
+						console.info('num_files.value BEFORE re reading ptr:', uneval(num_files)); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
+						num_files = ostypes.TYPE.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents;
+						console.info('num_files AFTER re reading ptr:', uneval(num_files));
 						
-						events_to_monitor = ostypes.TYPE.kevent.array(num_files.value).ptr(ctypes.UInt64(last_eventsToMonitorPtrStr));
-						event_data = ostypes.TYPE.kevent.array(num_files.value)();
+						events_to_monitor = ostypes.TYPE.kevent.array(num_files).ptr(ctypes.UInt64(last_eventsToMonitorPtrStr));
+						event_data = ostypes.TYPE.kevent.array(num_files)();
 					}
 					/*
-					if (num_files.value == 0) {
+					if (num_files == 0) {
 						// num_files is 0 so no need to make call to kevent
 						continue;
 					} else {
