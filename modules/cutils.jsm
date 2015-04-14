@@ -53,7 +53,7 @@ function utilsInit() {
 		var str1 = this.jscGetDeepest(str1); //cuz apparently its not passing by reference
 		var str2 = this.jscGetDeepest(str2); //cuz apparently its not passing by reference
 		
-		console.info('comparing:', str1, str2);
+		//console.info('comparing:', str1, str2);
 		
 		if (str1 == str2) {
 			return true;
