@@ -76,7 +76,7 @@ function init(objCore) {
 			break;
 		case 'darwin':
 			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
-			core.os.verison = 10.6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
+			core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 			break;
 		case 'freebsd':
 		case 'openbsd':
@@ -123,12 +123,13 @@ function createWatcher(aWatcherID, aOptions={}) {
 		case 'darwin':
 		case 'freebsd':
 		case 'openbsd':
+			
+			console.error('in createWatcher of worker, core.os.version:', core.os.version);
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
-
-			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
-				// use kqueue
+			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
 				
-				var rez_kq = core.os.name == 'darwin' ? ostypes.API('kqueue')(0) : /*bsd*/ ostypes.API('kqueue')();
+				// use kqueue
+				var rez_kq = ostypes.API('kqueue')(); //core.os.name == 'darwin' ? ostypes.API('kqueue')(0) : /*bsd*/ ostypes.API('kqueue')();
 				if (ctypes.errno != 0) {
 					console.error('Failed rez_kq, errno:', ctypes.errno);
 					throw new Error({
@@ -147,27 +148,28 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
 				
 				Watcher.num_files = ostypes.TYPE.int(); // defaults to 0 so this is same as doing `ostypes.TYPE.int(0)`
-				Watcher.events_to_monitor = ostypes.TYPE.kevent.array(num_files.value)(); // array of 0 length // now that im keeping a global c_string_of_ptrStr_to_eventsToMonitorArr i dont think i think i STILL have to keep this globally defined to prevent GC on it unsure/untested though
+				Watcher.events_to_monitor = ostypes.TYPE.kevent.array(Watcher.num_files.value)(); // array of 0 length // now that im keeping a global c_string_of_ptrStr_to_eventsToMonitorArr i dont think i think i STILL have to keep this globally defined to prevent GC on it unsure/untested though
 				
-				Watcher.c_string_of_ptrStr_to_eventsToMonitorArr = ctypes.char.array(50)(); // i dont use ostypes.TYPE.char here as this is not dependent on os, its dependent on the cutils modifyCStr function which says i should use a ctypes.char // i go to 50 to leave extra spaces in case in future new pointer address i put here is longer
-				console.info('c_string_of_ptrStr_to_eventsToMonitorArr.readString():', Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.readString(), Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address().toString());
+				console.log('created event_to_monitor and its address:', cutils.strOfPtr(Watcher.events_to_monitor.address()));
+				
+				Watcher.c_string_of_ptrStr_to_eventsToMonitorArr = ctypes.char.array(50)(); // link87354 // i dont use ostypes.TYPE.char here as this is not dependent on os, its dependent on the cutils modifyCStr function which says i should use a ctypes.char // i go to 50 to leave extra spaces in case in future new pointer address i put here is longer
+				console.info('c_string_of_ptrStr_to_eventsToMonitorArr.readString():', Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.readString().toString(), Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address().toString());
 				
 				cutils.modifyCStr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr, cutils.strOfPtr(Watcher.events_to_monitor.address()));
 				
-				console.info('c_string_of_ptrStr_to_eventsToMonitorArr.readString():', Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.readString(), Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address().toString());
+				console.info('c_string_of_ptrStr_to_eventsToMonitorArr.readString():', Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.readString().toString(), Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address().toString());
 				
 				
 				// can either set num_files by doing `num_files = ostypes.TYPE.int(NUMBER_HERE)` OR after defining it by `num_files = ostypes.TYPE.int(NUMBER_HERE_OPT_ELSE_0)` then can set it by doing `num_files.contents = NUMBER_HERE`
 				// to read it MUST be within same PID (as otherwise memory access is not allowed to it and firefox crashes (as tested on windows)) do this: `var readIntPtr = ctypes.int.ptr(ctypes.UInt64("0x14460454")).contents`
 				var argsForPoll = {
-					kq: parseInt(cutils.jscGetDeepest(rez_kq)),
-					num_files_ptrStr: cutils.strOfPtr(num_files.address()),
-					ptStr_cStringOfPtrStrToEventsToMonitorArr: cutils.strOfPtr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr)
+					kq: rez_kq, // rez_kq is return of kqueue which is int, so no need for jscGetDeepest
+					num_files_ptrStr: cutils.strOfPtr(Watcher.num_files.address()),
+					ptStr_cStringOfPtrStrToEventsToMonitorArr: cutils.strOfPtr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address())
 				};
 				
 				return argsForPoll;
-				
-			// end kqueue
+
 			} else {
 				// its mac and os.version is >= 10.7
 				// use FSEventFramework
@@ -220,7 +222,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 		
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
 
-			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
+			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
 				// use kqueue
 				
 				var Watcher = _Watcher_cache[aWatcherID];
@@ -232,7 +234,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				}
 				
 				// Open a file descriptor for the file/directory that you want to monitor.
-				var event_fd = core.os.name == 'darwin' ? ostypes.API('open')(aOSPath, OS.Constants.libc.O_EVTONLY) : /*bsd*/ ostypes.API('open')(aOSPath, 0;
+				var event_fd = core.os.name == 'darwin' ? ostypes.API('open')(aOSPath, OS.Constants.libc.O_EVTONLY) : /*bsd*/ ostypes.API('open')(aOSPath, 0);
 				console.info('event_fd:', event_fd.toString(), uneval(event_fd));
 				if (ctypes.errno != 0) {
 					console.error('Failed event_fd, errno:', ctypes.errno);
@@ -253,8 +255,8 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					// IN_MOVED_FROM - aEvent of renamed (maybe renamed-from?)
 					// IN_CREATE - created; file/direcotry created in watched directory
 					// NOTE_DELETE - deleted; File/directory deleted from watched directory.
-				if (options.masks) {
-					Watcher.vnode_events_for_path[aOSPath] |= options.masks;
+				if (aOptions.masks) {
+					Watcher.vnode_events_for_path[aOSPath] |= aOptions.masks;
 				}
 
 				var newNumFilesVal = Object.keys(Watcher.paths_watched).length; // can alternatively do Watcher.num_files.value + 1
@@ -264,8 +266,10 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				var i = -1;
 				for (var cOSPath in Watcher.paths_watched) {
 					i++;
-					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), cOSPath, ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, cOSPath);
+					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), Watcher.paths_watched[cOSPath], ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, cOSPath);
 				}
+				
+				console.log('created NEW after ADD event_to_monitor and its address:', cutils.strOfPtr(Watcher.events_to_monitor.address()));
 				
 				cutils.modifyCStr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr, cutils.strOfPtr(Watcher.events_to_monitor.address()));
 				Watcher.num_files.value = newNumFilesVal; // now after setting this, the next poll loop will find it is different from before

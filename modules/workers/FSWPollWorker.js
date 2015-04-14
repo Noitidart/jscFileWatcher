@@ -72,7 +72,6 @@ function init(objCore) {
 			break;
 		case 'darwin':
 			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
-			core.os.verison = 10.6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 			break;
 		case 'freebsd':
 		case 'openbsd':
@@ -96,13 +95,11 @@ function poll(aArgs) {
 		
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
 
-			if (core.os.version < 10.7) {
+			if (core.os.version < 7) {
+				
 				// use kqueue
-				
-				var kq = aArgs.kq;				
-				
-				// The address in user_data will be copied into a field in the event. If you are monitoring multiple files,you could,for example,pass in different data structure for each file.For this example,the path string is used.
-				var user_data = aOSPath;
+				console.error('poll kq');
+				var kq = aArgs.kq;
 
 				// Set the timeout to wake us every half second.
 				var timeout = ostypes.TYPE.timespec();
@@ -112,6 +109,8 @@ function poll(aArgs) {
 				timeout.tv_nsec = useNsec; // 500 milliseconds
 				
 				// Handle events
+				var last_eventsToMonitorPtrStr;
+				console.info('last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr);
 				var last_num_files = -1;
 				var num_files;
 				
@@ -120,20 +119,27 @@ function poll(aArgs) {
 				
 				var continue_loop = Infinity; // monitor forever // 40; // Monitor for twenty seconds. // ostypes.TYPE.int
 				while (--continue_loop) {
-					num_files = ostypes.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents; // i think i have to read pointer every time, i dont know im not sure, maybe once i have it i can just read it and when its updated in another thread it updates here i dont know i have to test
-					if (num_files.value != last_num_files) { /*link584732*/
-						last_num_files = num_files.value;
-						events_to_monitor = ostypes.TYPE.kevent.array(num_files.value).ptr(ctypes.UInt64(aArgs.num_files_ptrStr));
-						event_data = ostypes.TYPE.kevent.array(num_files.value)();
+					var now_eventsToMonitorPtrStr = ctypes.char.array(50).ptr(ctypes.UInt64(aArgs.ptStr_cStringOfPtrStrToEventsToMonitorArr)).contents.readString(); // using ctypes.char and NOT ostypes.TYPE.char as this is depending on cutils.modifyCStr (which says use ctypes.char) // link87354 50 cuz thats what i set it to
+					if (now_eventsToMonitorPtrStr != last_eventsToMonitorPtrStr) { // link584732
+						// so paths were added or removed OR added and remove you get what im trying to say
+						console.info('CHANGE ON last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr, 'now one is:', now_eventsToMonitorPtrStr);
+						last_eventsToMonitorPtrStr = now_eventsToMonitorPtrStr;
+						
+						console.info('num_files.value BEFORE re reading ptr:', uneval(num_files)); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
+						num_files = ostypes.TYPE.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents;
+						console.info('num_files AFTER re reading ptr:', uneval(num_files));
+						
+						events_to_monitor = ostypes.TYPE.kevent.array(num_files).ptr(ctypes.UInt64(now_eventsToMonitorPtrStr)).contents;
+						event_data = ostypes.TYPE.kevent.array(num_files)();
 					}
 					/*
-					if (num_files.value == 0) {
+					if (num_files == 0) {
 						// num_files is 0 so no need to make call to kevent
 						continue;
 					} else {
 					*/ // commented out as otherwise i have to make it setTimeout for half second // i also dont want to make this an infinite poll, as after addPath i need to update kevent arguments, which i do by reading hte num_files_ptrStr
 						// there is at least 1 file to watch
-						var event_count = ostypes.API('kevent')(Watcher.kq, events_to_monitor.address(), num_files, event_data.address(), num_files, timeout.address());
+						var event_count = ostypes.API('kevent')(kq, events_to_monitor/*.address()*/, num_files, event_data/*.address()*/, num_files, timeout.address());
 						console.info('event_count:', event_count.toString(), uneval(event_count));
 						if (ctypes.errno !== 0) {
 							console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
@@ -154,7 +160,8 @@ function poll(aArgs) {
 
 						if (!cutils.jscEqual(event_count, 0)) {
 							// something happend
-							console.log('Event ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.filter) + ', flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.flags) + ', filter flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.fflags) + ', filter data ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.data) + ', path ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.udata /*.contents.readString()*/ ));
+							console.log('Event ' + cutils.jscGetDeepest(event_data[0].ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data[0].filter) + ', flags ' + cutils.jscGetDeepest(event_data[0].flags) + ', filter flags ' + cutils.jscGetDeepest(event_data[0].fflags) + ', filter data ' + cutils.jscGetDeepest(event_data[0].data) + ', path ' + cutils.jscGetDeepest(event_data[0].udata /*.contents.readString()*/ ));
+							console.log('aEvent:', convertFlagsToAEventStr(event_data[0].fflags));
 						} else {
 							// No event
 						}
@@ -286,7 +293,7 @@ function convertFlagsToAEventStr(flags) {
 						NOTE_DELETE: 'deleted',
 						IN_MOVED_FROM: 'renamed-from',
 						IN_CREATE: 'created',
-						NOTE_EXTEND: 'note extended - i dont know what this action entails'.
+						NOTE_EXTEND: 'note extended - i dont know what this action entails',
 						NOTE_LINK: 'note link - i dont know what this action entails',
 						NOTE_UNLINK: 'note unlink - i dont know what this action entails',
 						NOTE_REVOKE: 'note revoke - i dont know what this action entails',

@@ -66,30 +66,14 @@ var macTypes = function() {
 	this.__CFAllocator = ctypes.StructType('__CFAllocator');
 	this.__CFString = ctypes.StructType('__CFString');
 	this.__CFURL = ctypes.StructType('__CFURL');
-	/*
-	if (is64bit) {
-		this.kevent = ctypes.StructType('kevent64_s', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-			{ ident: this.uint64_t },
-			{ filter: this.int16_t },
-			{ flags: this.uint16_t },
-			{ fflags: this.uint32_t },
-			{ data: this.int64_t },
-			{ udata: this.uint64_t },
-			{ ext: this.uint64_t.array(2) }
-		]);
-	} else {
-	*/
-		this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-			{ ident: this.uintptr_t },
-			{ filter: this.int16_t },
-			{ flags: this.uint16_t },
-			{ fflags: this.uint32_t },
-			{ data: this.intptr_t },
-			{ udata: this.void.ptr }
-		]);
-	/*
-	}
-	*/
+	this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
+		{ ident: this.uintptr_t },
+		{ filter: this.int16_t },
+		{ flags: this.uint16_t },
+		{ fflags: this.uint32_t },
+		{ data: this.intptr_t },
+		{ udata: this.void.ptr }
+	]);
 	this.Point = ctypes.StructType('Point', [
 		{ v: this.short },
 		{ h: this.short }
@@ -345,12 +329,14 @@ var macInit = function() {
 		EV_SET: function EV_SET(kev_address, ident, filter, flags, fflags, data, udata_jsStr) {
 			// macro
 			// docs say args are: &kev, ident, filter, flags, fflags, data, udata // docs are here: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-			kev_address.contents.ident = ident;
-			kev_address.contents.filter = filter;
-			kev_address.contents.flags = flags;
-			kev_address.contents.fflags = fflags;
-			kev_address.contents.data = data;
-			kev_address.contents.udata = ostypes.TYPE.char.array()(udata_jsStr);
+			console.info('kev_address:', kev_address.toString(), uneval(kev_address));
+			console.info('kev_address.contents:', kev_address.contents.toString(), uneval(kev_address.contents));
+			kev_address.contents.addressOfField('ident').contents = ident;
+			kev_address.contents.addressOfField('filter').contents = filter;
+			kev_address.contents.addressOfField('flags').contents = flags;
+			kev_address.contents.addressOfField('fflags').contents = fflags;
+			kev_address.contents.addressOfField('data').contents = data;
+			kev_address.contents.addressOfField('udata').contents = ostypes.TYPE.char.array()(udata_jsStr).address();
 		}
 	};
 }

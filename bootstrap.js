@@ -194,13 +194,26 @@ function _FSWatcherWorker_start() {
 			case 'darwin':
 				var userAgent = myServices.hph.userAgent;
 				//console.info('userAgent:', userAgent);
-				var version_osx = userAgent.match(/Mac OS X ([\d\.]+)/);
+				var version_osx = userAgent.match(/Mac OS X 10\.([\d\.]+)/);
 				//console.info('version_osx matched:', version_osx);
 				
 				if (!version_osx) {
 					throw new Error('Could not identify Mac OS X version.');
-				} else {		
-					objCore.os.version = parseFloat(version_osx[1]);
+				} else {
+					var version_osx_str = version_osx[1];
+					var ints_split = version_osx[1].split('.');
+					if (ints_split.length == 1) {
+						objCore.os.version = parseInt(ints_split[0]);
+					} else if (ints_split.length >= 2) {
+						objCore.os.version = ints_split[0] + '.' + ints_split[1];
+						if (ints_split.length > 2) {
+							objCore.os.version += ints_split.slice(2).join('');
+						}
+						objCore.os.version = parseFloat(objCore.os.version);
+					}
+					// this makes it so that 10.10.0 becomes 10.100
+					// 10.10.1 => 10.101
+					// so can compare numerically, as 10.100 is less then 10.101
 				}
 				break;
 			default:
@@ -307,7 +320,56 @@ function Watcher(aCallback) {
 			thisW.pendingAdds = null;
 			
 			// start - os specific
+			console.error('ok going to os specific');
 			switch (core.os.name) {
+				case 'darwin':
+				case 'freebsd':
+				case 'openbsd':
+				
+						// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
+						console.error('core.os.version:', core.os.version, 'core.os.version < 10.7', core.os.version < 7);
+						if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
+							// kqueue
+							
+							console.error('here');
+							// start the poll
+							var do_kqPoll = function() {
+								
+								if (thisW.readyState == 2 || thisW.readyState == 3) {
+									// watcher was closed so stop polling
+									return; // to prevent deeper exec
+								}
+								var promise_kqPoll = thisW.waitForNextChange();
+								promise_kqPoll.then(
+								  function(aVal) {
+									console.log('Fullfilled - promise_kqPoll - ', aVal);
+									// start - do stuff here - promise_kqPoll
+									//do_kqPoll(); // restart poll
+									// end - do stuff here - promise_kqPoll
+								  },
+								  function(aReason) {
+									var rejObj = {name:'promise_kqPoll', aReason:aReason};
+									console.warn('Rejected - promise_kqPoll - ', rejObj);
+									//deferred_createProfile.reject(rejObj);
+									//do_kqPoll();
+								  }
+								).catch(
+								  function(aCaught) {
+									var rejObj = {name:'promise_kqPoll', aCaught:aCaught};
+									console.error('Caught - promise_kqPoll - ', rejObj);
+									//deferred_createProfile.reject(rejObj);
+									//do_kqPoll();
+								  }
+								);
+							};
+							do_kqPoll();
+							
+						} else {
+							// its mac and os.version is >= 10.7
+							// use FSEventFramework
+						}
+							
+					break;
 				case 'linux':
 				case 'webos': // Palm Pre
 				case 'android':
@@ -408,7 +470,7 @@ function Watcher(aCallback) {
 								do_nixPoll();
 							  }
 							);
-						}
+						};
 						do_nixPoll();
 						
 					break;
@@ -754,7 +816,11 @@ Watcher.prototype.waitForNextChange = function() {
 		thisW.FSWPollWorker = new PromiseWorker(core.addon.path.content + 'modules/workers/FSWPollWorker.js');
 		_Watcher_UnterminatedFSWPollWorkers[thisW.id] = thisW.FSWPollWorker;
 		
-		var promise_initPollWorker = thisW.FSWPollWorker.post('init', [{}]); // am passing empty obj to init core with, as none of the FSWPollWorker functions use anything from core
+		var promise_initPollWorker = thisW.FSWPollWorker.post('init', [{
+			os: {
+				version: core.os.version // used for mac
+			}
+		}]); // just need core.os.version added to PromiseWorker core as i use it for mac
 		promise_initPollWorker.then(
 		  function(aVal) {
 			console.log('Fullfilled - promise_initPollWorker - ', aVal);
@@ -786,12 +852,71 @@ Watcher.prototype.waitForNextChange = function() {
 }
 // end - OS.File.Watcher API
 
+function addToCore() {
+	// adds some properties i use to core
+		switch (core.os.name) {
+			case 'winnt':
+			case 'winmo':
+			case 'wince':
+				core.os.version = parseFloat(Services.sysinfo.getProperty('version'));
+				// http://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
+				if (core.os.version == 6.0) {
+					core.os.version_name = 'vista';
+				}
+				if (core.os.version >= 6.1) {
+					core.os.version_name = '7+';
+				}
+				if (core.os.version == 5.1 || core.os.version == 5.2) { // 5.2 is 64bit xp
+					core.os.version_name = 'xp';
+				}
+				break;
+				
+			case 'darwin':
+				var userAgent = myServices.hph.userAgent;
+				//console.info('userAgent:', userAgent);
+				var version_osx = userAgent.match(/Mac OS X 10\.([\d\.]+)/);
+				//console.info('version_osx matched:', version_osx);
+				
+				if (!version_osx) {
+					throw new Error('Could not identify Mac OS X version.');
+				} else {
+					var version_osx_str = version_osx[1];
+					var ints_split = version_osx[1].split('.');
+					if (ints_split.length == 1) {
+						core.os.version = parseInt(ints_split[0]);
+					} else if (ints_split.length >= 2) {
+						core.os.version = ints_split[0] + '.' + ints_split[1];
+						if (ints_split.length > 2) {
+							core.os.version += ints_split.slice(2).join('');
+						}
+						core.os.version = parseFloat(core.os.version);
+					}
+					// this makes it so that 10.10.0 becomes 10.100
+					// 10.10.1 => 10.101
+					// so can compare numerically, as 10.100 is less then 10.101
+					
+					core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
+				}
+				break;
+			default:
+				// nothing special
+		}
+		
+		core.firefox = {};
+		core.firefox.version = Services.appinfo.version;
+		
+		console.log('done adding to core, it is now:', core);
+}
+
 function install() {}
 function uninstall() {}
 
 function startup(aData, aReason) {
 	console.log('test')
 	//core.addon.aData = aData;
+	
+	addToCore();
+	
 	PromiseWorker = Cu.import(core.addon.path.content + 'modules/PromiseWorker.jsm').BasePromiseWorker;
 
 	//Services.prompt.alert(null, myServices.sb.GetStringFromName('startup_prompt_title'), myServices.sb.GetStringFromName('startup_prompt_title'));
