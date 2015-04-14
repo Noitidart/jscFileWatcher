@@ -174,8 +174,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 				}
 
 				console.info('bytes_returned:', bytes_returned.toString());
-				//var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
-				//console.info('casted:', casted.toString(), uneval(casted));
+				var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+				console.info('casted:', casted.toString(), uneval(casted));
 				throw new Error('rawr');
 				
 				var rez_GOR = ostypes.API('GetOverlappedResult')(hDirectory, o.address(), bytes_returned.address(), false);
