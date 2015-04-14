@@ -321,6 +321,7 @@ function Watcher(aCallback) {
 			thisW.pendingAdds = null;
 			
 			// start - os specific
+			console.error('ok going to os specific');
 			switch (core.os.name) {
 				case 'darwin':
 				case 'freebsd':
