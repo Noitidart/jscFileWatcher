@@ -162,7 +162,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var argsForPoll = {
 					kq: parseInt(cutils.jscGetDeepest(rez_kq)),
 					num_files_ptrStr: cutils.strOfPtr(Watcher.num_files.address()),
-					ptStr_cStringOfPtrStrToEventsToMonitorArr: cutils.strOfPtr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr)
+					ptStr_cStringOfPtrStrToEventsToMonitorArr: cutils.strOfPtr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address())
 				};
 				
 				return argsForPoll;
