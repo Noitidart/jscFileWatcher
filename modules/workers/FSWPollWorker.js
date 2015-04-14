@@ -295,7 +295,7 @@ function convertFlagsToAEventStr(flags) {
 						NOTE_DELETE: 'deleted',
 						IN_MOVED_FROM: 'renamed-from',
 						IN_CREATE: 'created',
-						NOTE_EXTEND: 'note extended - i dont know what this action entails'.
+						NOTE_EXTEND: 'note extended - i dont know what this action entails',
 						NOTE_LINK: 'note link - i dont know what this action entails',
 						NOTE_UNLINK: 'note unlink - i dont know what this action entails',
 						NOTE_REVOKE: 'note revoke - i dont know what this action entails',
