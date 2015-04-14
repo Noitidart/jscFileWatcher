@@ -268,8 +268,18 @@ var bsdInit = function() {
 	// end - function declares
 	
 	this.HELPER = {
-
-	
+		EV_SET: function EV_SET(kev_address, ident, filter, flags, fflags, data, udata_jsStr) {
+			// macro
+			// docs say args are: &kev, ident, filter, flags, fflags, data, udata // docs are here: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
+			console.info('kev_address:', kev_address.toString(), uneval(kev_address));
+			console.info('kev_address.contents:', kev_address.contents.toString(), uneval(kev_address.contents));
+			kev_address.contents.addressOfField('ident').contents = ident;
+			kev_address.contents.addressOfField('filter').contents = filter;
+			kev_address.contents.addressOfField('flags').contents = flags;
+			kev_address.contents.addressOfField('fflags').contents = fflags;
+			kev_address.contents.addressOfField('data').contents = data;
+			kev_address.contents.addressOfField('udata').contents = ostypes.TYPE.char.array()(udata_jsStr).address();
+		}
 	};
 }
 
