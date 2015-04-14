@@ -816,7 +816,11 @@ Watcher.prototype.waitForNextChange = function() {
 		thisW.FSWPollWorker = new PromiseWorker(core.addon.path.content + 'modules/workers/FSWPollWorker.js');
 		_Watcher_UnterminatedFSWPollWorkers[thisW.id] = thisW.FSWPollWorker;
 		
-		var promise_initPollWorker = thisW.FSWPollWorker.post('init', [{}]); // am passing empty obj to init core with, as none of the FSWPollWorker functions use anything from core
+		var promise_initPollWorker = thisW.FSWPollWorker.post('init', [{
+			os: {
+				version: core.os.version // used for mac
+			}
+		}]); // just need core.os.version added to PromiseWorker core as i use it for mac
 		promise_initPollWorker.then(
 		  function(aVal) {
 			console.log('Fullfilled - promise_initPollWorker - ', aVal);

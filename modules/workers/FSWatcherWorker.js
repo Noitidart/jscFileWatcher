@@ -125,7 +125,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 		case 'openbsd':
 			
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
-			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
+			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
 				// use kqueue
 				
 				var rez_kq = ostypes.API('kqueue')(); //core.os.name == 'darwin' ? ostypes.API('kqueue')(0) : /*bsd*/ ostypes.API('kqueue')();
@@ -220,7 +220,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 		
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
 
-			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
+			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
 				// use kqueue
 				
 				var Watcher = _Watcher_cache[aWatcherID];

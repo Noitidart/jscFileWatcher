@@ -72,7 +72,6 @@ function init(objCore) {
 			break;
 		case 'darwin':
 			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
-			core.os.verison = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 			break;
 		case 'freebsd':
 		case 'openbsd':
@@ -96,9 +95,10 @@ function poll(aArgs) {
 		
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
 
-			if (core.os.version < 10.7) {
-				// use kqueue
+			if (core.os.version < 7) {
 				
+				// use kqueue
+				console.error('poll kq');
 				var kq = aArgs.kq;				
 				
 				// The address in user_data will be copied into a field in the event. If you are monitoring multiple files,you could,for example,pass in different data structure for each file.For this example,the path string is used.
