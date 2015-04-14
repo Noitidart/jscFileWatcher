@@ -109,6 +109,16 @@ function createWatcher(aWatcherID, aOptions={}) {
 				
 				var path = OS.Constants.Path.desktopDir;
 
+				ostypes.TYPE.char = ctypes.char;
+				
+				/*
+				var fni = ctypes.StructType('fni', [
+					{ i: ostypes.TYPE.FILE_NOTIFY_INFORMATION },
+					{ d: ostypes.TYPE.char.array(ostypes.TYPE.FILE_NOTIFY_INFORMATION.size + OS.Constants.Win.MAX_PATH) }
+				]);
+				*/
+				var fni = ostypes.TYPE.FILE_NOTIFY_INFORMATION();
+				
 				// verify path is a directory
 				var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, OS.Constants.Win.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
 				console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
@@ -130,17 +140,19 @@ function createWatcher(aWatcherID, aOptions={}) {
 				}
 				*/
 				var WATCHED_RES_MAXIMUM_NOTIFICATIONS = 100;
-				var NOTIFICATION_BUFFER_SIZE = WATCHED_RES_MAXIMUM_NOTIFICATIONS * ostypes.TYPE.FILE_NOTIFY_INFORMATION.size;
+				var NOTIFICATION_BUFFER_SIZE = ostypes.TYPE.FILE_NOTIFY_INFORMATION.size; // WATCHED_RES_MAXIMUM_NOTIFICATIONS * ostypes.TYPE.FILE_NOTIFY_INFORMATION.size;
 
-				var temp_buffer = ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
+				console.info('NOTIFICATION_BUFFER_SIZE:', NOTIFICATION_BUFFER_SIZE);
+				
+				var temp_buffer = fni; //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
 				var temp_buffer_size = ostypes.TYPE.DWORD(temp_buffer.constructor.size);
-				var bytes_returned = ostypes.TYPE.LPDWORD();
-				var changes_to_watch = ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
+				var bytes_returned = ostypes.TYPE.DWORD();
+				var changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE; //ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
 
-				var o = ostypes.TYPE.LPOVERLAPPED();
+				var o = ostypes.TYPE.OVERLAPPED();
 
 				console.error('may start hang');
-				var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer, temp_buffer_size, false, changes_to_watch, bytes_returned, o, null);
+				var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, false, changes_to_watch, bytes_returned.address(), o.address(), null);
 				console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
 
 				console.error('ok got here');
