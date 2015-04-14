@@ -128,7 +128,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
 				// use kqueue
 				
-				var rez_kq = core.os.name == 'darwin' ? ostypes.API('kqueue')(0) : /*bsd*/ ostypes.API('kqueue')();
+				var rez_kq = ostypes.API('kqueue')(); //core.os.name == 'darwin' ? ostypes.API('kqueue')(0) : /*bsd*/ ostypes.API('kqueue')();
 				if (ctypes.errno != 0) {
 					console.error('Failed rez_kq, errno:', ctypes.errno);
 					throw new Error({
