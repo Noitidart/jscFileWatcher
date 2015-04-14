@@ -210,7 +210,7 @@ function utilsInit() {
 		var ptrStr = ptr.toString().match(/.*"(.*?)"/); // can alternatively do `'0x' + ctypes.cast(num_files.address(), ctypes.uintptr_t).value.toString(16)`
 		
 		if (!ptrStr) {
-			throw new Error('Could not find address string, make sure you passed a .address()');
+			throw new Error('Could not find address string, make sure you passed a .address(), ptr.toString() was: ' + ptr.toString());
 		}
 		
 		return ptrStr[1];
