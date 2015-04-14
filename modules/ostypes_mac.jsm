@@ -332,11 +332,11 @@ var macInit = function() {
 			console.info('kev_address:', kev_address.toString(), uneval(kev_address));
 			console.info('kev_address.contents:', kev_address.contents.toString(), uneval(kev_address.contents));
 			kev_address.contents.addressOfField('ident').contents = ident;
-			kev_address.contents.addressOfField('ident').filter.contents = filter;
-			kev_address.contents.addressOfField('ident').flags.contents = flags;
-			kev_address.contents.addressOfField('ident').fflags.contents = fflags;
-			kev_address.contents.addressOfField('ident').data.contents = data;
-			kev_address.contents.addressOfField('ident').udata.contents = udata_jsStr; //ostypes.TYPE.char.array()(udata_jsStr);
+			kev_address.contents.addressOfField('filter').contents = filter;
+			kev_address.contents.addressOfField('flags').contents = flags;
+			kev_address.contents.addressOfField('fflags').contents = fflags;
+			kev_address.contents.addressOfField('data').contents = data;
+			kev_address.contents.addressOfField('udata').contents = udata_jsStr; //ostypes.TYPE.char.array()(udata_jsStr);
 		}
 	};
 }
