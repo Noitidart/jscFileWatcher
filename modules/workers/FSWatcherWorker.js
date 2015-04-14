@@ -124,10 +124,11 @@ function createWatcher(aWatcherID, aOptions={}) {
 		case 'freebsd':
 		case 'openbsd':
 			
+			console.error('in createWatcher of worker, core.os.version:', core.os.version);
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
 			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
-				// use kqueue
 				
+				// use kqueue
 				var rez_kq = ostypes.API('kqueue')(); //core.os.name == 'darwin' ? ostypes.API('kqueue')(0) : /*bsd*/ ostypes.API('kqueue')();
 				if (ctypes.errno != 0) {
 					console.error('Failed rez_kq, errno:', ctypes.errno);
@@ -166,8 +167,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				};
 				
 				return argsForPoll;
-				
-			// end kqueue
+
 			} else {
 				// its mac and os.version is >= 10.7
 				// use FSEventFramework
