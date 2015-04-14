@@ -199,8 +199,22 @@ function _FSWatcherWorker_start() {
 				
 				if (!version_osx) {
 					throw new Error('Could not identify Mac OS X version.');
-				} else {		
+				} else {
+					var version_osx_str = version_osx[1];
+					var ints_split = version_osx[1].split('.');
+					if (ints_split.length == 1) {
+						objCore.os.version = parseInt(ints_split[0]);
+					} else if (ints_split >= 2) {
+						objCore.os.version = ints_split[0] + '.' + ints_split[1];
+						if (ints_split > 2) {
+							objCore.os.version += ints_split.slice(2).join('');
+						}
+						objCore.os.version = parseFloat(objCore.os.version);
+					}
 					objCore.os.version = parseFloat(version_osx[1]);
+					// this makes it so that 10.10.0 becomes 10.100
+					// 10.10.1 => 10.101
+					// so can compare numerically, as 10.100 is less then 10.101
 				}
 				break;
 			default:
