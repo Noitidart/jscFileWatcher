@@ -253,8 +253,8 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					// IN_MOVED_FROM - aEvent of renamed (maybe renamed-from?)
 					// IN_CREATE - created; file/direcotry created in watched directory
 					// NOTE_DELETE - deleted; File/directory deleted from watched directory.
-				if (options.masks) {
-					Watcher.vnode_events_for_path[aOSPath] |= options.masks;
+				if (aOptions.masks) {
+					Watcher.vnode_events_for_path[aOSPath] |= aOptions.masks;
 				}
 
 				var newNumFilesVal = Object.keys(Watcher.paths_watched).length; // can alternatively do Watcher.num_files.value + 1
