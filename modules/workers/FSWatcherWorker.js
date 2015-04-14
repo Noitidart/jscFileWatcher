@@ -150,6 +150,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 				Watcher.num_files = ostypes.TYPE.int(); // defaults to 0 so this is same as doing `ostypes.TYPE.int(0)`
 				Watcher.events_to_monitor = ostypes.TYPE.kevent.array(Watcher.num_files.value)(); // array of 0 length // now that im keeping a global c_string_of_ptrStr_to_eventsToMonitorArr i dont think i think i STILL have to keep this globally defined to prevent GC on it unsure/untested though
 				
+				console.log('created event_to_monitor and its address:', cutils.strOfPtr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address()));
+				
 				Watcher.c_string_of_ptrStr_to_eventsToMonitorArr = ctypes.char.array(50)(); // link87354 // i dont use ostypes.TYPE.char here as this is not dependent on os, its dependent on the cutils modifyCStr function which says i should use a ctypes.char // i go to 50 to leave extra spaces in case in future new pointer address i put here is longer
 				console.info('c_string_of_ptrStr_to_eventsToMonitorArr.readString():', Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.readString().toString(), Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address().toString());
 				

@@ -126,7 +126,7 @@ function poll(aArgs) {
 						last_eventsToMonitorPtrStr = check_eventsToMonitorPtrStr;
 						
 						console.info('num_files.value BEFORE re reading ptr:', num_files); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
-						num_files = ostypes.TYPE.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents;
+						num_files = ostypes.TYPE.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr));
 						console.info('num_files.value AFTER re reading ptr:', num_files.value);
 						
 						events_to_monitor = ostypes.TYPE.kevent.array(num_files.value).ptr(ctypes.UInt64(last_eventsToMonitorPtrStr));
