@@ -904,6 +904,8 @@ function addToCore() {
 		
 		core.firefox = {};
 		core.firefox.version = Services.appinfo.version;
+		
+		console.log('done adding to core, it is now:', core);
 }
 
 function install() {}
