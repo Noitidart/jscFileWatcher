@@ -194,7 +194,7 @@ function _FSWatcherWorker_start() {
 			case 'darwin':
 				var userAgent = myServices.hph.userAgent;
 				//console.info('userAgent:', userAgent);
-				var version_osx = userAgent.match(/Mac OS X ([\d\.]+)/);
+				var version_osx = userAgent.match(/Mac OS X 10\.([\d\.]+)/);
 				//console.info('version_osx matched:', version_osx);
 				
 				if (!version_osx) {
@@ -328,7 +328,7 @@ function Watcher(aCallback) {
 				
 						// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
 						console.error('core.os.version:', core.os.version, 'core.os.version < 10.7', core.os.version < 10.7);
-						if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
+						if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
 							// kqueue
 							
 							console.error('here');
@@ -870,7 +870,7 @@ function addToCore() {
 			case 'darwin':
 				var userAgent = myServices.hph.userAgent;
 				//console.info('userAgent:', userAgent);
-				var version_osx = userAgent.match(/Mac OS X ([\d\.]+)/);
+				var version_osx = userAgent.match(/Mac OS X 10\.([\d\.]+)/);
 				//console.info('version_osx matched:', version_osx);
 				
 				if (!version_osx) {
