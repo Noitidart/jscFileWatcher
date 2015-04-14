@@ -347,12 +347,12 @@ var macInit = function() {
 			// docs say args are: &kev, ident, filter, flags, fflags, data, udata // docs are here: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 			console.info('kev_address:', kev_address.toString(), uneval(kev_address));
 			console.info('kev_address.contents:', kev_address.contents.toString(), uneval(kev_address.contents));
-			kev_address.contents.ident = ident;
-			kev_address.contents.filter = filter;
-			kev_address.contents.flags = flags;
-			kev_address.contents.fflags = fflags;
-			kev_address.contents.data = data;
-			kev_address.contents.udata = ostypes.TYPE.char.array()(udata_jsStr);
+			kev_address.contents.addressOfField('ident').contents = ident;
+			kev_address.contents.addressOfField('ident').filter.contents = filter;
+			kev_address.contents.addressOfField('ident').flags.contents = flags;
+			kev_address.contents.addressOfField('ident').fflags.contents = fflags;
+			kev_address.contents.addressOfField('ident').data.contents = data;
+			kev_address.contents.addressOfField('ident').udata.contents = udata_jsStr; //ostypes.TYPE.char.array()(udata_jsStr);
 		}
 	};
 }
