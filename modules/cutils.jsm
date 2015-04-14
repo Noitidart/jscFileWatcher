@@ -235,7 +235,7 @@ function utilsInit() {
 			throw new Error('not enough room in ctypesCharArr for the newStr_js and its null terminator');
 		}
 		
-		console.info('pre mod readString():', ctypesCharArr.readString().toString());
+		//console.info('pre mod readString():', ctypesCharArr.readString().toString());
 		
 		for (var i=0; i<ctypesCharArr.length; i++) {
 			var charCodeAtCurrentPosition = ctypesCharArr.addressOfElement(i).contents;
@@ -251,7 +251,7 @@ function utilsInit() {
 			ctypesCharArr.addressOfElement(i).contents = newStr_js.charCodeAt(i);
 		}
 		
-		console.info('post mod readString():', ctypesCharArr.readString().toString());
+		//console.info('post mod readString():', ctypesCharArr.readString().toString());
 	};
 }
 

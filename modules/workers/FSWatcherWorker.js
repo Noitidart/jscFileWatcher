@@ -123,8 +123,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 		case 'darwin':
 		case 'freebsd':
 		case 'openbsd':
+			
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
-
 			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
 				// use kqueue
 				

@@ -322,6 +322,53 @@ function Watcher(aCallback) {
 			
 			// start - os specific
 			switch (core.os.name) {
+				case 'darwin':
+				case 'freebsd':
+				case 'openbsd':
+				
+						// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
+						if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
+							// kqueue
+							
+							console.error('here');
+							// start the poll
+							var do_kqPoll = function() {
+								
+								if (thisW.readyState == 2 || thisW.readyState == 3) {
+									// watcher was closed so stop polling
+									return; // to prevent deeper exec
+								}
+								var promise_kqPoll = thisW.waitForNextChange();
+								promise_kqPoll.then(
+								  function(aVal) {
+									console.log('Fullfilled - promise_kqPoll - ', aVal);
+									// start - do stuff here - promise_kqPoll
+									//do_kqPoll(); // restart poll
+									// end - do stuff here - promise_kqPoll
+								  },
+								  function(aReason) {
+									var rejObj = {name:'promise_kqPoll', aReason:aReason};
+									console.warn('Rejected - promise_kqPoll - ', rejObj);
+									//deferred_createProfile.reject(rejObj);
+									do_kqPoll();
+								  }
+								).catch(
+								  function(aCaught) {
+									var rejObj = {name:'promise_kqPoll', aCaught:aCaught};
+									console.error('Caught - promise_kqPoll - ', rejObj);
+									//deferred_createProfile.reject(rejObj);
+									do_kqPoll();
+								  }
+								);
+							};
+							do_kqPoll();
+							
+						} else {
+							// its mac and os.version is >= 10.7
+							// use FSEventFramework
+						}
+							
+					break;
 				case 'linux':
 				case 'webos': // Palm Pre
 				case 'android':
@@ -422,7 +469,7 @@ function Watcher(aCallback) {
 								do_nixPoll();
 							  }
 							);
-						}
+						};
 						do_nixPoll();
 						
 					break;
