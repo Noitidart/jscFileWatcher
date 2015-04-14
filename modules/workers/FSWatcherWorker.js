@@ -232,7 +232,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				}
 				
 				// Open a file descriptor for the file/directory that you want to monitor.
-				var event_fd = core.os.name == 'darwin' ? ostypes.API('open')(aOSPath, OS.Constants.libc.O_EVTONLY) : /*bsd*/ ostypes.API('open')(aOSPath, 0;
+				var event_fd = core.os.name == 'darwin' ? ostypes.API('open')(aOSPath, OS.Constants.libc.O_EVTONLY) : /*bsd*/ ostypes.API('open')(aOSPath, 0);
 				console.info('event_fd:', event_fd.toString(), uneval(event_fd));
 				if (ctypes.errno != 0) {
 					console.error('Failed event_fd, errno:', ctypes.errno);
