@@ -147,7 +147,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
 				
 				Watcher.num_files = ostypes.TYPE.int(); // defaults to 0 so this is same as doing `ostypes.TYPE.int(0)`
-				Watcher.events_to_monitor = ostypes.TYPE.kevent.array(num_files.value)(); // array of 0 length // now that im keeping a global c_string_of_ptrStr_to_eventsToMonitorArr i dont think i think i STILL have to keep this globally defined to prevent GC on it unsure/untested though
+				Watcher.events_to_monitor = ostypes.TYPE.kevent.array(Watcher.num_files.value)(); // array of 0 length // now that im keeping a global c_string_of_ptrStr_to_eventsToMonitorArr i dont think i think i STILL have to keep this globally defined to prevent GC on it unsure/untested though
 				
 				Watcher.c_string_of_ptrStr_to_eventsToMonitorArr = ctypes.char.array(50)(); // link87354 // i dont use ostypes.TYPE.char here as this is not dependent on os, its dependent on the cutils modifyCStr function which says i should use a ctypes.char // i go to 50 to leave extra spaces in case in future new pointer address i put here is longer
 				console.info('c_string_of_ptrStr_to_eventsToMonitorArr.readString():', Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.readString(), Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address().toString());
@@ -161,7 +161,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				// to read it MUST be within same PID (as otherwise memory access is not allowed to it and firefox crashes (as tested on windows)) do this: `var readIntPtr = ctypes.int.ptr(ctypes.UInt64("0x14460454")).contents`
 				var argsForPoll = {
 					kq: parseInt(cutils.jscGetDeepest(rez_kq)),
-					num_files_ptrStr: cutils.strOfPtr(num_files.address()),
+					num_files_ptrStr: cutils.strOfPtr(Watcher.num_files.address()),
 					ptStr_cStringOfPtrStrToEventsToMonitorArr: cutils.strOfPtr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr)
 				};
 				
