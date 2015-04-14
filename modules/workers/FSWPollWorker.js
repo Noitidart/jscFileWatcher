@@ -93,9 +93,9 @@ function poll(aArgs) {
 		case 'freebsd':
 		case 'openbsd':
 		
-			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
+			// uses kqueue for core.os.version < 10.7 and non-Darwin, FSEventFramework for core.os.version >= 10.7
 
-			if (core.os.version < 7) {
+			if (core.os.name !== 'darwin' /* bsd */ || core.os.version < 7) {
 				
 				// use kqueue
 				console.error('poll kq');
