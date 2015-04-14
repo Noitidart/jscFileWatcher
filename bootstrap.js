@@ -211,7 +211,6 @@ function _FSWatcherWorker_start() {
 						}
 						objCore.os.version = parseFloat(objCore.os.version);
 					}
-					objCore.os.version = parseFloat(version_osx[1]);
 					// this makes it so that 10.10.0 becomes 10.100
 					// 10.10.1 => 10.101
 					// so can compare numerically, as 10.100 is less then 10.101
@@ -888,7 +887,6 @@ function addToCore() {
 						}
 						core.os.version = parseFloat(core.os.version);
 					}
-					core.os.version = parseFloat(version_osx[1]);
 					// this makes it so that 10.10.0 becomes 10.100
 					// 10.10.1 => 10.101
 					// so can compare numerically, as 10.100 is less then 10.101
