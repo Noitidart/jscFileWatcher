@@ -264,7 +264,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				var i = -1;
 				for (var cOSPath in Watcher.paths_watched) {
 					i++;
-					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), cOSPath, ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, cOSPath);
+					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), Watcher.paths_watched[cOSPath], ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, cOSPath);
 				}
 				
 				cutils.modifyCStr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr, cutils.strOfPtr(Watcher.events_to_monitor.address()));

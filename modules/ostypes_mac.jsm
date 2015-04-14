@@ -66,30 +66,14 @@ var macTypes = function() {
 	this.__CFAllocator = ctypes.StructType('__CFAllocator');
 	this.__CFString = ctypes.StructType('__CFString');
 	this.__CFURL = ctypes.StructType('__CFURL');
-	/*
-	if (is64bit) {
-		this.kevent = ctypes.StructType('kevent64_s', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-			{ ident: this.uint64_t },
-			{ filter: this.int16_t },
-			{ flags: this.uint16_t },
-			{ fflags: this.uint32_t },
-			{ data: this.int64_t },
-			{ udata: this.uint64_t },
-			{ ext: this.uint64_t.array(2) }
-		]);
-	} else {
-	*/
-		this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-			{ ident: this.uintptr_t },
-			{ filter: this.int16_t },
-			{ flags: this.uint16_t },
-			{ fflags: this.uint32_t },
-			{ data: this.intptr_t },
-			{ udata: this.void.ptr }
-		]);
-	/*
-	}
-	*/
+	this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
+		{ ident: this.uintptr_t },
+		{ filter: this.int16_t },
+		{ flags: this.uint16_t },
+		{ fflags: this.uint32_t },
+		{ data: this.intptr_t },
+		{ udata: this.void.ptr }
+	]);
 	this.Point = ctypes.StructType('Point', [
 		{ v: this.short },
 		{ h: this.short }
