@@ -849,12 +849,68 @@ Watcher.prototype.waitForNextChange = function() {
 }
 // end - OS.File.Watcher API
 
+function addToCore() {
+	// adds some properties i use to core
+		switch (core.os.name) {
+			case 'winnt':
+			case 'winmo':
+			case 'wince':
+				core.os.version = parseFloat(Services.sysinfo.getProperty('version'));
+				// http://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
+				if (core.os.version == 6.0) {
+					core.os.version_name = 'vista';
+				}
+				if (core.os.version >= 6.1) {
+					core.os.version_name = '7+';
+				}
+				if (core.os.version == 5.1 || core.os.version == 5.2) { // 5.2 is 64bit xp
+					core.os.version_name = 'xp';
+				}
+				break;
+				
+			case 'darwin':
+				var userAgent = myServices.hph.userAgent;
+				//console.info('userAgent:', userAgent);
+				var version_osx = userAgent.match(/Mac OS X ([\d\.]+)/);
+				//console.info('version_osx matched:', version_osx);
+				
+				if (!version_osx) {
+					throw new Error('Could not identify Mac OS X version.');
+				} else {
+					var version_osx_str = version_osx[1];
+					var ints_split = version_osx[1].split('.');
+					if (ints_split.length == 1) {
+						core.os.version = parseInt(ints_split[0]);
+					} else if (ints_split >= 2) {
+						core.os.version = ints_split[0] + '.' + ints_split[1];
+						if (ints_split > 2) {
+							core.os.version += ints_split.slice(2).join('');
+						}
+						core.os.version = parseFloat(core.os.version);
+					}
+					core.os.version = parseFloat(version_osx[1]);
+					// this makes it so that 10.10.0 becomes 10.100
+					// 10.10.1 => 10.101
+					// so can compare numerically, as 10.100 is less then 10.101
+				}
+				break;
+			default:
+				// nothing special
+		}
+		
+		core.firefox = {};
+		core.firefox.version = Services.appinfo.version;
+}
+
 function install() {}
 function uninstall() {}
 
 function startup(aData, aReason) {
 	console.log('test')
 	//core.addon.aData = aData;
+	
+	addToCore();
+	
 	PromiseWorker = Cu.import(core.addon.path.content + 'modules/PromiseWorker.jsm').BasePromiseWorker;
 
 	//Services.prompt.alert(null, myServices.sb.GetStringFromName('startup_prompt_title'), myServices.sb.GetStringFromName('startup_prompt_title'));
