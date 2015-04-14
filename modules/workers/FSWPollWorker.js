@@ -122,11 +122,11 @@ function poll(aArgs) {
 					var check_eventsToMonitorPtrStr = ctypes.char.array(50).ptr(ctypes.UInt64(aArgs.ptStr_cStringOfPtrStrToEventsToMonitorArr)).contents.readString(); // using ctypes.char and NOT ostypes.TYPE.char as this is depending on cutils.modifyCStr (which says use ctypes.char) // link87354 50 cuz thats what i set it to
 					if (check_eventsToMonitorPtrStr != last_eventsToMonitorPtrStr) { // link584732
 						// so paths were added or removed OR added and remove you get what im trying to say
-						console.info('CHANGE ON last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr, 'old one was:', last_eventsToMonitorPtrStr);
+						console.info('CHANGE ON last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr, 'new one is:', check_eventsToMonitorPtrStr);
 						last_eventsToMonitorPtrStr = check_eventsToMonitorPtrStr;
 						
 						console.info('num_files.value BEFORE re reading ptr:', num_files.value); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
-						num_files = ostypes.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents;
+						num_files = ostypes.TYPE.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents;
 						console.info('num_files.value AFTER re reading ptr:', num_files.value);
 						
 						events_to_monitor = ostypes.TYPE.kevent.array(num_files.value).ptr(ctypes.UInt64(last_eventsToMonitorPtrStr));
