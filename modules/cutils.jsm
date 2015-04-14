@@ -245,10 +245,10 @@ function utilsInit() {
 				// hit null terminator so break
 				break;
 			}
-			
-			for (var i=0; i<newStr_js.length; i++) {
-				ctypesCharArr.addressOfElement(i).contents = newStr_js.charCodeAt(i);
-			}
+		}
+		
+		for (var i=0; i<newStr_js.length; i++) {
+			ctypesCharArr.addressOfElement(i).contents = newStr_js.charCodeAt(i);
 		}
 		
 		console.info('post mod readString():', ctypesCharArr.readString().toString());
