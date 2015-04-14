@@ -112,6 +112,8 @@ function poll(aArgs) {
 				timeout.tv_nsec = useNsec; // 500 milliseconds
 				
 				// Handle events
+				var last_eventsToMonitorPtrStr;
+				console.info('last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr);
 				var last_num_files = -1;
 				var num_files;
 				
@@ -120,10 +122,17 @@ function poll(aArgs) {
 				
 				var continue_loop = Infinity; // monitor forever // 40; // Monitor for twenty seconds. // ostypes.TYPE.int
 				while (--continue_loop) {
-					num_files = ostypes.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents; // i think i have to read pointer every time, i dont know im not sure, maybe once i have it i can just read it and when its updated in another thread it updates here i dont know i have to test
-					if (num_files.value != last_num_files) { /*link584732*/
-						last_num_files = num_files.value;
-						events_to_monitor = ostypes.TYPE.kevent.array(num_files.value).ptr(ctypes.UInt64(aArgs.num_files_ptrStr));
+					var check_eventsToMonitorPtrStr = ctypes.char.array(50).ptr(aArgs.ptStr_cStringOfPtrStrToEventsToMonitorArr).contents.readString(); // using ctypes.char and NOT ostypes.TYPE.char as this is depending on cutils.modifyCStr (which says use ctypes.char) // link87354 50 cuz thats what i set it to
+					if (check_eventsToMonitorPtrStr != last_eventsToMonitorPtrStr) { // link584732
+						// so paths were added or removed OR added and remove you get what im trying to say
+						console.info('CHANGE ON last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr, 'old one was:', last_eventsToMonitorPtrStr);
+						last_eventsToMonitorPtrStr = check_eventsToMonitorPtrStr;
+						
+						console.info('num_files.value BEFORE re reading ptr:', num_files.value); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
+						num_files = ostypes.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents;
+						console.info('num_files.value AFTER re reading ptr:', num_files.value);
+						
+						events_to_monitor = ostypes.TYPE.kevent.array(num_files.value).ptr(ctypes.UInt64(last_eventsToMonitorPtrStr));
 						event_data = ostypes.TYPE.kevent.array(num_files.value)();
 					}
 					/*
