@@ -120,7 +120,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var fni = ostypes.TYPE.FILE_NOTIFY_INFORMATION();
 				
 				// verify path is a directory
-				var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, OS.Constants.Win.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
+				var hDirectory = ostypes.API('CreateFile')(ostypes.TYPE.WCHAR.array()(path), ostypes.CONST.FILE_LIST_DIRECTORY | ostypes.CONST.GENERIC_READ, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE, null, ostypes.CONST.OPEN_EXISTING/*OS.Constants.Win.OPEN_EXISTING*/, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS /*OS.Constants.Win.FILE_FLAG_BACKUP_SEMANTICS*/ | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
 				console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
 				if (ctypes.winLastError != 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
 					console.error('Failed hDirectory, winLastError:', ctypes.winLastError);
@@ -147,21 +147,24 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var temp_buffer = fni; //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
 				var temp_buffer_size = ostypes.TYPE.DWORD(temp_buffer.constructor.size);
 				var bytes_returned = ostypes.TYPE.DWORD();
-				var changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE; //ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
+				var changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; //ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
 
 				var o = ostypes.TYPE.OVERLAPPED();
 
+				o.hEvent = ostypes.API('CreateEvent')(null, false, false, null); // if i dont do this then calling ReadDirectoryChanges cause winLastError to be 6
+				console.info('o.hEvent:', o.hEvent.toString(), uneval(o.hEvent));
+				if (ctypes.winLastError != 0) {
+					console.error('Failed o.hEvent, winLastError:', ctypes.winLastError);
+					throw new Error('Failed o.hEvent, winLastError: ' + ctypes.winLastError);
+				}
+
 				console.error('may start hang');
-				var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, false, changes_to_watch, bytes_returned.address(), o.address(), null);
+				var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, true, changes_to_watch, bytes_returned.address(), /*o.address()*/null, null);
 				console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
 
-				console.error('ok got here');
-				throw new Error({
-					name: 'api-error',
-					message: 'Just testing WINNT, so not returning properly here'
-				});
+				console.error('ok got here didnt hang, this is good as i want it async');
 				
-				if (cutils.jscEqual(rez_RDC, 0)) {
+				if (rez_RDC == false) {
 					console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
 					throw new Error({
 						name: 'os-api-error',
@@ -170,15 +173,12 @@ function createWatcher(aWatcherID, aOptions={}) {
 					});
 				}
 
+				console.info('bytes_returned:', bytes_returned.toString());
 				//var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
 				//console.info('casted:', casted.toString(), uneval(casted));
-
-				throw new Error({
-					name: 'api-error',
-					message: 'Just testing WINNT, so not returning properly here'
-				});
+				throw new Error('rawr');
 				
-				var rez_GOR = ostypes.API('GetOverlappedResult')(hDirectory, o, b, false);
+				var rez_GOR = ostypes.API('GetOverlappedResult')(hDirectory, o.address(), bytes_returned.address(), false);
 				console.info('rez_GOR:', rez_GOR.toString(), uneval(rez_GOR));
 				if (ctypes.winLastError != 0) { // can also do cutils.jscEqual(rez_GOR, 0)
 					console.error('Failed rez_GOR, winLastError:', ctypes.winLastError);

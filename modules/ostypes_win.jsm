@@ -176,8 +176,10 @@ var winInit = function() {
 		FILE_SHARE_DELETE: 4,
 		FILE_SHARE_READ: 1,
 		FILE_SHARE_WRITE: 2,
+		GENERIC_READ: 31, // from https://msdn.microsoft.com/en-us/library/windows/desktop/aa374892%28v=vs.85%29.aspx i have no idea where i got 0x80000000 from // 0x80000000,
 		INVALID_HANDLE_VALUE: -1,
-		MB_OK: 0
+		MB_OK: 0,
+		OPEN_EXISTING: 3
 	};
 	
 	var _lib = {}; // cache for lib
@@ -247,10 +249,10 @@ var winInit = function() {
 			 */
 			return lib('kernel32').declare(ifdef_UNICODE ? 'CreateEventW' : 'CreateEventA', self.TYPE.ABI,
 				self.TYPE.HANDLE,					// return
-				self.TYPE.LPSECURITY_ATTRIBUTES,	// hFile
-				self.TYPE.BOOL,						// lpOverlapped
-				self.TYPE.BOOL,						// lpNumberOfBytesTransferred
-				self.TYPE.LPCTSTR					// bWait
+				self.TYPE.LPSECURITY_ATTRIBUTES,	// lpEventAttributes
+				self.TYPE.BOOL,						// bManualReset
+				self.TYPE.BOOL,						// bInitialState
+				self.TYPE.LPCTSTR					// lpName
 			);
 		},
 		GetOverlappedResult: function() {
