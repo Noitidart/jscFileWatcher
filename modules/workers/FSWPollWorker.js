@@ -283,20 +283,19 @@ function convertFlagsToAEventStr(flags) {
 		case 'freebsd':
 		case 'openbsd':
 		
-				if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
+				if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
 			
 					// kqueue
 					
 					var default_flags = { // shoud be whatever is passed in FSWatcherWorker.js addPathToWatcher function
 						NOTE_WRITE: 'contents-modified',
-						IN_MOVED_TO: 'renamed-to',
 						NOTE_DELETE: 'deleted',
-						IN_MOVED_FROM: 'renamed-from',
-						IN_CREATE: 'created',
+						NOTE_RENAME: 'renamed',
 						NOTE_EXTEND: 'note extended - i dont know what this action entails',
 						NOTE_LINK: 'note link - i dont know what this action entails',
 						NOTE_UNLINK: 'note unlink - i dont know what this action entails',
 						NOTE_REVOKE: 'note revoke - i dont know what this action entails',
+						NOTE_ATTRIB: 'note attrib - i dont know what this action entails'
 					};
 					for (var f in default_flags) {
 						if (flags & ostypes.CONST[f]) {
