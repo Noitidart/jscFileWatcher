@@ -160,7 +160,8 @@ function poll(aArgs) {
 
 						if (!cutils.jscEqual(event_count, 0)) {
 							// something happend
-							console.log('Event ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.filter) + ', flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.flags) + ', filter flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.fflags) + ', filter data ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.data) + ', path ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.udata /*.contents.readString()*/ ));
+							console.log('Event ' + cutils.jscGetDeepest(event_data[0].ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data[0].filter) + ', flags ' + cutils.jscGetDeepest(event_data[0].flags) + ', filter flags ' + cutils.jscGetDeepest(event_data[0].fflags) + ', filter data ' + cutils.jscGetDeepest(event_data[0].data) + ', path ' + cutils.jscGetDeepest(event_data[0].udata /*.contents.readString()*/ ));
+							console.log('aEvent:', convertFlagsToAEventStr(event_data[0].fflags));
 						} else {
 							// No event
 						}
