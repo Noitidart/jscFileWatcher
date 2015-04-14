@@ -168,9 +168,6 @@ var macInit = function() {
 		EV_EOF: 0x8000,		// EOF detected
 		EV_ERROR: 0x4000,	// error, data contains errno
 		
-		NUM_EVENT_FDS: 1,
-		NUM_EVENT_SLOTS: 1,
-		
 		// https://github.com/jonnybest/taskcoach/blob/f930e55fa895315e9e9688994aa8dbc10b09b1e5/taskcoachlib/filesystem/fs_darwin.py#L35
 		NOTE_DELETE: 0x00000001,
 		NOTE_WRITE: 0x00000002,

@@ -178,8 +178,37 @@ function utilsInit() {
 		} else {
 			return readJSCharString();
 		}
-	}
+	},
 	// end - my alternative to .readStringReplaceMalformed
+	
+	this.strOfPtr = function(ptr) {
+		// ptr must be something.address() something can be `ctypes.int.array(5)()` or `ctypes.int()` or anything like that
+		// to read this later on do: `ctypes.int.ptr(ctypes.UInt64(RETURNED_PTRSTR_OF_THIS_FUNC)).contents`
+		
+		/* EXAMPLE 1 - shows you cant pass just a `ctypes.blah.array(10)()` here as its not auto converted to ptr. if you pass this (`ctypes.blah.array(10)()`) to argument of a ctypes declared function it gets converted to a ptr im pretty sure (maybe auto converted even if in field of struct)
+		 *   var events_to_monitor = ctypes.int.array(10)();
+		 *   events_to_monitor.toString(); // "ctypes.int.array(10)([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])"
+		 *   events_to_monitor.address().toString(); // "ctypes.int.array(10).ptr(ctypes.UInt64("0x16aca8b0"))"
+		 *   events_to_monitor.addressOfElement(3).contents = 3
+		 *   events_to_monitor.toString(); // "ctypes.int.array(10)([0, 0, 0, 3, 0, 0, 0, 0, 0, 0])"
+		 *   var readIntArrPtr = ctypes.int.array(10).ptr(ctypes.UInt64('0x16aca8b0'));
+		 *   readIntArrPtr.contents // CData { length: 10 }
+		 *   readIntArrPtr.contents.toString(); // "ctypes.int.array(10)([0, 0, 0, 3, 0, 0, 0, 0, 0, 0])"
+		 */
+		 
+		/* EXAMPLE 2
+		 *   var i = ctypes.int(10);
+		 *   i.value = 5; // this just shows how you can change the number contained inside without having to do `ctypes.int(NEW_NUM_HERE)` again
+		 *   i.address().toString(); // "ctypes.int.ptr(ctypes.UInt64("0x14460454"))"
+		 *   var ptrStr = cutils.stringOfPtr(i.address()); // "0x14460454"
+		 *   var readIntPtr = ctypes.int.ptr(ctypes.UInt64(ptrStr)).;
+		 *   readIntPtr // CData { contents: 5 }
+		 */
+		 
+		var ptrStr = ptr.toString().match(/.*"(.*?)"/)[1]; // can alternatively do `'0x' + ctypes.cast(num_files.address(), ctypes.uintptr_t).value.toString(16)`
+		
+		return ptrStr;
+	}
 }
 
 var cutils = new utilsInit();

@@ -76,8 +76,7 @@ function init(objCore) {
 			break;
 		case 'darwin':
 			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
-			// note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
-			core.os.verison = 10.6.9;
+			core.os.verison = 10.6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 			break;
 		case 'freebsd':
 		case 'openbsd':
@@ -122,13 +121,14 @@ function createWatcher(aWatcherID, aOptions={}) {
 		// 	
 		// 	break;
 		case 'darwin':
-
+		case 'freebsd':
+		case 'openbsd':
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
 
-			if (core.os.version < 10.7) {
+			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
 				// use kqueue
 				
-				var rez_kq = ostypes.API('kqueue')(0);
+				var rez_kq = core.os.name == 'darwin' ? ostypes.API('kqueue')(0) : /*bsd*/ ostypes.API('kqueue')();
 				if (ctypes.errno != 0) {
 					console.error('Failed rez_kq, errno:', ctypes.errno);
 					throw new Error({
@@ -145,15 +145,22 @@ function createWatcher(aWatcherID, aOptions={}) {
 				
 				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
 				
+				thisW.num_files = ostypes.TYPE.int(); // defaults to 0 so this is same as doing `ostypes.TYPE.int(0)`
+				thisW.events_to_monitor = ostypes.TYPE.kevent.array(num_files.value)();
+				
+				// can either set num_files by doing `num_files = ostypes.TYPE.int(NUMBER_HERE)` OR after defining it by `num_files = ostypes.TYPE.int(NUMBER_HERE_OPT_ELSE_0)` then can set it by doing `num_files.contents = NUMBER_HERE`
+				// to read it MUST be within same PID (as otherwise memory access is not allowed to it and firefox crashes (as tested on windows)) do this: `var readIntPtr = ctypes.int.ptr(ctypes.UInt64("0x14460454")).contents`
 				var argsForPoll = {
-					kq: parseInt(cutils.jscGetDeepest(rez_kq))
+					kq: parseInt(cutils.jscGetDeepest(rez_kq)),
+					num_files_ptrStr: cutils.strOfPtr(num_files.address()),
+					events_to_monitor_ptrStr: cutils.strOfPtr(events_to_monitor.address())
 				};
 				
 				return argsForPoll;
 				
 			// end kqueue
 			} else {
-				// os.version is >= 10.7
+				// its mac and os.version is >= 10.7
 				// use FSEventFramework
 			}
 
@@ -199,10 +206,12 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 	
 	switch (core.os.name) {
 		case 'darwin':
-
+		case 'freebsd':
+		case 'openbsd':
+		
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
 
-			if (core.os.version < 10.7) {
+			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
 				// use kqueue
 				
 				var Watcher = _Watcher_cache[aWatcherID];
@@ -214,7 +223,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				}
 				
 				// Open a file descriptor for the file/directory that you want to monitor.
-				var event_fd = ostypes.API('open')(aOSPath, OS.Constants.libc.O_EVTONLY);
+				var event_fd = core.os.name == 'darwin' ? ostypes.API('open')(aOSPath, OS.Constants.libc.O_EVTONLY) : /*bsd*/ ostypes.API('open')(aOSPath, 0;
 				console.info('event_fd:', event_fd.toString(), uneval(event_fd));
 				if (ctypes.errno != 0) {
 					console.error('Failed event_fd, errno:', ctypes.errno);
@@ -227,11 +236,24 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 
 				Watcher.paths_watched[aOSPath] = event_fd; // safe as is ostypes.TYPE.int which is ctypes.int
 				
+				// Set up a list of events to monitor.
+				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
+				// reason for flags with respect to aEvent of callback to main thread:
+					// NOTE_WRITE - aEvent of contents-modified; File opened for writing was closed.; i dont think this gurantees a change in the contents happend
+					// NOTE_RENAME - aEvent of renamed
+					// IN_MOVED_FROM - aEvent of renamed (maybe renamed-from?)
+					// IN_CREATE - created; file/direcotry created in watched directory
+					// NOTE_DELETE - deleted; File/directory deleted from watched directory.
+				if (options.masks) {
+					vnode_events |= options.masks;
+				}
+				EV_SET(thisW.events_to_monitor.addressOfElement(thisW.num_files.value), event_fd, ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, vnode_events, 0, user_data);
+				
 
 				
 				// end kqueue
 			} else {
-				// os.version is >= 10.7
+				// its mac and os.version is >= 10.7
 				// use FSEventFramework
 			}
 

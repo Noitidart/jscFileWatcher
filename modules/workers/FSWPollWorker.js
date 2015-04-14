@@ -72,6 +72,7 @@ function init(objCore) {
 			break;
 		case 'darwin':
 			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
+			core.os.verison = 10.6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 			break;
 		case 'freebsd':
 		case 'openbsd':
@@ -90,15 +91,15 @@ function init(objCore) {
 function poll(aArgs) {
 	switch (core.os.name) {
 		case 'darwin':
-
+		case 'freebsd':
+		case 'openbsd':
+		
 			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
 
 			if (core.os.version < 10.7) {
 				// use kqueue
 				
-				var kq = aArgs.kq;
-				var vnode_events = aArgs.vnode_events;
-				
+				var kq = aArgs.kq;				
 				
 				// The address in user_data will be copied into a field in the event. If you are monitoring multiple files,you could,for example,pass in different data structure for each file.For this example,the path string is used.
 				var user_data = aOSPath;
@@ -109,38 +110,61 @@ function poll(aArgs) {
 				var useNsec = 500000000;
 				timeout.tv_sec = useSec; // 0 seconds
 				timeout.tv_nsec = useNsec; // 500 milliseconds
-
-				// Set up a list of events to monitor.
-				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
-				var events_to_monitor = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_FDS)();
-				EV_SET(events_to_monitor.addressOfElement(0), event_fd, ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, vnode_events, 0, user_data);
-
+				
 				// Handle events
-				var event_data = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_SLOTS)();
-
-				var num_files = 1; // ostypes.TYPE.int
-				var continue_loop = 40; // Monitor for twenty seconds. // ostypes.TYPE.int
+				var last_num_files = -1;
+				var num_files;
+				
+				var events_to_monitor;
+				var event_data;// = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_SLOTS)();
+				
+				var continue_loop = Infinity; // monitor forever // 40; // Monitor for twenty seconds. // ostypes.TYPE.int
 				while (--continue_loop) {
-					var event_count = ostypes.API('kevent')(Watcher.kq, events_to_monitor, ostypes.CONST.NUM_EVENT_SLOTS, event_data, num_files, timeout.address());
-					console.info('event_count:', event_count.toString(), uneval(event_count));
-					if (ctypes.errno !== 0) {
-						console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
-						throw new Error('Failed event_count, errno: ' + ctypes.errno + ' and event_count: ' + cutils.jscGetDeepest(event_count));
+					num_files = ostypes.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents; // i think i have to read pointer every time, i dont know im not sure, maybe once i have it i can just read it and when its updated in another thread it updates here i dont know i have to test
+					if (num_files.value != last_num_files) {
+						last_num_files = num_files.value;
+						events_to_monitor = ostypes.TYPE.kevent.array(num_files.value).ptr(ctypes.UInt64(aArgs.num_files_ptrStr));
+						event_data = ostypes.TYPE.kevent.array(num_files.value)();
 					}
-					if (cutils.jscEqual(event_data.addressOfElement(0).contents.flags, ostypes.CONST.EV_ERROR)) {
-						console.error('Failed event_count, due to event_data.flags == EV_ERROR, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
-						throw new Error('Failed event_count, due to event_data.flags == EV_ERROR, errno: ' + ctypes.errno + ' and event_count: ' + cutils.jscGetDeepest(event_count));
-					}
-
-					if (!cutils.jscEqual(event_count, '0')) {
-						console.log('Event ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.filter) + ', flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.flags) + ', filter flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.fflags) + ', filter data ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.data) + ', path ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.udata /*.contents.readString()*/ ));
+					/*
+					if (num_files.value == 0) {
+						// num_files is 0 so no need to make call to kevent
+						continue;
 					} else {
-						// No event
-					}
+					*/ // commented out as otherwise i have to make it setTimeout for half second // i also dont want to make this an infinite poll, as after addPath i need to update kevent arguments, which i do by reading hte num_files_ptrStr
+						// there is at least 1 file to watch
+						var event_count = ostypes.API('kevent')(Watcher.kq, events_to_monitor.address(), num_files, event_data.address(), num_files, timeout.address());
+						console.info('event_count:', event_count.toString(), uneval(event_count));
+						if (ctypes.errno !== 0) {
+							console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
+							throw new Error({
+								name: 'os-api-error',
+								message: 'Failed to event_count due to failed kevent call',
+								uniEerrno: ctypes.errno
+							});
+						}
+						if (cutils.jscEqual(event_data.addressOfElement(0).contents.flags, ostypes.CONST.EV_ERROR)) {
+							console.error('Failed event_count, due to event_data.flags == EV_ERROR, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
+							throw new Error({
+								name: 'os-api-error',
+								message: 'Failed to event_count despite succesful kevent call due to event_data.flags == EV_ERROR',
+								uniEerrno: ctypes.errno
+							});
+						}
 
-					// Reset the timeout. In case of a signal interrruption, the values may change.
-					timeout.tv_sec = useSec; // 0 seconds
-					timeout.tv_nsec = useNsec; // 500 milliseconds
+						if (!cutils.jscEqual(event_count, 0)) {
+							// something happend
+							console.log('Event ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.filter) + ', flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.flags) + ', filter flags ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.fflags) + ', filter data ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.data) + ', path ' + cutils.jscGetDeepest(event_data.addressOfElement(0).contents.udata /*.contents.readString()*/ ));
+						} else {
+							// No event
+						}
+
+						// Reset the timeout. In case of a signal interrruption, the values may change.
+						timeout.tv_sec = useSec; // 0 seconds
+						timeout.tv_nsec = useNsec; // 500 milliseconds
+					/*
+					}
+					*/
 				}
 				ostypes.API('close')(event_fd);
 				return 0;
@@ -191,7 +215,7 @@ function poll(aArgs) {
 					throw new Error({
 						name: 'os-api-error',
 						message: 'Failed to read during poll',
-						errno: ctypes.errno
+						uniEerrno: ctypes.errno
 					});
 				} else if (!cutils.jscEqual(length, 0)) {
 					// then its > 0 as its not -1
@@ -248,22 +272,54 @@ function poll(aArgs) {
 
 function convertFlagsToAEventStr(flags) {
 	switch (core.os.name) {
+		case 'darwin':
+		case 'freebsd':
+		case 'openbsd':
+		
+				if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 10.7 /*is old mac*/) {
+			
+					// kqueue
+					
+					var default_flags = { // shoud be whatever is passed in FSWatcherWorker.js addPathToWatcher function
+						NOTE_WRITE: 'contents-modified',
+						IN_MOVED_TO: 'renamed-to',
+						NOTE_DELETE: 'deleted',
+						IN_MOVED_FROM: 'renamed-from',
+						IN_CREATE: 'created',
+						NOTE_EXTEND: 'note extended - i dont know what this action entails'.
+						NOTE_LINK: 'note link - i dont know what this action entails',
+						NOTE_UNLINK: 'note unlink - i dont know what this action entails',
+						NOTE_REVOKE: 'note revoke - i dont know what this action entails',
+					};
+					for (var f in default_flags) {
+						if (flags & ostypes.CONST[f]) {
+							return default_flags[f];
+						}
+					}
+					return 'UNKNOWN FLAG';
+				} else {
+					// its mac and os.version is >= 10.7
+					// use FSEventFramework
+				}
+				
+			break;
 		case 'linux':
 		case 'webos': // Palm Pre // im guessng this has inotify, untested
 		case 'android': // im guessng this has inotify, untested
-			var default_flags = { // shoud be whatever is passed in FSWatcherWorker.js addPathToWatcher function
-				'IN_CLOSE_WRITE': 'contents-modified',
-				'IN_MOVED_TO': 'renamed-to',
-				'IN_DELETE': 'deleted',
-				'IN_MOVED_FROM': 'renamed-from',
-				'IN_CREATE': 'created'
-			};
-			for (var f in default_flags) {
-				if (flags & ostypes.CONST[f]) {
-					return default_flags[f];
+		
+				var default_flags = { // shoud be whatever is passed in FSWatcherWorker.js addPathToWatcher function
+					IN_CLOSE_WRITE: 'contents-modified',
+					IN_MOVED_TO: 'renamed-to',
+					IN_DELETE: 'deleted',
+					IN_MOVED_FROM: 'renamed-from',
+					IN_CREATE: 'created'
+				};
+				for (var f in default_flags) {
+					if (flags & ostypes.CONST[f]) {
+						return default_flags[f];
+					}
 				}
-			}
-			return 'blah'
+				return 'UNKNOWN FLAG';
 
 			break;
 		default:
