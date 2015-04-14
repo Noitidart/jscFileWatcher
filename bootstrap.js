@@ -351,14 +351,14 @@ function Watcher(aCallback) {
 									var rejObj = {name:'promise_kqPoll', aReason:aReason};
 									console.warn('Rejected - promise_kqPoll - ', rejObj);
 									//deferred_createProfile.reject(rejObj);
-									do_kqPoll();
+									//do_kqPoll();
 								  }
 								).catch(
 								  function(aCaught) {
 									var rejObj = {name:'promise_kqPoll', aCaught:aCaught};
 									console.error('Caught - promise_kqPoll - ', rejObj);
 									//deferred_createProfile.reject(rejObj);
-									do_kqPoll();
+									//do_kqPoll();
 								  }
 								);
 							};

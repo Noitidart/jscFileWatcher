@@ -160,7 +160,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				// can either set num_files by doing `num_files = ostypes.TYPE.int(NUMBER_HERE)` OR after defining it by `num_files = ostypes.TYPE.int(NUMBER_HERE_OPT_ELSE_0)` then can set it by doing `num_files.contents = NUMBER_HERE`
 				// to read it MUST be within same PID (as otherwise memory access is not allowed to it and firefox crashes (as tested on windows)) do this: `var readIntPtr = ctypes.int.ptr(ctypes.UInt64("0x14460454")).contents`
 				var argsForPoll = {
-					kq: parseInt(cutils.jscGetDeepest(rez_kq)),
+					kq: rez_kq, // rez_kq is return of kqueue which is int, so no need for jscGetDeepest
 					num_files_ptrStr: cutils.strOfPtr(Watcher.num_files.address()),
 					ptStr_cStringOfPtrStrToEventsToMonitorArr: cutils.strOfPtr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address())
 				};
