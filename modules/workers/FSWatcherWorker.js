@@ -269,6 +269,8 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), Watcher.paths_watched[cOSPath], ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, cOSPath);
 				}
 				
+				console.log('created NEW after ADD event_to_monitor and its address:', cutils.strOfPtr(Watcher.events_to_monitor.address()));
+				
 				cutils.modifyCStr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr, cutils.strOfPtr(Watcher.events_to_monitor.address()));
 				Watcher.num_files.value = newNumFilesVal; // now after setting this, the next poll loop will find it is different from before
 				
