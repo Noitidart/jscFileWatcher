@@ -204,9 +204,9 @@ function _FSWatcherWorker_start() {
 					var ints_split = version_osx[1].split('.');
 					if (ints_split.length == 1) {
 						objCore.os.version = parseInt(ints_split[0]);
-					} else if (ints_split >= 2) {
+					} else if (ints_split.length >= 2) {
 						objCore.os.version = ints_split[0] + '.' + ints_split[1];
-						if (ints_split > 2) {
+						if (ints_split.length > 2) {
 							objCore.os.version += ints_split.slice(2).join('');
 						}
 						objCore.os.version = parseFloat(objCore.os.version);
@@ -880,9 +880,9 @@ function addToCore() {
 					var ints_split = version_osx[1].split('.');
 					if (ints_split.length == 1) {
 						core.os.version = parseInt(ints_split[0]);
-					} else if (ints_split >= 2) {
+					} else if (ints_split.length >= 2) {
 						core.os.version = ints_split[0] + '.' + ints_split[1];
-						if (ints_split > 2) {
+						if (ints_split.length > 2) {
 							core.os.version += ints_split.slice(2).join('');
 						}
 						core.os.version = parseFloat(core.os.version);
