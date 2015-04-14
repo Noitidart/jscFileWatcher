@@ -120,7 +120,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var fni = ostypes.TYPE.FILE_NOTIFY_INFORMATION();
 				
 				// verify path is a directory
-				var hDirectory = ostypes.API('CreateFile')(ostypes.TYPE.WCHAR.array()(path), ostypes.CONST.FILE_LIST_DIRECTORY | ostypes.CONST.GENERIC_READ, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE, null, ostypes.CONST.OPEN_EXISTING/*OS.Constants.Win.OPEN_EXISTING*/, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS /*OS.Constants.Win.FILE_FLAG_BACKUP_SEMANTICS*/ | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
+				var hDirectory = ostypes.API('CreateFile')(ostypes.TYPE.WCHAR.array()(path), ostypes.CONST.FILE_LIST_DIRECTORY | ostypes.CONST.GENERIC_READ, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE, null, ostypes.CONST.OPEN_EXISTING/*OS.Constants.Win.OPEN_EXISTING*/, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS /*OS.Constants.Win.FILE_FLAG_BACKUP_SEMANTICS*/, null);
 				console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
 				if (ctypes.winLastError != 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
 					console.error('Failed hDirectory, winLastError:', ctypes.winLastError);
