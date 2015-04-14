@@ -16,7 +16,7 @@ function utilsInit() {
 	// start - comparison stuff
 	this.jscGetDeepest = function(obj) {
 		if (obj !== null && obj !== undefined) {
-			console.log('trying on:', obj.toString())
+			//console.log('trying on:', obj.toString())
 		}
 		while (obj && isNaN(obj) && ('contents' in obj || 'value' in obj)) {
 			if ('contents' in obj) {
