@@ -341,6 +341,16 @@ var macInit = function() {
 			// js str is just a string
 			// returns a CFStr that must be released with CFRelease when done
 			return self.API('CFStringCreateWithCharacters')(null, jsStr, jsStr.length);
+		},
+		EV_SET: function EV_SET(kev_address, ident, filter, flags, fflags, data, udata_jsStr) {
+			// macro
+			// docs say args are: &kev, ident, filter, flags, fflags, data, udata // docs are here: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
+			kev_address.contents.ident = ident;
+			kev_address.contents.filter = filter;
+			kev_address.contents.flags = flags;
+			kev_address.contents.fflags = fflags;
+			kev_address.contents.data = data;
+			kev_address.contents.udata = ostypes.TYPE.char.array()(udata_jsStr);
 		}
 	};
 }

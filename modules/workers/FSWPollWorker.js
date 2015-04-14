@@ -121,7 +121,7 @@ function poll(aArgs) {
 				var continue_loop = Infinity; // monitor forever // 40; // Monitor for twenty seconds. // ostypes.TYPE.int
 				while (--continue_loop) {
 					num_files = ostypes.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents; // i think i have to read pointer every time, i dont know im not sure, maybe once i have it i can just read it and when its updated in another thread it updates here i dont know i have to test
-					if (num_files.value != last_num_files) {
+					if (num_files.value != last_num_files) { /*link584732*/
 						last_num_files = num_files.value;
 						events_to_monitor = ostypes.TYPE.kevent.array(num_files.value).ptr(ctypes.UInt64(aArgs.num_files_ptrStr));
 						event_data = ostypes.TYPE.kevent.array(num_files.value)();

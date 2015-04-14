@@ -142,18 +142,27 @@ function createWatcher(aWatcherID, aOptions={}) {
 				_Watcher_cache[aWatcherID] = Watcher;
 				Watcher.kq = rez_kq;
 				Watcher.paths_watched = {}; // casing is whatever devuser passed in, key is aOSPath and value is fd of the watched file
+				Watcher.vnode_events_for_path = {}; //holds the fflags to monitor for the path, usually should be default, but user can modify it via using options.masks arg of Watcher.prototype.addPath which calls addPathToWatcher in PromiseWorker
 				
 				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
 				
-				thisW.num_files = ostypes.TYPE.int(); // defaults to 0 so this is same as doing `ostypes.TYPE.int(0)`
-				thisW.events_to_monitor = ostypes.TYPE.kevent.array(num_files.value)();
+				Watcher.num_files = ostypes.TYPE.int(); // defaults to 0 so this is same as doing `ostypes.TYPE.int(0)`
+				Watcher.events_to_monitor = ostypes.TYPE.kevent.array(num_files.value)(); // array of 0 length // now that im keeping a global c_string_of_ptrStr_to_eventsToMonitorArr i dont think i think i STILL have to keep this globally defined to prevent GC on it unsure/untested though
+				
+				Watcher.c_string_of_ptrStr_to_eventsToMonitorArr = ctypes.char.array(50)(); // i dont use ostypes.TYPE.char here as this is not dependent on os, its dependent on the cutils modifyCStr function which says i should use a ctypes.char // i go to 50 to leave extra spaces in case in future new pointer address i put here is longer
+				console.info('c_string_of_ptrStr_to_eventsToMonitorArr.readString():', Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.readString(), Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address().toString());
+				
+				cutils.modifyCStr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr, cutils.strOfPtr(Watcher.events_to_monitor.address()));
+				
+				console.info('c_string_of_ptrStr_to_eventsToMonitorArr.readString():', Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.readString(), Watcher.c_string_of_ptrStr_to_eventsToMonitorArr.address().toString());
+				
 				
 				// can either set num_files by doing `num_files = ostypes.TYPE.int(NUMBER_HERE)` OR after defining it by `num_files = ostypes.TYPE.int(NUMBER_HERE_OPT_ELSE_0)` then can set it by doing `num_files.contents = NUMBER_HERE`
 				// to read it MUST be within same PID (as otherwise memory access is not allowed to it and firefox crashes (as tested on windows)) do this: `var readIntPtr = ctypes.int.ptr(ctypes.UInt64("0x14460454")).contents`
 				var argsForPoll = {
 					kq: parseInt(cutils.jscGetDeepest(rez_kq)),
 					num_files_ptrStr: cutils.strOfPtr(num_files.address()),
-					events_to_monitor_ptrStr: cutils.strOfPtr(events_to_monitor.address())
+					ptStr_cStringOfPtrStrToEventsToMonitorArr: cutils.strOfPtr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr)
 				};
 				
 				return argsForPoll;
@@ -237,7 +246,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				Watcher.paths_watched[aOSPath] = event_fd; // safe as is ostypes.TYPE.int which is ctypes.int
 				
 				// Set up a list of events to monitor.
-				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
+				Watcher.vnode_events_for_path[aOSPath] = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
 				// reason for flags with respect to aEvent of callback to main thread:
 					// NOTE_WRITE - aEvent of contents-modified; File opened for writing was closed.; i dont think this gurantees a change in the contents happend
 					// NOTE_RENAME - aEvent of renamed
@@ -245,12 +254,24 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					// IN_CREATE - created; file/direcotry created in watched directory
 					// NOTE_DELETE - deleted; File/directory deleted from watched directory.
 				if (options.masks) {
-					vnode_events |= options.masks;
+					Watcher.vnode_events_for_path[aOSPath] |= options.masks;
 				}
-				EV_SET(thisW.events_to_monitor.addressOfElement(thisW.num_files.value), event_fd, ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, vnode_events, 0, user_data);
-				
 
+				var newNumFilesVal = Object.keys(Watcher.paths_watched).length; // can alternatively do Watcher.num_files.value + 1
 				
+				// i dont change num_files.value until after the new events_to_monitor is created and pointer is set, because if i change this first, then my loop in FSWPollWorker /*link584732*/ might be at a time such that it takes the new num_files and the new events_to_monitor wasnt created and strPtr not set yet, so it will use old events_to_monitor with new num_files number which will probably make kevents throw error in this linked loop
+				Watcher.events_to_monitor = ostypes.TYPE.kevent.array(newNumFilesVal)();
+				var i = -1;
+				for (var cOSPath in Watcher.paths_watched) {
+					i++;
+					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), cOSPath, ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, cOSPath);
+				}
+				
+				cutils.modifyCStr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr, cutils.strOfPtr(Watcher.events_to_monitor.address()));
+				Watcher.num_files.value = newNumFilesVal; // now after setting this, the next poll loop will find it is different from before
+				
+				// what if user does removePath of x addPath of x2, num_files.value stays same and loop wont trigger, so am changing it to check the pointer string to events_to_monitor
+
 				// end kqueue
 			} else {
 				// its mac and os.version is >= 10.7
