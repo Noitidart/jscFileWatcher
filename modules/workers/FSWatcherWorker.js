@@ -119,7 +119,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var fni = ostypes.TYPE.FILE_NOTIFY_INFORMATION();
 				
 				// verify path is a directory
-				var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY | ostypes.CONST.GENERIC_READ, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE, null, ostypes.CONST.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS/* | ostypes.CONST.FILE_FLAG_OVERLAPPED*/, null);
+				var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY /*| ostypes.CONST.GENERIC_READ*/, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE, null, ostypes.CONST.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
 				console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
 				if (ctypes.winLastError != 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
 					console.error('Failed hDirectory, winLastError:', ctypes.winLastError);
@@ -143,19 +143,21 @@ function createWatcher(aWatcherID, aOptions={}) {
 
 				console.info('NOTIFICATION_BUFFER_SIZE:', NOTIFICATION_BUFFER_SIZE);
 				
-				var dummyForSize = ostypes.TYPE.FILE_NOTIFY_INFORMATION.array(1)();
+				var dummyForSize = ostypes.TYPE.FILE_NOTIFY_INFORMATION.array(1)(); // accept max of 1 notifications at once (in application you should set this to like 50 or something higher as its very possible for more then 1 notification to be reported in one read/call to ReadDirectoryChangesW)
 				console.log('dummyForSize.constructor.size:', dummyForSize.constructor.size);
 				console.log('ostypes.TYPE.DWORD.size:', ostypes.TYPE.DWORD.size);
-				console.log('dummyForSize.constructor.size / ostypes.TYPE.DWORD.size:', dummyForSize.constructor.size / ostypes.TYPE.DWORD.size, Math.ceil(dummyForSize.constructor.size / ostypes.TYPE.DWORD.size));
+				var dummyForSize_DIVIDED_BY_DwordSize = dummyForSize.constructor.size / ostypes.TYPE.DWORD.size;
+
+				console.log('dummyForSize.constructor.size / ostypes.TYPE.DWORD.size:', dummyForSize_DIVIDED_BY_DwordSize, Math.ceil(dummyForSize_DIVIDED_BY_DwordSize)); // should be whole int but lets round up with Math.ceil just in case
 				
-				var temp_buffer = ostypes.TYPE.DWORD.array(Math.ceil(dummyForSize.constructor.size / ostypes.TYPE.DWORD.size))(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
+				var temp_buffer = ostypes.TYPE.DWORD.array(Math.ceil(dummyForSize_DIVIDED_BY_DwordSize))(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
 				var temp_buffer_size = temp_buffer.constructor.size; // obeys length of .array //ostypes.TYPE.DWORD(temp_buffer.constructor.size);
 				console.info('temp_buffer.constructor.size:', temp_buffer.constructor.size);
 				var bytes_returned = ostypes.TYPE.DWORD();
 				var changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; //ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
 				
 				console.error('may start hang');
-				var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, true, changes_to_watch, bytes_returned.address(), null/*o.address()*/, null);
+				var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, true, changes_to_watch, bytes_returned.address(), o.address(), null);
 				console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
 
 				console.error('ok got here didnt hang, this is good as i want it async');
@@ -170,15 +172,15 @@ function createWatcher(aWatcherID, aOptions={}) {
 				}
 
 				// for sync
-				console.info('bytes_returned:', bytes_returned.toString());
-				var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
-				console.info('casted:', casted.toString(), uneval(casted));
+				// console.info('bytes_returned:', bytes_returned.toString());
+				// var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+				// console.info('casted:', casted.toString(), uneval(casted));
 				throw new Error('breaking out, im just trying to get rez_RDC to consistenly return true right now');
 				
-				var rez_GOR = ostypes.API('GetOverlappedResult')(hDirectory, o.address(), bytes_returned.address(), false);
-				console.info('rez_GOR:', rez_GOR.toString(), uneval(rez_GOR));
-				if (ctypes.winLastError != 0) { // can also do cutils.jscEqual(rez_GOR, 0)
-					console.error('Failed rez_GOR, winLastError:', ctypes.winLastError);
+				var rez_GetOverlappedResult = ostypes.API('GetOverlappedResult')(hDirectory, o.address(), bytes_returned.address(), false);
+				console.info('rez_GetOverlappedResult:', rez_GetOverlappedResult.toString(), uneval(rez_GetOverlappedResult));
+				if (ctypes.winLastError != 0) { // can also do cutils.jscEqual(rez_GetOverlappedResult, 0)
+					console.error('Failed rez_GetOverlappedResult, winLastError:', ctypes.winLastError);
 					throw new Error({
 						name: 'os-api-error',
 						message: 'Failed to GetOverlappedResult',
