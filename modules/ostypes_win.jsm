@@ -65,6 +65,7 @@ var winTypes = function() {
 	this.OLECHAR = this.WCHAR; // typedef WCHAR OLECHAR; // https://github.com/wine-mirror/wine/blob/bdeb761357c87d41247e0960f71e20d3f05e40e6/include/wtypes.idl#L286
 	this.PLONG = this.LONG.ptr;
 	this.PULONG = this.ULONG.ptr;
+	this.PULONG_PTR = this.ULONG.ptr;
 	this.PCWSTR = this.WCHAR.ptr;
 	this.SIZE_T = this.ULONG_PTR;
 	this.SYSTEM_INFORMATION_CLASS = this.INT; // i think due to this search: http://stackoverflow.com/questions/28858849/where-is-system-information-class-defined
@@ -215,6 +216,17 @@ var winInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
+		CloseHandle: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/ms724211%28v=vs.85%29.aspx
+			 * BOOL WINAPI CloseHandle(
+			 *   __in_  HANDLE hObject
+			 * );
+			 */
+			return lib('kernel32').declare('CloseHandle', self.TYPE.ABI,
+				self.TYPE.BOOL,		// return
+				self.TYPE.HANDLE	// hObject
+			);
+		},
 		CreateFile: function() {
 			/* https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858%28v=vs.85%29.aspx
 			 * HANDLE WINAPI CreateFile(
@@ -227,7 +239,7 @@ var winInit = function() {
 			 *   __in_opt_  HANDLE hTemplateFile
 			 * );
 			 */
-			return lib('kernel32').declare('CreateFileW', self.TYPE.ABI,
+			return lib('kernel32').declare(ifdef_UNICODE ? 'CreateFileW' : 'CreateFileA', self.TYPE.ABI,
 				self.TYPE.HANDLE,					// return
 				self.TYPE.LPCTSTR,					// lpFileName
 				self.TYPE.DWORD,					// dwDesiredAccess
@@ -255,6 +267,23 @@ var winInit = function() {
 				self.TYPE.LPCTSTR					// lpName
 			);
 		},
+		CreateIoCompletionPort: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/aa363862%28v=vs.85%29.aspx
+			 *   HANDLE WINAPI CreateIoCompletionPort(
+			 *     __in_      HANDLE FileHandle,
+			 *     __in_opt_  HANDLE ExistingCompletionPort,
+			 *     __in_      ULONG_PTR CompletionKey,
+			 *     __in_      DWORD NumberOfConcurrentThreads
+			 *   );
+			 */
+			return lib('kernel32').declare('CreateIoCompletionPort', self.TYPE.ABI,
+				self.TYPE.HANDLE,		// return
+				self.TYPE.HANDLE,		// FileHandle
+				self.TYPE.HANDLE,		// ExistingCompletionPort
+				self.TYPE.ULONG_PTR,	// CompletionKey
+				self.TYPE.DWORD			// NumberOfConcurrentThreads
+			);
+		},
 		GetOverlappedResult: function() {
 			/* https://msdn.microsoft.com/en-us/library/windows/desktop/ms683209%28v=vs.85%29.aspx
 			 * BOOL WINAPI GetOverlappedResult(
@@ -272,6 +301,25 @@ var winInit = function() {
 				self.TYPE.BOOL			// bWait
 			);
 		},
+		GetQueuedCompletionStatus: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/aa364986%28v=vs.85%29.aspx
+			 * BOOL WINAPI GetQueuedCompletionStatus(
+			 *   __in_   HANDLE CompletionPort,
+			 *   __out_  LPDWORD lpNumberOfBytes,
+			 *   __out_  PULONG_PTR lpCompletionKey,
+			 *   __out_  LPOVERLAPPED *lpOverlapped,
+			 *   __in_   DWORD dwMilliseconds
+			 * );
+			 */
+			return lib('kernel32').declare('GetQueuedCompletionStatus', self.TYPE.ABI,
+				self.TYPE.BOOL,			// return
+				self.TYPE.HANDLE,		// CompletionPort
+				self.TYPE.LPDWORD,		// lpNumberOfBytes
+				self.TYPE.PULONG_PTR,	// lpCompletionKey
+				self.TYPE.LPOVERLAPPED,	// *lpOverlapped
+				self.TYPE.DWORD			// dwMilliseconds
+			);
+		},
 		MessageBox: function() {
 			/*
 				int WINAPI MessageBox(
@@ -281,7 +329,7 @@ var winInit = function() {
 				  _In_      UINT uType
 				);
 			*/
-			return lib('user32').declare('MessageBoxW', self.TYPE.ABI,
+			return lib('user32').declare(ifdef_UNICODE ? 'MessageBoxW' : 'MessageBoxA', self.TYPE.ABI,
 				self.TYPE.INT,			// return
 				self.TYPE.HWND,			// hWnd
 				self.TYPE.LPCTSTR,		// lpText
