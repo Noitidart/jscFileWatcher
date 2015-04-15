@@ -15,9 +15,7 @@ let masks = {
   /* port_alert() flags */
   PORT_ALERT_SET: 0x01,
   PORT_ALERT_UPDATE: 0x02,
-  PORT_ALERT_INVALID: (function(){
-    return this.PORT_ALERT_SET | this. PORT_ALERT_UPDATE;
-  })(),
+  PORT_ALERT_INVALID: 0x03,
   
   FILE_ACCESS:               0x00000001,
   FILE_MODIFIED:          0x00000002,
@@ -29,9 +27,9 @@ let masks = {
   UNMOUNTED:             0x20000000,
   MOUNTEDOVER:          0x40000000,
   
-  FILE_EXCEPTION: (function(){
+  get FILE_EXCEPTION() {
     return this.UNMOUNTED | this.FILE_DELETE | this.FILE_RENAME_TO | this. FILE_RENAME_FROM | this.MOUNTEDOVER;
-  })()  
+  }
 };
 let structures = { 
   port_event: ctypes.StructType("port_event", [
