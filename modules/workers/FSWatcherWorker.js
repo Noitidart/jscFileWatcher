@@ -109,9 +109,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 				
 				var path = OS.Constants.Path.desktopDir;
 
-				ostypes.TYPE.char = ctypes.char;
-				
 				/*
+				ostypes.TYPE.char = ctypes.char;
 				var fni = ctypes.StructType('fni', [
 					{ i: ostypes.TYPE.FILE_NOTIFY_INFORMATION },
 					{ d: ostypes.TYPE.char.array(ostypes.TYPE.FILE_NOTIFY_INFORMATION.size + OS.Constants.Win.MAX_PATH) }
@@ -120,7 +119,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var fni = ostypes.TYPE.FILE_NOTIFY_INFORMATION();
 				
 				// verify path is a directory
-				var hDirectory = ostypes.API('CreateFile')(ostypes.TYPE.WCHAR.array()(path), ostypes.CONST.FILE_LIST_DIRECTORY | ostypes.CONST.GENERIC_READ, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, ostypes.CONST.OPEN_EXISTING/*OS.Constants.Win.OPEN_EXISTING*/, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS /*OS.Constants.Win.FILE_FLAG_BACKUP_SEMANTICS*/ | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
+				var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY | ostypes.CONST.GENERIC_READ, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE, null, ostypes.CONST.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS/* | ostypes.CONST.FILE_FLAG_OVERLAPPED*/, null);
 				console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
 				if (ctypes.winLastError != 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
 					console.error('Failed hDirectory, winLastError:', ctypes.winLastError);
@@ -130,37 +129,33 @@ function createWatcher(aWatcherID, aOptions={}) {
 					});
 				}
 
-				/*
-				var o = new ostypes.TYPE.OVERLAPPED;
-				o.hEvent = ostypes.API('CreateEvent')(null, null, null, null);
+				
+				var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
+				o.hEvent = ostypes.API('CreateEvent')(null, false, false, null);
 				console.info('o.hEvent:', o.hEvent.toString(), uneval(o.hEvent));
-				if (o.hEvent.isNull()) { // ctypes.winLastError != 0
-				console.error('Failed o.hEvent, winLastError:', ctypes.winLastError);
-				throw new Error('Failed o.hEvent, winLastError: ' + ctypes.winLastError);
+				if (ctypes.winLastError != 0) { // o.hEvent.isNull()
+					console.error('Failed o.hEvent, winLastError:', ctypes.winLastError);
+					throw new Error('Failed o.hEvent, winLastError: ' + ctypes.winLastError);
 				}
-				*/
+				
 				var WATCHED_RES_MAXIMUM_NOTIFICATIONS = 100;
 				var NOTIFICATION_BUFFER_SIZE = ostypes.TYPE.FILE_NOTIFY_INFORMATION.size; // WATCHED_RES_MAXIMUM_NOTIFICATIONS * ostypes.TYPE.FILE_NOTIFY_INFORMATION.size;
 
 				console.info('NOTIFICATION_BUFFER_SIZE:', NOTIFICATION_BUFFER_SIZE);
 				
-				var temp_buffer = fni; //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
-				var temp_buffer_size = ostypes.TYPE.DWORD(temp_buffer.constructor.size);
+				var dummyForSize = ostypes.TYPE.FILE_NOTIFY_INFORMATION.array(1)();
+				console.log('dummyForSize.constructor.size:', dummyForSize.constructor.size);
+				console.log('ostypes.TYPE.DWORD.size:', ostypes.TYPE.DWORD.size);
+				console.log('dummyForSize.constructor.size / ostypes.TYPE.DWORD.size:', dummyForSize.constructor.size / ostypes.TYPE.DWORD.size, Math.ceil(dummyForSize.constructor.size / ostypes.TYPE.DWORD.size));
+				
+				var temp_buffer = ostypes.TYPE.DWORD.array(Math.ceil(dummyForSize.constructor.size / ostypes.TYPE.DWORD.size))(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
+				var temp_buffer_size = temp_buffer.constructor.size; // obeys length of .array //ostypes.TYPE.DWORD(temp_buffer.constructor.size);
 				console.info('temp_buffer.constructor.size:', temp_buffer.constructor.size);
 				var bytes_returned = ostypes.TYPE.DWORD();
 				var changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; //ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
-
-				var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
-
-				o.hEvent = ostypes.API('CreateEvent')(null, false, false, null); // if i dont do this then calling ReadDirectoryChanges cause winLastError to be 6
-				console.info('o.hEvent:', o.hEvent.toString(), uneval(o.hEvent));
-				if (ctypes.winLastError != 0) {
-					console.error('Failed o.hEvent, winLastError:', ctypes.winLastError);
-					throw new Error('Failed o.hEvent, winLastError: ' + ctypes.winLastError);
-				}
 				
 				console.error('may start hang');
-				var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, true, changes_to_watch, bytes_returned.address(), o.address(), null);
+				var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, true, changes_to_watch, bytes_returned.address(), null/*o.address()*/, null);
 				console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
 
 				console.error('ok got here didnt hang, this is good as i want it async');
@@ -175,10 +170,10 @@ function createWatcher(aWatcherID, aOptions={}) {
 				}
 
 				// for sync
-				// console.info('bytes_returned:', bytes_returned.toString());
-				// var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
-				// console.info('casted:', casted.toString(), uneval(casted));
-				throw new Error('rawr');
+				console.info('bytes_returned:', bytes_returned.toString());
+				var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+				console.info('casted:', casted.toString(), uneval(casted));
+				throw new Error('breaking out, im just trying to get rez_RDC to consistenly return true right now');
 				
 				var rez_GOR = ostypes.API('GetOverlappedResult')(hDirectory, o.address(), bytes_returned.address(), false);
 				console.info('rez_GOR:', rez_GOR.toString(), uneval(rez_GOR));
