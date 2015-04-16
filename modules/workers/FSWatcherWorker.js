@@ -298,7 +298,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					if (ex.message != 'Just testing WINNT, so not returning properly here') {
 						if (hDirectory && !hDirectory.isNull()) {
 							console.log('need to closeHandle on hDirectory');
-							var rez_CloseHandle = false; //ostypes.API('CloseHandle')(hDirectory);
+							var rez_CloseHandle = ostypes.API('CloseHandle')(hDirectory);
 							if (rez_CloseHandle == false) {
 								console.error('encountered error earlier and also encoutnering error when trying to finally close')
 								console.error('Failed to CloseHandle on hDirectory, winLastError:', ctypes.winLastError);			
