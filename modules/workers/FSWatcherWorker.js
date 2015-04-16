@@ -68,8 +68,10 @@ function init(objCore) {
 		case 'wince':
 			importScripts(core.addon.path.content + 'modules/ostypes_win.jsm');
 			break;
+        	case 'sunos':
+          	 	 importScripts(core.addon.path.content + 'modules/ostypes_sunos.jsm');
+           		 break;
 		case 'linux':
-		case 'sunos':
 		case 'webos': // Palm Pre
 		case 'android':
 			importScripts(core.addon.path.content + 'modules/ostypes_nix.jsm');
@@ -114,12 +116,20 @@ function createWatcher(aWatcherID, aOptions={}) {
 		// 		// uses kqueue
 		// 	
 		// 	break;		
-		// case 'sunos':
-		// 	
-		// 		// from http://www.experts-exchange.com/Programming/System/Q_22735761.html
-		// 			// inotify equivalent for SunOS => The best you can get is use FAM for Solaris, have a look at: http://savannah.nongnu.org/task/?2058
-		// 	
-		// 	break;
+        	case 'sunos':
+         		var port = ostypes.API('port_create')();
+            		if (port === -1) {
+              			throw new Error('Creating a port failed!');
+		   	}
+		 	var jsCb = function(yep) {
+       				console.log('got here');
+		  	}
+ 
+			var cCb = ostypes.TYPE.start_routine.ptr(jsCb);
+			var firstArg = ctypes.unsigned_int(1); // defaults to 0 otherwise put a number like ctypes.unsigned_int(4);
+			var casted = ctypes.cast(ctypes.int(port).address(), ctypes.void_t.ptr);
+			var pthread = ostypes.API('pthread_create')(firstArg.address(), ostypes.TYPE.pthread_attr_t.ptr, cCb, casted); 
+		    break;
 		case 'darwin':
 		case 'freebsd':
 		case 'openbsd':
