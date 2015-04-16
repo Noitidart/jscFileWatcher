@@ -89,14 +89,6 @@ var macTypes = function() {
 		{ tv_sec: this.time_t },
 		{ tv_nsec: this.long }
 	]);
-
-	this.FSEventStreamContext = new ctypes.StructType("FSEventStreamContext", [
-		{version: this.CFIndex},
-		{info: this.void.ptr},
-		{retain: this.CFAllocatorRetainCallBack},
-		{release: this.CFAllocatorReleaseCallBack},
-		{copyDescription: this.CFAllocatorCopyDescriptionCallBack}
-	]);
 	
 	// ADV STRUCTS
 	this.CFAllocatorRef = this.__CFAllocator.ptr;
@@ -124,7 +116,7 @@ var macTypes = function() {
 	// ADVANCED FUNCTION TYPES
 	this.ModalFilterUPP = this.ModalFilterProcPtr;
 	
-	// CRAZY ADVANCED STRUCT TYPE
+	// CRAZY ADVANCED STRUCT TYPE - uses the func types defined
 	this.AlertStdAlertParamRec = ctypes.StructType("AlertStdAlertParamRec", [
 		{ movable: this.Boolean },
 		{ helpButton: this.Boolean },
@@ -135,6 +127,13 @@ var macTypes = function() {
 		{ defaultButton: this.SInt16 },
 		{ cancelButton: this.SInt16 },
 		{ position: this.UInt16 }
+	]);
+	this.FSEventStreamContext = new ctypes.StructType("FSEventStreamContext", [
+		{version: this.CFIndex},
+		{info: this.void.ptr},
+		{retain: this.CFAllocatorRetainCallBack},
+		{release: this.CFAllocatorReleaseCallBack},
+		{copyDescription: this.CFAllocatorCopyDescriptionCallBack}
 	]);
 }
 
