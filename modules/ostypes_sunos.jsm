@@ -1,5 +1,14 @@
 /*jshint esnext: true, moz: true*/
+'use strict';
 var EXPORTED_SYMBOLS = ['ostypes'];
+
+if (ctypes.voidptr_t.size === 4 /* 32-bit */) {
+  var is64bit = false;
+} else if (ctypes.voidptr_t.size === 8 /* 64-bit */) {
+  var is64bit = true;
+} else {
+  throw new Error('huh??? not 32 or 64 bit?!?!');
+}
 
 var sunosTypes = function() {
   this.FILE = ctypes.StructType('FILE', [ // http://tigcc.ticalc.org/doc/stdio.html#FILE
@@ -11,6 +20,13 @@ var sunosTypes = function() {
     { alloc: ctypes.unsigned_long },                  /* Number of currently allocated bytes for the file */
     { buffincrement: ctypes.unsigned_short }  /* Number of bytes allocated at once */
   ]);
+  
+  this.timespec = ctypes.StructType('timespec', [
+    { tv_sec: ctypes.long },
+    { tv_nsec: ctypes.long }
+  ]);
+
+  this.timestruc_t = this.timespec;
   
   this.file_obj = ctypes.StructType('file_obj', [
     { fo_atime: this.timestruc_t },    /* Access time from stat(2) */
@@ -34,23 +50,44 @@ var sunosTypes = function() {
     { portev_user: ctypes.void_t.ptr }              /* user cookie */
   ]);
 
-  this.stat = {}; //  http://opensolarisforum.org/man/man2/stat.html
-  
-  this.timespec = ctypes.StructType('timespec', [
-    { tv_sec: ctypes.long },
-    { tv_nsec: ctypes.long }
+  this.stat = ctypes.StructType('stat', [ // http://opensolarisforum.org/man/man2/stat.html
+    { st_mode: ctypes.unsigned_int },          /* File mode (see mknod(2)) */
+    { st_ino: is64bit ? ctypes.unsigned_long_long : ctypes.unsigned_long }, /* Inode number */
+    { st_dev: ctypes.unsigned_long },   /* ID of device containing */
+    /* a directory entry for this file */
+    { st_rdev: ctypes.unsigned_long },   /* ID of device */
+    /* This entry is defined only for */
+    /* char special or block special files */
+    { st_nlink: ctypes.short },       /* Number of links */
+    { st_uid: ctypes.unsigned_int },           /* User ID of the file’s owner */
+    { st_gid: ctypes.unsigned_int  },           /* Group ID of the file’s group */
+    { st_size: is64bit? ctypes.long_long : ctypes.long },       /* File size in bytes */
+    { st_atime: ctypes.long },        /* Time of last access */
+    { st_mtime: ctypes.long },        /* Time of last data modification */
+    { st_ctime: ctypes.long },       /* Time of last file status change */
+    /* Times measured in seconds since */
+    /* 00:00:00 UTC, Jan. 1, 1970 */
+    { st_blksize: ctypes.long },     /* Preferred I/O block size */
+    { st_blocks: ctypes.long },    /* Number of 512 byte blocks allocated*/
+    { st_fstype: ctypes.char }    /* Null-terminated type of filesystem */
   ]);
-
-  this.timestruc_t = this.timespec;
   
   this._pthread_attr_t = ctypes.StructType('pthread_attr_t', [
-    { _pthread_attr_tp: ctypes.void_t }
+    { _pthread_attr_tp: ctypes.void_t.ptr }
   ]);
 };
 
-var sunosInit = function(){
+var sunosInit = function() {
+  var self = this;
+  
   this.TYPE = new sunosTypes();
-  var lib = ctypes.open('libc.so');
+  
+  var lib = function() {
+    var cache;
+    return function() {
+      return cache || (cache = ctypes.open('libc.so'));
+    };
+  }();
   var _api = {};
   this.API = function(declaration) { // it means ensureDeclared and return declare. if its not declared it declares it. else it returns the previously declared.
     if (!(declaration in _api)) {
@@ -59,18 +96,18 @@ var sunosInit = function(){
     return _api[declaration];
   };
   var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
-    close() {
+    close: function() {
      /* https://en.wikipedia.org/wiki/Close_%28system_call%29
       * int close(
       *   int fd
       * );
       */
-      return lib.declare("close", ctypes.default_abi, 
+      return lib().declare("close", ctypes.default_abi, 
         ctypes.int, // return
         ctypes.int // filedes
       );
     },
-    fgets() {
+    fgets: function() {
      /* https://docs.oracle.com/cd/E19253-01/816-5168/6mbb3hr8o/index.html
       * char *fgets(
       *   char *s,
@@ -78,14 +115,14 @@ var sunosInit = function(){
       *   FILE *stream
       * );
       */
-      return lib.declare('fgets', ctypes.default_abi, 
+      return lib().declare('fgets', ctypes.default_abi, 
         ctypes.char.ptr, // return
         ctypes.char.ptr, 
         ctypes.int, 
-        this.TYPE.FILE.ptr
+        self.TYPE.FILE.ptr
       );
     }, 
-    port_associate() {
+    port_associate: function() {
      /* https://docs.oracle.com/cd/E19253-01/816-5168/6mbb3hri4/index.html
       * int port_associate(
       *   int port, 
@@ -95,7 +132,7 @@ var sunosInit = function(){
       *   void *user
       * );
       */
-      return lib.declare('port_associate', ctypes.default_abi,
+      return lib().declare('port_associate', ctypes.default_abi,
         ctypes.int,           // return        
         ctypes.int,           // port
         ctypes.int,           // source 
@@ -104,17 +141,17 @@ var sunosInit = function(){
         ctypes.void_t.ptr // user
       );
     },
-    port_create() { 
+    port_create: function() { 
       /* https://docs.oracle.com/cd/E19253-01/816-5168/6mbb3hri5/index.html
       * int port_create(
       *   void
       * );
       */
-      return lib.declare('port_create', ctypes.default_abi, 
+      return lib().declare('port_create', ctypes.default_abi, 
         ctypes.int // return
       );
     },
-    port_dissociate() {
+    port_dissociate: function() {
      /* https://docs.oracle.com/cd/E19253-01/816-5168/6mbb3hri4/index.html
       * int port_dissociate(
       *   int port, 
@@ -122,14 +159,14 @@ var sunosInit = function(){
       *   uintptr_t object
       * );
       */
-      return lib.declare("port_dissociate", ctypes.default_abi, 
+      return lib().declare("port_dissociate", ctypes.default_abi, 
          ctypes.int,         // return
          ctypes.int,          // port
          ctypes.int,          // source
          ctypes.uintptr_t // object
         );
     },
-    port_get() {
+    port_get: function() {
      /* https://docs.oracle.com/cd/E19253-01/816-5168/6mbb3hri7/index.html
       * int port_get(
       *   int port, 
@@ -137,14 +174,14 @@ var sunosInit = function(){
       *   const timespec_t *timeout
       * );
       */
-      return lib.declare('port_get', ctypes.default_abi, 
+      return lib().declare('port_get', ctypes.default_abi, 
          ctypes.int,                        // return
          ctypes.int,                        // port
-         this.TYPE.port_event.ptr, // pe
-         this.TYPE.timespec.ptr    // timeout
+         self.TYPE.port_event.ptr, // pe
+         self.TYPE.timespec.ptr    // timeout
         );
     },
-    pthread_create() {
+    pthread_create: function() {
      /* https://docs.oracle.com/cd/E19253-01/816-5168/6mbb3hrld/index.html
       * int pthread_create(
       *   pthread_t *restrict thread,
@@ -153,25 +190,25 @@ var sunosInit = function(){
       *   void *restrict arg
       *);
       */
-      return lib.declare('pthread_create', ctypes.default_abi,
+      return lib().declare('pthread_create', ctypes.default_abi,
         ctypes.int, // return
         ctypes.unsigned_int.ptr,    // restrict thread
-        this.TYPE._pthread_attr_t, // restrict attr
+        self.TYPE._pthread_attr_t, // restrict attr
         ctypes.void_t.ptr,               // unknown
         ctypes.void_t.ptr               // restrict arg                    
       );
     },
-    stat() {
+    stat: function() {
      /* https://en.wikipedia.org/wiki/Stat_%28system_call%29
       * int stat(
       *   const char *filename, 
       *   struct stat *buf
       * );
       */
-      return lib.declare('stat', ctypes.default_abi,
+      return lib().declare('stat', ctypes.default_abi,
         ctypes.int,              // return    
         ctypes.char.ptr,      // filename
-         this.TYPE.stat.ptr  // buf
+        self.TYPE.stat.ptr  // buf
       );
     }
   };
