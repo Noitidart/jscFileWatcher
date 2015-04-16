@@ -183,7 +183,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				};
 				
 				var path_jsStr = OS.Constants.Path.desktopDir;
-				var path_cfStr = ostypes.HELPER.makeCFStr(path);
+				var path_cfStr = ostypes.HELPER.makeCFStr(path_jsStr);
 				
 				try {
 					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback.ptr(_js_fsevents_callback);
