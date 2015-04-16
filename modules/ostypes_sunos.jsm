@@ -193,7 +193,7 @@ var sunosInit = function() {
       return lib().declare('pthread_create', ctypes.default_abi,
         ctypes.int, // return
         ctypes.unsigned_int.ptr,    // restrict thread
-        self.TYPE._pthread_attr_t, // restrict attr
+        self.TYPE._pthread_attr_t.ptr, // restrict attr
         ctypes.void_t.ptr,               // unknown
         ctypes.void_t.ptr               // restrict arg                    
       );
