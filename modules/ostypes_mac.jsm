@@ -206,7 +206,7 @@ var macInit = function() {
 			 *   CFTypeRef cf
 			 * ); 
 			 */
-			var CFRelease = lib('CoreFoundation').declare('CFRelease', self.TYPE.ABI,
+			return lib('CoreFoundation').declare('CFRelease', self.TYPE.ABI,
 				self.TYPE.VOID,		// return
 				self.TYPE.CFTypeRef	// cf
 			);
@@ -219,7 +219,7 @@ var macInit = function() {
 			 *   CFIndex numChars
 			 * ); 
 			 */
-			var CFStringCreateWithCharacters = lib('CoreFoundation').declare('CFStringCreateWithCharacters', self.TYPE.ABI,
+			return lib('CoreFoundation').declare('CFStringCreateWithCharacters', self.TYPE.ABI,
 				self.TYPE.CFStringRef,		// return
 				self.TYPE.CFAllocatorRef,	// alloc
 				self.TYPE.UniChar.ptr,		// *chars
