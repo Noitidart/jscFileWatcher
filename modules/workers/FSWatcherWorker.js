@@ -182,7 +182,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					return null;
 				};
 				
-				var path_jsStr = OS.Contants.Path.desktopDir;
+				var path_jsStr = OS.Constants.Path.desktopDir;
 				var path_cfStr = ostypes.HELPER.makeCFStr(path);
 				
 				try {
