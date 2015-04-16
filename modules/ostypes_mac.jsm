@@ -14,7 +14,7 @@ var macTypes = function() {
 	
 	// ABIs
 	this.CALLBACK_ABI = ctypes.default_abi;
-	self.TYPE.ABI = ctypes.default_abi;
+	this.ABI = ctypes.default_abi;
 	
 	// C TYPES - also simple types but just not really specific to os - i even define these here, in case i want to change everything global. if i had done ctypes.uint32_t in places, i couldn't do a global change, but with ostypes.TYPE.uint32_t i can do global change
 	this.char = ctypes.char;
