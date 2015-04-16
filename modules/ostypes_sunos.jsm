@@ -11,8 +11,11 @@ if (ctypes.voidptr_t.size === 4 /* 32-bit */) {
 }
 
 var sunosTypes = function() {
-  // defined types
-  this.default_abi = ctypes.default_abi;
+  // ABIs
+  this.ABI = ctypes.default_abi;
+  this.CALLBACK_ABI = ctypes.default_abi;
+  
+  // Re-defining c types
   this.int = ctypes.int;
   this.unsigned_int = ctypes.unsigned_int;
   this.char = ctypes.char;
@@ -26,6 +29,9 @@ var sunosTypes = function() {
   this.u_longlong_t = ctypes.unsigned_long_long;
   this.uintptr_t  = ctypes.uintptr_t;
   this.ushort_t  = ctypes.unsigned_short;
+  this.void = ctypes.void_t;
+  
+  // SIMPLE TYPES
   this.suseconds_t  = ctypes.long;
   this.time_t = ctypes.long;
   this.mode_t = ctypes.unsigned_int;
@@ -36,10 +42,11 @@ var sunosTypes = function() {
   this.gid_t = ctypes.unsigned_int;
   this.off_t = is64bit? ctypes.long_long : ctypes.long;
   this.blkcnt_t = ctypes.long; 
+  this.pthread_t = ctypes.unsigned_int;
   
   this.FILE = ctypes.StructType('FILE', [ // http://tigcc.ticalc.org/doc/stdio.html#FILE
     { fpos: this.char.ptr },                               /* Current position of file pointer (absolute address) */
-    { base: this.void_t.ptr },                           /* Pointer to the base of the file */
+    { base: this.void.ptr },                           /* Pointer to the base of the file */
     { handle: this.unsigned_short },             /* File handle */
     { flags: this.short },                                   /* Flags (see FileFlags) */
     { unget: this.short },                                 /* 1-byte buffer for ungetc (b15=1 if non-empty) */
@@ -47,12 +54,12 @@ var sunosTypes = function() {
     { buffincrement: this.unsigned_short }  /* Number of bytes allocated at once */
   ]);
   
-  this.timespec = ctypes.StructType('timespec', [
+  this.timespec_t = ctypes.StructType('timespec_t', [
     { tv_sec: this.time_t },
     { tv_nsec: this.suseconds_t }
   ]);
 
-  this.timestruc_t = this.timespec;
+  this.timestruc_t = this.timespec_t;
   
   this.file_obj = ctypes.StructType('file_obj', [
     { fo_atime: this.timestruc_t }, /* Access time from stat(2) */
@@ -68,12 +75,12 @@ var sunosTypes = function() {
     { port: this.int }
   ]);
     
-  this.port_event = ctypes.StructType('port_event', [
+  this.port_event_t = ctypes.StructType('port_event_t', [
     { portev_events: this.int },  /* event data is source specific */
     { portev_source: this.ushort_t }, /* event source */
     { portev_pad: this.ushort_t },    /* port internal use */
     { portev_object: this.uintptr_t },  /* source specific object */
-    { portev_user: this.void_t.ptr }  /* user cookie */
+    { portev_user: this.void.ptr }  /* user cookie */
   ]);
   
   this.stat = ctypes.StructType('stat', [ // http://opensolarisforum.org/man/man2/stat.html
@@ -98,10 +105,10 @@ var sunosTypes = function() {
     { st_fstype: this.char }    /* Null-terminated type of filesystem */
   ]);
   
-  this.start_routine = ctypes.FunctionType(this.default_abi, this.void_t.ptr, [this.void_t.ptr]);
+  this.start_routine = ctypes.FunctionType(this.CALLBACK_ABI, this.void.ptr, [this.void.ptr]);
 
   this.pthread_attr_t = ctypes.StructType('pthread_attr_t', [
-    { _pthread_attr_tp: this.void_t.ptr }
+    { _pthread_attr_tp: this.void.ptr }
   ]);
 };
 
@@ -130,7 +137,7 @@ var sunosInit = function() {
       *   int fd
       * );
       */
-      return lib().declare("close", self.TYPE.default_abi, 
+      return lib().declare("close", self.TYPE.ABI, 
         self.TYPE.int, // return
         self.TYPE.int // filedes
       );
@@ -143,7 +150,7 @@ var sunosInit = function() {
       *   FILE *stream
       * );
       */
-      return lib().declare('fgets', self.TYPE.default_abi, 
+      return lib().declare('fgets', self.TYPE.ABI, 
         self.TYPE.char.ptr, // return
         self.TYPE.char.ptr, 
         self.TYPE.int, 
@@ -160,13 +167,13 @@ var sunosInit = function() {
       *   void *user
       * );
       */
-      return lib().declare('port_associate', self.TYPE.default_abi,
+      return lib().declare('port_associate', self.TYPE.ABI,
         self.TYPE.int,           // return        
         self.TYPE.int,           // port
         self.TYPE.int,           // source 
         self.TYPE.uintptr_t, // object
         self.TYPE.int,           // events
-        self.TYPE.void_t.ptr // user
+        self.TYPE.void.ptr // user
       );
     },
     port_create: function() { 
@@ -175,7 +182,7 @@ var sunosInit = function() {
       *   void
       * );
       */
-      return lib().declare('port_create', self.TYPE.default_abi, 
+      return lib().declare('port_create', self.TYPE.ABI, 
         self.TYPE.int // return
       );
     },
@@ -187,7 +194,7 @@ var sunosInit = function() {
       *   uintptr_t object
       * );
       */
-      return lib().declare("port_dissociate", self.TYPE.default_abi, 
+      return lib().declare("port_dissociate", self.TYPE.ABI, 
         self.TYPE.int,         // return
         self.TYPE.int,          // port
         self.TYPE.int,          // source
@@ -202,11 +209,11 @@ var sunosInit = function() {
       *   const timespec_t *timeout
       * );
       */
-      return lib().declare('port_get', self.TYPE.default_abi, 
+      return lib().declare('port_get', self.TYPE.ABI, 
         self.TYPE.int,  // return
         self.TYPE.int,  // port
-        self.TYPE.port_event.ptr, // pe
-        self.TYPE.timespec.ptr    // timeout
+        self.TYPE.port_event_t.ptr, // pe
+        self.TYPE.timespec_t.ptr    // timeout
       );
     },
     pthread_create: function() {
@@ -218,12 +225,12 @@ var sunosInit = function() {
       *   void *restrict arg
       *);
       */
-      return lib().declare('pthread_create', ctypes.default_abi,
+      return lib().declare('pthread_create', self.TYPE.ABI,
         self.TYPE.int, // return
-        self.TYPE.unsigned_int.ptr,    // restrict thread
+        self.TYPE.pthread_t.ptr,    // restrict thread
         self.TYPE.pthread_attr_t.ptr, // restrict attr
         self.TYPE.start_routine.ptr,        // unknown
-        self.TYPE.void_t.ptr               // restrict arg                    
+        self.TYPE.void.ptr               // restrict arg                    
       );
     },
     stat: function() {
@@ -233,7 +240,7 @@ var sunosInit = function() {
       *   struct stat *buf
       * );
       */
-      return lib().declare('stat', self.TYPE.default_abi,
+      return lib().declare('stat', self.TYPE.ABI,
         self.TYPE.int,              // return    
         self.TYPE.char.ptr,      // filename
         self.TYPE.stat.ptr  // buf
