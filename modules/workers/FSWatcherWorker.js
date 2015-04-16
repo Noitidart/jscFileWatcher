@@ -182,22 +182,29 @@ function createWatcher(aWatcherID, aOptions={}) {
 					return null;
 				};
 				
-				var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback.ptr(_js_fsevents_callback);
-				var cfArray = ;
-				var cId = ostypes.API('FSEventsGetCurrentEventId')();
-				var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArray, cId, 0.1, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
-				console.info('fsstream:', fsstream, fsstream.toString(), uneval(fsstream));
-				if (ctypes.errno != 0) {
-					console.error('Failed fsstream, errno:', ctypes.errno);
-					throw new Error({
-						name: 'os-api-error',
-						message: 'Failed fsstream',
-						unixErrno: ctypes.errno
-					});
+				var path_jsStr = OS.Contants.Path.desktopDir;
+				var path_cfStr = ostypes.HELPER.makeCFStr(path);
+				
+				try {
+					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback.ptr(_js_fsevents_callback);
+					var cfArray = ostypes.TYPE.CFArray.array()([
+						path_cfStr
+					]);
+					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArray, cId, 0.1, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
+					console.info('fsstream:', fsstream, fsstream.toString(), uneval(fsstream));
+					if (ctypes.errno != 0) {
+						console.error('Failed fsstream, errno:', ctypes.errno);
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed fsstream',
+							unixErrno: ctypes.errno
+						});
+					}
+					
+					//var rez_FSEventStreamScheduleWithRunLoop = ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, DirectoryWatch.EventThread.loop, ostypes.CONST.kCFRunLoopDefaultMode)
+				} catch(ex) {
+					var rez_CFRelease = ostypes.API('CFRelease')(path_cfStr); // returns void
 				}
-				
-				//var rez_FSEventStreamScheduleWithRunLoop = ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, DirectoryWatch.EventThread.loop, ostypes.CONST.kCFRunLoopDefaultMode)
-				
 				
 				
 			}
