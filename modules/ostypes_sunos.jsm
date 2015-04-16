@@ -222,7 +222,7 @@ var sunosInit = function() {
         self.TYPE.int, // return
         self.TYPE.unsigned_int.ptr,    // restrict thread
         self.TYPE.pthread_attr_t.ptr, // restrict attr
-        self.TYPE.voidptr_t.ptr,               // unknown
+        self.TYPE.start_routine.ptr,        // unknown
         self.TYPE.void_t.ptr               // restrict arg                    
       );
     },
