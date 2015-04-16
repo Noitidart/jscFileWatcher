@@ -177,7 +177,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				// its mac and os.version is >= 10.7
 				// use FSEventFramework
 
-				var _js_fsevents_callback = function(self, streamRef, info, numEvents, paths, eventFlags, eventId) {
+				var _js_fsevents_callback = function(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
 					
 					return null;
 				};
