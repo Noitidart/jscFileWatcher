@@ -165,7 +165,10 @@ function createWatcher(aWatcherID, aOptions={}) {
 					
 					var lpCompletionRoutine_js = function(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 						console.error('in callback!');
-						console.info('dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered);
+						console.info('dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped.contents:', lpOverlapped.contents.toString());
+						
+						var casted = ctypes.cast(lpOverlapped.contents.hEvent, ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+						console.info('casted:', casted.toString(), uneval(casted));
 						
 						return ostypes.TYPE.VOID;
 					}
@@ -183,6 +186,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 					console.info('temp_buffer.constructor.size:', temp_buffer.constructor.size);
 					var bytes_returned = ostypes.TYPE.DWORD();
 					var changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; //ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
+					
+					o.hEvent = temp_buffer.address();
 					
 					console.error('will not hang, as async');
 					console.log('winLastError pre RDC:', ctypes.winLastError.toString());
