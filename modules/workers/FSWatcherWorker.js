@@ -131,6 +131,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				}
 
 				try {
+					/*
 					var dwCompKey = ostypes.TYPE.ULONG_PTR(1);
 					var hComPort = ostypes.API('CreateIoCompletionPort')(hDirectory, null, dwCompKey, 0);
 					console.info('hComPort:', hComPort.toString(), uneval(hComPort));
@@ -142,11 +143,13 @@ function createWatcher(aWatcherID, aOptions={}) {
 							winLastError: ctypes.winLastError
 						});
 					}
+					*/
 					
 					var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
+					/*
 					o.hEvent = ostypes.API('CreateEvent')(null, false, false, null);
 					console.info('o.hEvent:', o.hEvent.toString(), uneval(o.hEvent));
-					if (ctypes.winLastError != 0) { // o.hEvent.isNull()
+					if (ctypes.winLastError != 0) { // o.hEvent.isNull() // :todo: 041515 837p - Eventually you'll need to fix the error checking for CreateEvent etc., because winLastError might return non-zero even though the calls succeeded. But that isn't your immediate problem.
 						console.error('Failed o.hEvent CreateEvent, winLastError:', ctypes.winLastError);
 						throw new Error({
 							name: 'os-api-error',
@@ -154,10 +157,19 @@ function createWatcher(aWatcherID, aOptions={}) {
 							winLastError: ctypes.winLastError
 						});
 					}
+					*/
 					
 					//var WATCHED_RES_MAXIMUM_NOTIFICATIONS = 100;
 					//var NOTIFICATION_BUFFER_SIZE = ostypes.TYPE.FILE_NOTIFY_INFORMATION.size; // WATCHED_RES_MAXIMUM_NOTIFICATIONS * ostypes.TYPE.FILE_NOTIFY_INFORMATION.size;
 					//console.info('NOTIFICATION_BUFFER_SIZE:', NOTIFICATION_BUFFER_SIZE);
+					
+					var lpCompletionRoutine_js = function(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
+						console.error('in callback!');
+						console.info('dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered);
+						
+						return ostypes.TYPE.VOID;
+					}
+					var lpCompletionRoutine = ostypes.TYPE.FileIOCompletionRoutine.ptr(lpCompletionRoutine_js);
 					
 					var dummyForSize = ostypes.TYPE.FILE_NOTIFY_INFORMATION.array(1)(); // accept max of 1 notifications at once (in application you should set this to like 50 or something higher as its very possible for more then 1 notification to be reported in one read/call to ReadDirectoryChangesW)
 					console.log('dummyForSize.constructor.size:', dummyForSize.constructor.size);
@@ -173,12 +185,14 @@ function createWatcher(aWatcherID, aOptions={}) {
 					var changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; //ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
 					
 					console.error('will not hang, as async');
-					var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, false, changes_to_watch, bytes_returned.address(), o.address(), null);
+					console.log('winLastError pre RDC:', ctypes.winLastError.toString());
+					var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, true, changes_to_watch, null /*bytes_returned.address()*/, o.address(), lpCompletionRoutine);
+					console.log('winLastError post RDC:', ctypes.winLastError.toString());
 					console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
 
 					console.error('ok got here didnt hang, this is good as i wanted it async');
 					
-					if (rez_RDC == false) {
+					if (rez_RDC == false || ctypes.winLastError != 0) {
 						console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
 						throw new Error({
 							name: 'os-api-error',
@@ -187,6 +201,29 @@ function createWatcher(aWatcherID, aOptions={}) {
 						});
 					}
 
+					//var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(1, );
+					console.error('going to sleep');
+					var rez_Sleep = ostypes.API('SleepEx')(10000, true);
+					console.error('woke');
+					console.info('rez_Sleep:', rez_Sleep.toString(), uneval(rez_Sleep));
+					if (cutils.jscEqual(rez_Sleep, 0)) {
+						// timeout elapsed and nothing happend
+						console.log('SleepEx done and nothing happended');
+					} else if (cutils.jscEqual(rez_Sleep, ostypes.CONST.WAIT_IO_COMPLETION)) {
+						// something happened
+						console.log('SleepEx done and something happended');
+					}
+					/*
+					if (ctypes.winLastError != 0) {
+						console.error('Failed rez_Sleep, winLastError:', ctypes.winLastError);
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed to SleepEx',
+							winLastError: ctypes.winLastError
+						});
+					}
+					*/
+					/*
 					console.error('does this hang?');
 					var rez_GetQueuedCompletionStatus = ostypes.API('GetQueuedCompletionStatus')(hComPort, bytes_returned.address(), dwCompKey.address(), o.address(), 10000);
 					console.error('if this msg shows before 10000ms are up then no it doesnt hang');
@@ -199,7 +236,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 							winLastError: ctypes.winLastError
 						});
 					}
-					
+					*/
+
 					// for sync
 					// console.info('bytes_returned:', bytes_returned.toString());
 					// var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
@@ -232,7 +270,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					if (ex.message != 'Just testing WINNT, so not returning properly here') {
 						if (hDirectory && !hDirectory.isNull()) {
 							console.log('need to closeHandle on hDirectory');
-							var rez_CloseHandle = ostypes.API('CloseHandle')(hDirectory);
+							var rez_CloseHandle = false; //ostypes.API('CloseHandle')(hDirectory);
 							if (rez_CloseHandle == false) {
 								console.error('encountered error earlier and also encoutnering error when trying to finally close')
 								console.error('Failed to CloseHandle on hDirectory, winLastError:', ctypes.winLastError);			
@@ -240,6 +278,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 								console.log('succesfully closed handle on hDirectory');
 							}
 						}
+						/*
 						if (hComPort && !hComPort.isNull()) {
 							console.log('need to closeHandle on hComPort');
 							var rez_CloseHandle = ostypes.API('CloseHandle')(hComPort);
@@ -250,6 +289,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 								console.log('succesfully closed handle on hComPort');
 							}
 						}
+						*/
 					}
 					throw ex;
 				}
