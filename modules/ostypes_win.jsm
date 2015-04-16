@@ -179,9 +179,14 @@ var winInit = function() {
 		FILE_SHARE_WRITE: 2,
 		GENERIC_READ: 31, // from https://msdn.microsoft.com/en-us/library/windows/desktop/aa374892%28v=vs.85%29.aspx i have no idea where i got 0x80000000 from // 0x80000000,
 		INVALID_HANDLE_VALUE: -1,
+		MAXIMUM_WAIT_OBJECTS: 64,
 		MB_OK: 0,
 		OPEN_EXISTING: 3,
-		WAIT_IO_COMPLETION: 192
+		WAIT_ABANDONED_0: 0x00000080, // 128
+		WAIT_FAILED: self.TYPE.DWORD('0xFFFFFFFF'),
+		WAIT_IO_COMPLETION: 0x000000C0, // 192
+		WAIT_OBJECT_0: 0,
+		WAIT_TIMEOUT: 0x00000102 // 258
 	};
 	
 	var _lib = {}; // cache for lib

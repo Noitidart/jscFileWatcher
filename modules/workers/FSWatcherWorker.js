@@ -23,6 +23,7 @@ const core = { // have to set up the main keys
 // Imports that use stuff defined in chrome
 // I don't import ostypes_*.jsm yet as I want to init core first, as they use core stuff like core.os.isWinXP etc
 importScripts(core.addon.path.content + 'modules/cutils.jsm');
+importScripts(core.addon.path.content + 'modules/ctypes_math.jsm');
 
 
 // Setup PromiseWorker
@@ -168,7 +169,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 						console.info('dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped.contents:', lpOverlapped.contents.toString());
 						
 						var casted = ctypes.cast(lpOverlapped.contents.hEvent, ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
-						console.info('casted:', casted.toString(), uneval(casted));
+						console.info('casted:', casted.toString());
 						
 						return ostypes.TYPE.VOID;
 					}
@@ -189,13 +190,13 @@ function createWatcher(aWatcherID, aOptions={}) {
 					
 					o.hEvent = temp_buffer.address();
 					
-					console.error('will not hang, as async');
+					//console.error('will not hang, as async');
 					console.log('winLastError pre RDC:', ctypes.winLastError.toString());
-					var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, true, changes_to_watch, null /*bytes_returned.address()*/, o.address(), lpCompletionRoutine);
+					var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, false, changes_to_watch, null /*bytes_returned.address()*/, o.address(), lpCompletionRoutine);
 					console.log('winLastError post RDC:', ctypes.winLastError.toString());
 					console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
 
-					console.error('ok got here didnt hang, this is good as i wanted it async');
+					//console.error('ok got here didnt hang, this is good as i wanted it async');
 					
 					if (rez_RDC == false || ctypes.winLastError != 0) {
 						console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
@@ -206,7 +207,37 @@ function createWatcher(aWatcherID, aOptions={}) {
 						});
 					}
 
-					//var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(1, );
+					var handles = ostypes.TYPE.VOID.ptr.array(1)([
+						hDirectory
+					]);
+					
+					console.error('going to hang for WaitForMultipleObjectsEx');
+					var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(handles.length, handles, false, 10000 /*in ship product set this to half a second, so 500ms*/, true);
+					console.error('hang completed for WaitForMultipleObjectsEx');
+					if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_FAILED)) {
+						console.error('Failed rez_WaitForMultipleObjectsEx, winLastError:', ctypes.winLastError);
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed to rez_WaitForMultipleObjectsEx',
+							winLastError: ctypes.winLastError
+						});
+					} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_IO_COMPLETION)) {
+						console.error('The wait was ended by one or more user-mode asynchronous procedure calls (APC) queued to the thread.');
+					} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_TIMEOUT)) {
+						console.error('The time-out interval elapsed, the conditions specified by the bWaitAll parameter were not satisfied, and no completion routines are queued.');
+						// scratch this comment to right maybe, this really just means timeout // ill get here if there are no paths being watched, like (1) on creat of watcher and addPath hasnt been called yet, or (2) all paths that were added were removed
+					} else {
+						// either nCount number of object  ABANDONDED or SATISFIED
+						var nCount = handles.length;
+						var postSubtract = ctypes_math.UInt64.sub(rez_WaitForMultipleObjectsEx, nCount - 1);
+						
+						if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_ABANDONED_0)) {
+							console.error('This is not an error I just made it this so I can notice in browser console logs, likely I did .removePath so its callback was abandoned. The lpHandles array index of ' + nCount + ' was the abandoned mutex object.');
+						} else if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_OBJECT_0)) {
+							console.info('The lpHandles array index of ' + nCount + ' was the signaled with some file event!!');
+						}
+					}
+					/*
 					console.error('going to sleep');
 					var rez_Sleep = ostypes.API('SleepEx')(10000, true);
 					console.error('woke');
@@ -218,16 +249,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 						// something happened
 						console.log('SleepEx done and something happended');
 					}
-					/*
-					if (ctypes.winLastError != 0) {
-						console.error('Failed rez_Sleep, winLastError:', ctypes.winLastError);
-						throw new Error({
-							name: 'os-api-error',
-							message: 'Failed to SleepEx',
-							winLastError: ctypes.winLastError
-						});
-					}
 					*/
+					
 					/*
 					console.error('does this hang?');
 					var rez_GetQueuedCompletionStatus = ostypes.API('GetQueuedCompletionStatus')(hComPort, bytes_returned.address(), dwCompKey.address(), o.address(), 10000);
