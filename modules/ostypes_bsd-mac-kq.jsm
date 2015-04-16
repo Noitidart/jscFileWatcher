@@ -111,6 +111,7 @@ var kqInit = function() {
 			//default it opens the path, but some things are special like libc in mac is different then linux or like x11 needs to be located based on linux version
 			switch (path) {
 				case 'libc':
+				
 					if (core.os.name == 'darwin') {
 						_lib[path] = ctypes.open('libc.dylib');
 					} else if (core.os.name == 'freebsd') {
@@ -123,6 +124,8 @@ var kqInit = function() {
 							message: 'Path to libc on operating system of , "' + OS.Constants.Sys.Name + '" is not supported for kqueue'
 						});
 					}
+					
+					break;
 				default:
 					try {
 						_lib[path] = ctypes.open(path);

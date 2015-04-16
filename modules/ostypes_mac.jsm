@@ -10,8 +10,6 @@ if (ctypes.voidptr_t.size == 4 /* 32-bit */) {
 	throw new Error('huh??? not 32 or 64 bit?!?!');
 }
 
-//var ifdef_UNICODE = true;
-
 var macTypes = function() {
 	
 	// ABIs
@@ -26,15 +24,17 @@ var macTypes = function() {
 	this.intptr_t = ctypes.intptr_t;
 	this.long = ctypes.long;
 	this.short = ctypes.short;
+	this.size_t = ctypes.size_t;
 	this.uint16_t = ctypes.uint16_t;
 	this.uint32_t = ctypes.uint32_t;
 	this.uintptr_t = ctypes.uintptr_t
 	this.uint64_t = ctypes.uint64_t;
+	this.void = ctypes.void_t;
 	
 	// ADV C TYPES
 	this.time_t = this.long; // https://github.com/j4cbo/chiral/blob/3c66a8bb64e541c0f63b04b78ec2d0ffdf5b473c/chiral/os/kqueue.py#L34 AND also based on this github search https://github.com/search?utf8=%E2%9C%93&q=time_t+ctypes&type=Code&ref=searchresults AND based on this answer here: http://stackoverflow.com/a/471287/1828637
 	
-	// SIMPLE TYPES
+	// SIMPLE TYPES - as per typedef in c code in header files, docs, etc
 	this.Boolean = ctypes.unsigned_char;
 	this.CFIndex = ctypes.long;
 	this.CFOptionFlags = ctypes.unsigned_long;
@@ -47,8 +47,8 @@ var macTypes = function() {
 	this.SInt32 = ctypes.long;
 	this.UInt16 = ctypes.unsigned_short;
 	this.UInt32 = ctypes.unsigned_long;
+	this.UInt64 = ctypes.unsigned_long_long;
 	this.UniChar = ctypes.jschar;
-	this.void = ctypes.void_t;
 	this.VOID = ctypes.void_t;
 	
 	// ADVANCED TYPES
@@ -56,6 +56,9 @@ var macTypes = function() {
 	this.DialogItemIndex = this.SInt16;
 	this.DialogPtr = this.OpaqueDialogPtr.ptr;
 	this.EventKind = this.UInt16;
+	this.FSEventStreamCreateFlags = this.UInt32;
+	this.FSEventStreamEventFlags = this.UInt32;
+	this.FSEventStreamEventId = this.UInt64;
 	this.EventModifiers = this.UInt16;
 	this.OSErr = this.SInt16;
 	
@@ -63,9 +66,13 @@ var macTypes = function() {
 	this.DialogRef = this.DialogPtr;
 
 	// SIMPLE STRUCTS
+	
 	this.__CFAllocator = ctypes.StructType('__CFAllocator');
+	this.__CFArray = new ctypes.StructType("__CFArray");
+	this.__CFRunLoop = new ctypes.StructType("__CFRunLoop");
 	this.__CFString = ctypes.StructType('__CFString');
 	this.__CFURL = ctypes.StructType('__CFURL');
+    this.__FSEventStream = new ctypes.StructType("__FSEventStream");
 	this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 		{ ident: this.uintptr_t },
 		{ filter: this.int16_t },
@@ -83,8 +90,17 @@ var macTypes = function() {
 		{ tv_nsec: this.long }
 	]);
 
+	this.FSEventStreamContext = new ctypes.StructType("FSEventStreamContext", [
+		{version: this.CFIndex},
+		{info: this.void.ptr},
+		{retain: this.CFAllocatorRetainCallBack},
+		{release: this.CFAllocatorReleaseCallBack},
+		{copyDescription: this.CFAllocatorCopyDescriptionCallBack}
+	]);
+	
 	// ADV STRUCTS
 	this.CFAllocatorRef = this.__CFAllocator.ptr;
+	this.CFArrayRef = this.__CFArray.ptr;
 	this.CFStringRef = this.__CFString.ptr;
 	this.CFURLRef = this.__CFURL.ptr;
 	this.EventRecord = ctypes.StructType("EventRecord", [
@@ -94,9 +110,16 @@ var macTypes = function() {
 		{ where: this.Point },
 		{ modifiers: this.EventModifiers }
 	]);
+	this.FSEventStreamRef = this.__FSEventStream.ptr;
+	this.ConstFSEventStreamRef = this.__FSEventStream.ptr;
+	this.CFRunLoopRef = this.__CFRunLoop.ptr;
 	
 	// SIMPLE FUNCTION TYPES
-	this.ModalFilterProcPtr = ctypes.FunctionType(this.ABI, this.Boolean, [this.DialogRef, this.EventRecord.ptr, this.DialogItemIndex.ptr]).ptr;
+	this.CFAllocatorCopyDescriptionCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.CFStringRef, [this.void.ptr]).ptr;
+	this.CFAllocatorRetainCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.void.ptr, [this.void.ptr]).ptr;
+	this.CFAllocatorReleaseCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.void, [this.void.ptr]).ptr;
+	this.FSEventStreamCallback = ctypes.FunctionType(this.CALLBACK_ABI, this.void, [this.ConstFSEventStreamRef, this.void.ptr, this.size_t, this.void.ptr, this.FSEventStreamEventFlags, this.FSEventStreamEventId]);
+	this.ModalFilterProcPtr = ctypes.FunctionType(this.CALLBACK_ABI, this.Boolean, [this.DialogRef, this.EventRecord.ptr, this.DialogItemIndex.ptr]).ptr;
 	
 	// ADVANCED FUNCTION TYPES
 	this.ModalFilterUPP = this.ModalFilterProcPtr;
@@ -124,44 +147,7 @@ var macInit = function() {
 
 	// CONSTANTS
 	this.CONST = {
-		kCFUserNotificationStopAlertLevel: 0,
-		kCFUserNotificationNoteAlertLevel: 1,
-		kCFUserNotificationCautionAlertLevel: 2,
-		kCFUserNotificationPlainAlertLevel: 3,
-		
-		// start - kqueue - https://github.com/j4cbo/chiral/blob/3c66a8bb64e541c0f63b04b78ec2d0ffdf5b473c/chiral/os/kqueue.py#L122
-		EVFILT_READ: -1,
-		EVFILT_WRITE: -2,
-		EVFILT_AIO: -3,
-		EVFILT_VNODE: -4,
-		EVFILT_PROC: -5,
-		EVFILT_SIGNAL: -6,
-		EVFILT_TIMER: -7,
-		EVFILT_MACHPORT: -8,
-		EVFILT_FS: -9,
-
-		EV_ADD: 0x0001,		// add event to kq (implies enable)
-		EV_DELETE: 0x0002,	// delete event from kq
-		EV_ENABLE: 0x0004,	// enable event
-		EV_DISABLE: 0x0008,	// disable event (not reported)
-		EV_ONESHOT: 0x0010,	// only report one occurrence
-		EV_CLEAR: 0x0020,	// clear event state after reporting
-		EV_SYSFLAGS: 0xF000,	// reserved by system
-		EV_FLAG0: 0x1000,	// filter-specific flag
-		EV_FLAG1: 0x2000,	// filter-specific flag
-		EV_EOF: 0x8000,		// EOF detected
-		EV_ERROR: 0x4000,	// error, data contains errno
-		
-		// https://github.com/jonnybest/taskcoach/blob/f930e55fa895315e9e9688994aa8dbc10b09b1e5/taskcoachlib/filesystem/fs_darwin.py#L35
-		NOTE_DELETE: 0x00000001,
-		NOTE_WRITE: 0x00000002,
-		NOTE_EXTEND: 0x00000004,
-		NOTE_ATTRIB: 0x00000008,
-		NOTE_LINK: 0x00000010,
-		NOTE_RENAME: 0x00000020,
-		NOTE_REVOKE: 0x00000040,
-		
-		// end - kqueue
+		kCFAllocatorDefault: null // 0
 	};
 	
 	var _lib = {}; // cache for lib
@@ -174,6 +160,16 @@ var macInit = function() {
 			//need to open the library
 			//default it opens the path, but some things are special like libc in mac is different then linux or like x11 needs to be located based on linux version
 			switch (path) {
+				case 'CarbonCore':
+				
+						_lib[path] = ctypes.open('/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/CarbonCore');
+					
+					break;
+				case 'objc':
+				
+						_lib[path] = ctypes.open(ctypes.libraryName('objc'));
+					
+					break;
 				default:
 					try {
 						_lib[path] = ctypes.open(path);
@@ -197,31 +193,6 @@ var macInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
-		CFUserNotificationDisplayNotice: function() {
-			/* https://developer.apple.com/library/mac/documentation/CoreFoundation/Reference/CFUserNotificationRef/index.html#//apple_ref/c/func/CFUserNotificationDisplayNotice
-			 * SInt32 CFUserNotificationDisplayNotice (
-			 *   CFTimeInterval timeout,
-			 *   CFOptionFlags flags,
-			 *   CFURLRef iconURL,
-			 *   CFURLRef soundURL,
-			 *   CFURLRef localizationURL,
-			 *   CFStringRef alertHeader,
-			 *   CFStringRef alertMessage,
-			 *   CFStringRef defaultButtonTitle
-			 * ); 
-			 */
-			return lib('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation').declare('CFUserNotificationDisplayNotice', this.ABI,
-				self.SInt32,			// return
-				self.CFTimeInterval,	// timeout
-				self.CFOptionFlags,		// flags
-				self.CFURLRef,			// iconURL
-				self.CFURLRef,			// soundURL
-				self.CFURLRef,			// localizationURL
-				self.CFStringRef,		// alertHeader
-				self.CFStringRef,		// alertMessage
-				self.CFStringRef		// defaultButtonTitle
-			);
-		},
 		CFRelease: function() {
 			/* https://developer.apple.com/library/mac/documentation/CoreFoundation/Reference/CFTypeRef/#//apple_ref/c/func/CFRelease
 			 * void CFRelease (
@@ -259,37 +230,6 @@ var macInit = function() {
 				self.TYPE.int	// fildes
 			);
 		},
-		kevent: function() {
-			/* https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-			 * int kevent (
-			 *   int kq,
-			 *   const struct kevent *changelist,
-			 *   int nchanges,
-			 *   struct kevent *eventlist,
-			 *   int nevents,
-			 *   const struct timespec *timeout
-			 * ); 
-			 */
-			return lib('libc.dylib').declare('kevent', self.TYPE.ABI,
-				self.TYPE.int,			// return
-				self.TYPE.int,			// kq
-				self.TYPE.kevent.ptr,	// *changelist
-				self.TYPE.int,			// nchanges
-				self.TYPE.kevent.ptr,	// *eventlist
-				self.TYPE.int,			// nevents
-				self.TYPE.timespec.ptr	// *timeout
-			);
-		},
-		kqueue: function() {
-			/* https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-			 * int kqueue (
-			 *   void
-			 * ); 
-			 */
-			return lib('libc.dylib').declare('kqueue', self.TYPE.ABI,
-				self.TYPE.int	// return
-			);
-		},
 		open: function() {
 			/* https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/open.2.html
 			 * int open (
@@ -303,16 +243,49 @@ var macInit = function() {
 				self.TYPE.int		// oflag
 			);
 		},
-		StandardAlert: function() {
-			return lib('/System/Library/Frameworks/Carbon.framework/Carbon').declare('StandardAlert', self.ABI,
-				self.OSErr,
-				self.AlertType,
-				self.ConstStr255Param,
-				self.ConstStr255Param,
-				self.AlertStdAlertParamRec.ptr,
-				self.SInt16.ptr
+		FSEventStreamCreate: function() {
+			return lib('CarbonCore').declare('FSEventStreamCreate', self.TYPE.ABI,
+				self.TYPE.FSEventStreamRef,
+				self.TYPE.CFAllocatorRef,
+				self.TYPE.FSEventStreamCallback,
+				self.TYPE.FSEventStreamContext.ptr,
+				self.TYPE.CFArrayRef,
+				self.TYPE.FSEventStreamEventId,
+				self.TYPE.CFTimeInterval,
+				self.TYPE.FSEventStreamCreateFlags
 			);
-		}
+		},
+		FSEventStreamCreateRelativeToDevice: function() {},
+		FSEventStreamScheduleWithRunLoop: function() {
+			return lib('CarbonCore').declare("FSEventStreamScheduleWithRunLoop", this.ABI,
+				this.void,
+				this.FSEventStreamRef,
+				this.CFRunLoopRef,
+				this.CFStringRef
+			);
+		},
+		FSEventStreamStart: function() {
+			return lib('CarbonCore').declare("FSEventStreamStart", this.ABI,
+				this.Boolean,
+				this.FSEventStreamRef
+			);
+		},
+		FSEventStreamStop: function() {},
+		FSEventStreamInvalidate: function() {},
+		FSEventStreamRelease: function() {},
+		FSEventStreamGetLatestEventId: function() {},
+		FSEventStreamFlushAsync: function() {},
+		FSEventStreamFlushSync: function() {},
+		FSEventStreamGetDeviceBeingWatched: function() {},
+		FSEventStreamCopyPathsBeingWatched: function() {},
+		FSEventsCopyUUIDForDevice: function() {},
+		FSEventsGetCurrentEventId: function() {
+			return lib('CarbonCore').declare("FSEventsGetCurrentEventId", this.ABI,
+				this.FSEventStreamEventId
+			);
+		},
+		FSEventsGetLastEventIdForDeviceBeforeTime: function() {},
+		FSEventsPurgeEventsForDeviceUpToEventId: function() {}
 	};
 	// end - predefine your declares here
 	// end - function declares
@@ -325,18 +298,6 @@ var macInit = function() {
 			// js str is just a string
 			// returns a CFStr that must be released with CFRelease when done
 			return self.API('CFStringCreateWithCharacters')(null, jsStr, jsStr.length);
-		},
-		EV_SET: function EV_SET(kev_address, ident, filter, flags, fflags, data, udata_jsStr) {
-			// macro
-			// docs say args are: &kev, ident, filter, flags, fflags, data, udata // docs are here: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-			console.info('kev_address:', kev_address.toString(), uneval(kev_address));
-			console.info('kev_address.contents:', kev_address.contents.toString(), uneval(kev_address.contents));
-			kev_address.contents.addressOfField('ident').contents = ident;
-			kev_address.contents.addressOfField('filter').contents = filter;
-			kev_address.contents.addressOfField('flags').contents = flags;
-			kev_address.contents.addressOfField('fflags').contents = fflags;
-			kev_address.contents.addressOfField('data').contents = data;
-			kev_address.contents.addressOfField('udata').contents = ostypes.TYPE.char.array()(udata_jsStr).address();
 		}
 	};
 }

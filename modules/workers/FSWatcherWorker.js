@@ -176,6 +176,30 @@ function createWatcher(aWatcherID, aOptions={}) {
 			} else {
 				// its mac and os.version is >= 10.7
 				// use FSEventFramework
+
+				var _js_fsevents_callback = function(self, streamRef, info, numEvents, paths, eventFlags, eventId) {
+					
+					return null;
+				};
+				
+				var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback.ptr(_js_fsevents_callback);
+				var cfArray = ;
+				var cId = ostypes.API('FSEventsGetCurrentEventId')();
+				var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArray, cId, 0.1, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
+				console.info('fsstream:', fsstream, fsstream.toString(), uneval(fsstream));
+				if (ctypes.errno != 0) {
+					console.error('Failed fsstream, errno:', ctypes.errno);
+					throw new Error({
+						name: 'os-api-error',
+						message: 'Failed fsstream',
+						unixErrno: ctypes.errno
+					});
+				}
+				
+				//var rez_FSEventStreamScheduleWithRunLoop = ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, DirectoryWatch.EventThread.loop, ostypes.CONST.kCFRunLoopDefaultMode)
+				
+				
+				
 			}
 
 		break;
