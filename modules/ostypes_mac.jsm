@@ -14,7 +14,7 @@ var macTypes = function() {
 	
 	// ABIs
 	this.CALLBACK_ABI = ctypes.default_abi;
-	this.ABI = ctypes.default_abi;
+	self.TYPE.ABI = ctypes.default_abi;
 	
 	// C TYPES - also simple types but just not really specific to os - i even define these here, in case i want to change everything global. if i had done ctypes.uint32_t in places, i couldn't do a global change, but with ostypes.TYPE.uint32_t i can do global change
 	this.char = ctypes.char;
@@ -167,6 +167,11 @@ var macInit = function() {
 						_lib[path] = ctypes.open('/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/CarbonCore');
 					
 					break;
+				case 'CoreFoundation':
+				
+						_lib[path] = ctypes.open('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation');
+					
+					break;
 				case 'objc':
 				
 						_lib[path] = ctypes.open(ctypes.libraryName('objc'));
@@ -201,9 +206,9 @@ var macInit = function() {
 			 *   CFTypeRef cf
 			 * ); 
 			 */
-			var CFRelease = lib('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation').declare('CFRelease', self.ABI,
-				self.VOID,		// return
-				self.CFTypeRef	// cf
+			var CFRelease = lib('CoreFoundation').declare('CFRelease', self.TYPE.ABI,
+				self.TYPE.VOID,		// return
+				self.TYPE.CFTypeRef	// cf
 			);
 		},
 		CFStringCreateWithCharacters: function() {
@@ -214,11 +219,11 @@ var macInit = function() {
 			 *   CFIndex numChars
 			 * ); 
 			 */
-			var CFStringCreateWithCharacters = lib('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation').declare('CFStringCreateWithCharacters', self.ABI,
-				self.CFStringRef,		// return
-				self.CFAllocatorRef,	// alloc
-				self.UniChar.ptr,		// *chars
-				self.CFIndex			// numChars
+			var CFStringCreateWithCharacters = lib('CoreFoundation').declare('CFStringCreateWithCharacters', self.TYPE.ABI,
+				self.TYPE.CFStringRef,		// return
+				self.TYPE.CFAllocatorRef,	// alloc
+				self.TYPE.UniChar.ptr,		// *chars
+				self.TYPE.CFIndex			// numChars
 			);
 		},
 		close: function() {
@@ -259,17 +264,17 @@ var macInit = function() {
 		},
 		FSEventStreamCreateRelativeToDevice: function() {},
 		FSEventStreamScheduleWithRunLoop: function() {
-			return lib('CarbonCore').declare("FSEventStreamScheduleWithRunLoop", this.ABI,
-				this.void,
-				this.FSEventStreamRef,
-				this.CFRunLoopRef,
-				this.CFStringRef
+			return lib('CarbonCore').declare("FSEventStreamScheduleWithRunLoop", self.TYPE.ABI,
+				self.TYPE.void,
+				self.TYPE.FSEventStreamRef,
+				self.TYPE.CFRunLoopRef,
+				self.TYPE.CFStringRef
 			);
 		},
 		FSEventStreamStart: function() {
-			return lib('CarbonCore').declare("FSEventStreamStart", this.ABI,
-				this.Boolean,
-				this.FSEventStreamRef
+			return lib('CarbonCore').declare("FSEventStreamStart", self.TYPE.ABI,
+				self.TYPE.Boolean,
+				self.TYPE.FSEventStreamRef
 			);
 		},
 		FSEventStreamStop: function() {},
@@ -282,7 +287,7 @@ var macInit = function() {
 		FSEventStreamCopyPathsBeingWatched: function() {},
 		FSEventsCopyUUIDForDevice: function() {},
 		FSEventsGetCurrentEventId: function() {
-			return lib('CarbonCore').declare("FSEventsGetCurrentEventId", this.ABI,
+			return lib('CarbonCore').declare("FSEventsGetCurrentEventId", self.TYPE.ABI,
 				this.FSEventStreamEventId
 			);
 		},
