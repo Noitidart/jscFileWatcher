@@ -171,7 +171,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 						var casted = ctypes.cast(lpOverlapped.contents.hEvent, ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
 						console.info('casted:', casted.toString());
 						
-						return ostypes.TYPE.VOID;
+						return ostypes.TYPE.VOID();
 					}
 					var lpCompletionRoutine = ostypes.TYPE.FileIOCompletionRoutine.ptr(lpCompletionRoutine_js);
 					
