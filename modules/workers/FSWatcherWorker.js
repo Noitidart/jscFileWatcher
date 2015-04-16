@@ -75,12 +75,15 @@ function init(objCore) {
 			importScripts(core.addon.path.content + 'modules/ostypes_nix.jsm');
 			break;
 		case 'darwin':
-			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
-			core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
+			if (core.os.version < 7) {
+				importScripts(core.addon.path.content + 'modules/ostypes_bsd-mac-kq.jsm');
+			} else {
+				importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
+			}
 			break;
 		case 'freebsd':
 		case 'openbsd':
-			importScripts(core.addon.path.content + 'modules/ostypes_bsd.jsm');
+			importScripts(core.addon.path.content + 'modules/ostypes_bsd-mac-kq.jsm');
 			break;
 		default:
 			throw new Error({

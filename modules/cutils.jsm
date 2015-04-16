@@ -203,7 +203,7 @@ function utilsInit() {
 		 *   i.value = 5; // this just shows how you can change the number contained inside without having to do `ctypes.int(NEW_NUM_HERE)` again
 		 *   i.address().toString(); // "ctypes.int.ptr(ctypes.UInt64("0x14460454"))"
 		 *   var ptrStr = cutils.stringOfPtr(i.address()); // "0x14460454"
-		 *   var readIntPtr = ctypes.int.ptr(ctypes.UInt64(ptrStr)).;
+		 *   var readIntPtr = ctypes.int.ptr(ctypes.UInt64(ptrStr));
 		 *   readIntPtr // CData { contents: 5 }
 		 */
 		 

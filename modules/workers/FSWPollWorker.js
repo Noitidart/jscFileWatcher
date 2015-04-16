@@ -71,11 +71,15 @@ function init(objCore) {
 			importScripts(core.addon.path.content + 'modules/ostypes_nix.jsm');
 			break;
 		case 'darwin':
-			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
+			if (core.os.version < 7) {
+				importScripts(core.addon.path.content + 'modules/ostypes_bsd-mac-kq.jsm');
+			} else {
+				importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
+			}
 			break;
 		case 'freebsd':
 		case 'openbsd':
-			importScripts(core.addon.path.content + 'modules/ostypes_bsd.jsm');
+			importScripts(core.addon.path.content + 'modules/ostypes_bsd-mac-kq.jsm');
 			break;
 		default:
 			throw new Error({
