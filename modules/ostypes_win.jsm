@@ -65,6 +65,7 @@ var winTypes = function() {
 	this.OLECHAR = this.WCHAR; // typedef WCHAR OLECHAR; // https://github.com/wine-mirror/wine/blob/bdeb761357c87d41247e0960f71e20d3f05e40e6/include/wtypes.idl#L286
 	this.PLONG = this.LONG.ptr;
 	this.PULONG = this.ULONG.ptr;
+	this.PULONG_PTR = this.ULONG.ptr;
 	this.PCWSTR = this.WCHAR.ptr;
 	this.SIZE_T = this.ULONG_PTR;
 	this.SYSTEM_INFORMATION_CLASS = this.INT; // i think due to this search: http://stackoverflow.com/questions/28858849/where-is-system-information-class-defined
@@ -107,7 +108,7 @@ var winTypes = function() {
 		{ NextEntryOffset: this.DWORD },
 		{ Action: this.DWORD },
 		{ FileNameLength: this.DWORD },
-		{ FileName: ctypes.ArrayType(this.WCHAR, 1) }, // not null terminated
+		{ FileName: ctypes.ArrayType(this.WCHAR, OS.Constants.Win.MAX_PATH) }, // not null terminated
 	]);
 	this.GUID = ctypes.StructType('GUID', [
 	  { 'Data1': this.ULONG },
@@ -176,8 +177,16 @@ var winInit = function() {
 		FILE_SHARE_DELETE: 4,
 		FILE_SHARE_READ: 1,
 		FILE_SHARE_WRITE: 2,
+		GENERIC_READ: 31, // from https://msdn.microsoft.com/en-us/library/windows/desktop/aa374892%28v=vs.85%29.aspx i have no idea where i got 0x80000000 from // 0x80000000,
 		INVALID_HANDLE_VALUE: -1,
-		MB_OK: 0
+		MAXIMUM_WAIT_OBJECTS: 64,
+		MB_OK: 0,
+		OPEN_EXISTING: 3,
+		WAIT_ABANDONED_0: 0x00000080, // 128
+		WAIT_FAILED: self.TYPE.DWORD('0xFFFFFFFF'),
+		WAIT_IO_COMPLETION: 0x000000C0, // 192
+		WAIT_OBJECT_0: 0,
+		WAIT_TIMEOUT: 0x00000102 // 258
 	};
 	
 	var _lib = {}; // cache for lib
@@ -213,6 +222,17 @@ var winInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
+		CloseHandle: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/ms724211%28v=vs.85%29.aspx
+			 * BOOL WINAPI CloseHandle(
+			 *   __in_  HANDLE hObject
+			 * );
+			 */
+			return lib('kernel32').declare('CloseHandle', self.TYPE.ABI,
+				self.TYPE.BOOL,		// return
+				self.TYPE.HANDLE	// hObject
+			);
+		},
 		CreateFile: function() {
 			/* https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858%28v=vs.85%29.aspx
 			 * HANDLE WINAPI CreateFile(
@@ -225,7 +245,7 @@ var winInit = function() {
 			 *   __in_opt_  HANDLE hTemplateFile
 			 * );
 			 */
-			return lib('kernel32').declare('CreateFileW', self.TYPE.ABI,
+			return lib('kernel32').declare(ifdef_UNICODE ? 'CreateFileW' : 'CreateFileA', self.TYPE.ABI,
 				self.TYPE.HANDLE,					// return
 				self.TYPE.LPCTSTR,					// lpFileName
 				self.TYPE.DWORD,					// dwDesiredAccess
@@ -247,10 +267,27 @@ var winInit = function() {
 			 */
 			return lib('kernel32').declare(ifdef_UNICODE ? 'CreateEventW' : 'CreateEventA', self.TYPE.ABI,
 				self.TYPE.HANDLE,					// return
-				self.TYPE.LPSECURITY_ATTRIBUTES,	// hFile
-				self.TYPE.BOOL,						// lpOverlapped
-				self.TYPE.BOOL,						// lpNumberOfBytesTransferred
-				self.TYPE.LPCTSTR					// bWait
+				self.TYPE.LPSECURITY_ATTRIBUTES,	// lpEventAttributes
+				self.TYPE.BOOL,						// bManualReset
+				self.TYPE.BOOL,						// bInitialState
+				self.TYPE.LPCTSTR					// lpName
+			);
+		},
+		CreateIoCompletionPort: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/aa363862%28v=vs.85%29.aspx
+			 *   HANDLE WINAPI CreateIoCompletionPort(
+			 *     __in_      HANDLE FileHandle,
+			 *     __in_opt_  HANDLE ExistingCompletionPort,
+			 *     __in_      ULONG_PTR CompletionKey,
+			 *     __in_      DWORD NumberOfConcurrentThreads
+			 *   );
+			 */
+			return lib('kernel32').declare('CreateIoCompletionPort', self.TYPE.ABI,
+				self.TYPE.HANDLE,		// return
+				self.TYPE.HANDLE,		// FileHandle
+				self.TYPE.HANDLE,		// ExistingCompletionPort
+				self.TYPE.ULONG_PTR,	// CompletionKey
+				self.TYPE.DWORD			// NumberOfConcurrentThreads
 			);
 		},
 		GetOverlappedResult: function() {
@@ -270,6 +307,25 @@ var winInit = function() {
 				self.TYPE.BOOL			// bWait
 			);
 		},
+		GetQueuedCompletionStatus: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/aa364986%28v=vs.85%29.aspx
+			 * BOOL WINAPI GetQueuedCompletionStatus(
+			 *   __in_   HANDLE CompletionPort,
+			 *   __out_  LPDWORD lpNumberOfBytes,
+			 *   __out_  PULONG_PTR lpCompletionKey,
+			 *   __out_  LPOVERLAPPED *lpOverlapped,
+			 *   __in_   DWORD dwMilliseconds
+			 * );
+			 */
+			return lib('kernel32').declare('GetQueuedCompletionStatus', self.TYPE.ABI,
+				self.TYPE.BOOL,			// return
+				self.TYPE.HANDLE,		// CompletionPort
+				self.TYPE.LPDWORD,		// lpNumberOfBytes
+				self.TYPE.PULONG_PTR,	// lpCompletionKey
+				self.TYPE.LPOVERLAPPED,	// *lpOverlapped
+				self.TYPE.DWORD			// dwMilliseconds
+			);
+		},
 		MessageBox: function() {
 			/*
 				int WINAPI MessageBox(
@@ -279,7 +335,7 @@ var winInit = function() {
 				  _In_      UINT uType
 				);
 			*/
-			return lib('user32').declare('MessageBoxW', self.TYPE.ABI,
+			return lib('user32').declare(ifdef_UNICODE ? 'MessageBoxW' : 'MessageBoxA', self.TYPE.ABI,
 				self.TYPE.INT,			// return
 				self.TYPE.HWND,			// hWnd
 				self.TYPE.LPCTSTR,		// lpText
@@ -310,6 +366,38 @@ var winInit = function() {
 				self.TYPE.LPDWORD,							// lpBytesReturned,
 				self.TYPE.LPOVERLAPPED,						// lpOverlapped,
 				self.TYPE.LPOVERLAPPED_COMPLETION_ROUTINE	// lpCompletionRoutine
+			);
+		},
+		SleepEx: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/ms686307%28v=vs.85%29.aspx
+			 * DWORD WINAPI SleepEx(
+			 *   __in_  DWORD dwMilliseconds,
+			 *   __in_  BOOL bAlertable
+			 * );
+			 */
+			return lib('kernel32').declare('SleepEx', self.TYPE.ABI,
+				self.TYPE.DWORD,	// return
+				self.TYPE.DWORD,	// dwMilliseconds
+				self.TYPE.BOOL		//bAlertable
+			);
+		},
+		WaitForMultipleObjectsEx: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/ms687028%28v=vs.85%29.aspx
+			 * DWORD WINAPI WaitForMultipleObjectsEx(
+			 *   __in_  DWORD nCount,
+			 *   __in_  const HANDLE *lpHandles,
+			 *   __in_  BOOL bWaitAll,
+			 *   __in_  DWORD dwMilliseconds,
+			 *   __in_  BOOL bAlertable
+			 * );
+			 */
+			return lib('kernel32').declare('WaitForMultipleObjectsEx', self.TYPE.ABI,
+				self.TYPE.DWORD,		// return
+				self.TYPE.DWORD,		// nCount
+				self.TYPE.HANDLE.ptr,	// *lpHandles
+				self.TYPE.BOOL,			// bWaitAll
+				self.TYPE.DWORD,		// dwMilliseconds
+				self.TYPE.BOOL			// bAlertable
 			);
 		}
 	};
