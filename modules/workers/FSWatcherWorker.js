@@ -191,6 +191,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 						path_cfStr
 					]);
 					var cId = ostypes.API('FSEventsGetCurrentEventId')(); //ostypes.CONST.kFSEventStreamEventIdSinceNow; //ostypes.TYPE.FSEventStreamEventId(); //
+					console.info('cId:', cId.toString());
 					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArray, cId, 0.1, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 					console.info('fsstream:', fsstream, fsstream.toString(), uneval(fsstream));
 					if (ctypes.errno != 0) {
@@ -205,6 +206,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 					//var rez_FSEventStreamScheduleWithRunLoop = ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, DirectoryWatch.EventThread.loop, ostypes.CONST.kCFRunLoopDefaultMode)
 				} catch(ex) {
 					var rez_CFRelease = ostypes.API('CFRelease')(path_cfStr); // returns void
+					console.error('ex caught:', ex);
+					throw ex;
 				}
 				
 				
