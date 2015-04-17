@@ -187,7 +187,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				
 				try {
 					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback.ptr(_js_fsevents_callback);
-					var cfArray = ostypes.TYPE.__CFArray.array()([
+					var cfArray = ostypes.TYPE.__CFString.array()([
 						path_cfStr
 					]);
 					var cId = ostypes.API('FSEventsGetCurrentEventId')(); //ostypes.CONST.kFSEventStreamEventIdSinceNow; //ostypes.TYPE.FSEventStreamEventId(); //
@@ -206,7 +206,6 @@ function createWatcher(aWatcherID, aOptions={}) {
 					//var rez_FSEventStreamScheduleWithRunLoop = ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, DirectoryWatch.EventThread.loop, ostypes.CONST.kCFRunLoopDefaultMode)
 				} catch(ex) {
 					var rez_CFRelease = ostypes.API('CFRelease')(path_cfStr); // returns void
-					console.error('ex caught:', ex);
 					throw ex;
 				}
 				
