@@ -173,6 +173,11 @@ var macInit = function() {
 						_lib[path] = ctypes.open('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation');
 					
 					break;
+				case 'FSEvents':
+				
+						_lib[path] = ctypes.open('/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/FSEvents');
+					
+					break;
 				case 'objc':
 				
 						_lib[path] = ctypes.open(ctypes.libraryName('objc'));
@@ -233,7 +238,7 @@ var macInit = function() {
 			 *   int fildes
 			 * ); 
 			 */
-			return lib('libc.dylib').declare('close', self.TYPE.ABI,
+			return lib('libc').declare('close', self.TYPE.ABI,
 				self.TYPE.int,	// return
 				self.TYPE.int	// fildes
 			);
@@ -245,14 +250,14 @@ var macInit = function() {
 			 *   int oflag
 			 * ); 
 			 */
-			return lib('libc.dylib').declare('open', self.TYPE.ABI,
+			return lib('libc').declare('open', self.TYPE.ABI,
 				self.TYPE.int,		// return
 				self.TYPE.char.ptr,	// *path
 				self.TYPE.int		// oflag
 			);
 		},
 		FSEventStreamCreate: function() {
-			return lib('CarbonCore').declare('FSEventStreamCreate', self.TYPE.ABI,
+			return lib('FSEvents').declare('FSEventStreamCreate', self.TYPE.ABI,
 				self.TYPE.FSEventStreamRef,
 				self.TYPE.CFAllocatorRef,
 				self.TYPE.FSEventStreamCallback,
@@ -265,7 +270,7 @@ var macInit = function() {
 		},
 		FSEventStreamCreateRelativeToDevice: function() {},
 		FSEventStreamScheduleWithRunLoop: function() {
-			return lib('CarbonCore').declare("FSEventStreamScheduleWithRunLoop", self.TYPE.ABI,
+			return lib('FSEvents').declare("FSEventStreamScheduleWithRunLoop", self.TYPE.ABI,
 				self.TYPE.void,
 				self.TYPE.FSEventStreamRef,
 				self.TYPE.CFRunLoopRef,
@@ -273,7 +278,7 @@ var macInit = function() {
 			);
 		},
 		FSEventStreamStart: function() {
-			return lib('CarbonCore').declare("FSEventStreamStart", self.TYPE.ABI,
+			return lib('FSEvents').declare("FSEventStreamStart", self.TYPE.ABI,
 				self.TYPE.Boolean,
 				self.TYPE.FSEventStreamRef
 			);
@@ -288,7 +293,7 @@ var macInit = function() {
 		FSEventStreamCopyPathsBeingWatched: function() {},
 		FSEventsCopyUUIDForDevice: function() {},
 		FSEventsGetCurrentEventId: function() {
-			return lib('CarbonCore').declare("FSEventsGetCurrentEventId", self.TYPE.ABI,
+			return lib('FSEvents').declare("FSEventsGetCurrentEventId", self.TYPE.ABI,
 				self.TYPE.FSEventStreamEventId
 			);
 		},
