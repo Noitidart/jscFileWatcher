@@ -74,14 +74,6 @@ var macTypes = function() {
 	this.__CFString = ctypes.StructType('__CFString');
 	this.__CFURL = ctypes.StructType('__CFURL');
     this.__FSEventStream = ctypes.StructType("__FSEventStream");
-	this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-		{ ident: this.uintptr_t },
-		{ filter: this.int16_t },
-		{ flags: this.uint16_t },
-		{ fflags: this.uint32_t },
-		{ data: this.intptr_t },
-		{ udata: this.void.ptr }
-	]);
 	this.Point = ctypes.StructType('Point', [
 		{ v: this.short },
 		{ h: this.short }
@@ -111,6 +103,10 @@ var macTypes = function() {
 	this.CFAllocatorCopyDescriptionCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.CFStringRef, [this.void.ptr]).ptr;
 	this.CFAllocatorRetainCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.void.ptr, [this.void.ptr]).ptr;
 	this.CFAllocatorReleaseCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.void, [this.void.ptr]).ptr;
+	this.CFArrayCopyDescriptionCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.CFStringRef, [this.void.ptr]).ptr;
+	this.CFArrayEqualCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.Boolean, [this.void.ptr, this.void.ptr]).ptr;
+	this.CFArrayReleaseCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.void, [this.CFAllocatorRef, this.void.ptr]).ptr;
+	this.CFArrayRetainCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.void.ptr, [this.CFAllocatorRef, this.void.ptr]).ptr;
 	this.FSEventStreamCallback = ctypes.FunctionType(this.CALLBACK_ABI, this.void, [this.ConstFSEventStreamRef, this.void.ptr, this.size_t, this.void.ptr, this.FSEventStreamEventFlags, this.FSEventStreamEventId]).ptr;
 	this.ModalFilterProcPtr = ctypes.FunctionType(this.CALLBACK_ABI, this.Boolean, [this.DialogRef, this.EventRecord.ptr, this.DialogItemIndex.ptr]).ptr;
 	
@@ -128,6 +124,13 @@ var macTypes = function() {
 		{ defaultButton: this.SInt16 },
 		{ cancelButton: this.SInt16 },
 		{ position: this.UInt16 }
+	]);
+	this.CFArrayCallBacks = ctypes.StructType("CFArrayCallBacks", [
+		{ version: this.CFIndex },
+		{ retain: this.CFArrayRetainCallBack },
+		{ release: this.CFArrayReleaseCallBack },
+		{ copyDescription: this.CFArrayCopyDescriptionCallBack },
+		{ equal: this.CFArrayEqualCallBack }
 	]);
 	this.FSEventStreamContext = ctypes.StructType("FSEventStreamContext", [
 		{version: this.CFIndex},
@@ -206,6 +209,15 @@ var macInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
+		CFArrayCreate: function() {
+			return lib('CoreFoundation').declare("CFArrayCreate", self.TYPE.ABI,
+				self.TYPE.CFArrayRef,
+				self.TYPE.CFAllocatorRef,
+				self.TYPE.void.ptr.ptr,
+				self.TYPE.CFIndex,
+				self.TYPE.CFArrayCallBacks.ptr
+			);
+		},
 		CFRelease: function() {
 			/* https://developer.apple.com/library/mac/documentation/CoreFoundation/Reference/CFTypeRef/#//apple_ref/c/func/CFRelease
 			 * void CFRelease (
@@ -232,6 +244,9 @@ var macInit = function() {
 				self.TYPE.CFIndex			// numChars
 			);
 		},
+		kCFTypeArrayCallBacks: function() {
+			return lib('CoreFoundation').declare("kCFTypeArrayCallBacks", self.TYPE.CFArrayCallBacks);
+		}
 		close: function() {
 			/* https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/close.2.html#//apple_ref/doc/man/2/close
 			 * int close (

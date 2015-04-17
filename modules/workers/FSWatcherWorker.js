@@ -187,14 +187,22 @@ function createWatcher(aWatcherID, aOptions={}) {
 				
 				try {
 					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(_js_fsevents_callback);
-					var cfStrArr = ostypes.TYPE.CFStringRef.array(1)([
+					var cfStrArr = ostypes.TYPE.void.ptr.array(1)([
 						path_cfStr
 					]);
-					var cfArray = ctypes.cast(cfStrArr, ostypes.TYPE.CFArrayRef);
+					var cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.API('kCFTypeArrayCallBacks')());
+					console.info('cfArrRef:', cfArrRef.toString());
+					if (cfArrRef.isNull()) {
+						console.error('Failed cfArrRef');
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed CFArrayCreate'
+						});
+					}
 					
 					var cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
 					console.info('cId:', cId.toString());
-					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArray, cId, 0.1, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
+					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArrRef, cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 					console.info('fsstream:', fsstream, fsstream.toString(), uneval(fsstream));
 					if (ctypes.errno != 0) {
 						console.error('Failed fsstream, errno:', ctypes.errno);
