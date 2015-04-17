@@ -170,7 +170,16 @@ var macInit = function() {
 					break;
 				case 'FSEvents':
 				
-						_lib[path] = ctypes.open('/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/FSEvents');
+						try {
+							// for osx 10.10
+							_lib[path] = ctypes.open('/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/FSEvents');
+						} catch (ex) {
+							if (ex.message.indexOf('couldn\'t open library') == -1) {
+								throw ex; // failed due to some othe reason
+							}
+							// for osx < 10.10
+							_lib[path] = lib('CarbonCore');
+						}
 					
 					break;
 				case 'objc':
