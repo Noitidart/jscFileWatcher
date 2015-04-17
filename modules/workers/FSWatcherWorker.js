@@ -190,7 +190,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					var cfArray = ostypes.TYPE.CFStringRef.array(1)([
 						path_cfStr
 					]);
-					var cId = ostypes.API('FSEventsGetCurrentEventId')(); //ostypes.CONST.kFSEventStreamEventIdSinceNow; //ostypes.TYPE.FSEventStreamEventId(); //
+					var cId = ostypes.CONST.kFSEventStreamEventIdSinceNow; //ostypes.TYPE.FSEventStreamEventId(); //ostypes.API('FSEventsGetCurrentEventId')();
 					console.info('cId:', cId.toString());
 					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArray, cId, 0.1, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 					console.info('fsstream:', fsstream, fsstream.toString(), uneval(fsstream));
