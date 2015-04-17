@@ -204,6 +204,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					console.info('cId:', cId.toString());
 					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArrRef, cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 					console.info('fsstream:', fsstream, fsstream.toString(), uneval(fsstream));
+					/*
 					if (ctypes.errno != 0) {
 						console.error('Failed fsstream, errno:', ctypes.errno);
 						throw new Error({
@@ -212,6 +213,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 							unixErrno: ctypes.errno
 						});
 					}
+					*/
 					
 					//var rez_FSEventStreamScheduleWithRunLoop = ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, DirectoryWatch.EventThread.loop, ostypes.CONST.kCFRunLoopDefaultMode)
 				} catch(ex) {

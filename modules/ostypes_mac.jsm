@@ -246,7 +246,7 @@ var macInit = function() {
 		},
 		kCFTypeArrayCallBacks: function() {
 			return lib('CoreFoundation').declare("kCFTypeArrayCallBacks", self.TYPE.CFArrayCallBacks);
-		}
+		},
 		close: function() {
 			/* https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/close.2.html#//apple_ref/doc/man/2/close
 			 * int close (
