@@ -187,10 +187,12 @@ function createWatcher(aWatcherID, aOptions={}) {
 				
 				try {
 					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(_js_fsevents_callback);
-					var cfArray = ostypes.TYPE.CFStringRef.array(1)([
+					var cfStrArr = ostypes.TYPE.CFStringRef.array(1)([
 						path_cfStr
 					]);
-					var cId = ostypes.CONST.kFSEventStreamEventIdSinceNow; //ostypes.TYPE.FSEventStreamEventId(); //ostypes.API('FSEventsGetCurrentEventId')();
+					var cfArr = ctypes.cast(cfStrArr, ostypes.TYPE.CFArrayRef);
+					
+					var cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
 					console.info('cId:', cId.toString());
 					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArray, cId, 0.1, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 					console.info('fsstream:', fsstream, fsstream.toString(), uneval(fsstream));
