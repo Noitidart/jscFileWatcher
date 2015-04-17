@@ -210,7 +210,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					
 					ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
 					
-					var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart', fsstream)();
+					var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart')(fsstream);
 					if (!rez_FSEventStreamStart) {
 						console.error('Failed FSEventStreamStart');
 						throw new Error({
