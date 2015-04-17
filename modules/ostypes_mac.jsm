@@ -29,6 +29,7 @@ var macTypes = function() {
 	this.uint32_t = ctypes.uint32_t;
 	this.uintptr_t = ctypes.uintptr_t
 	this.uint64_t = ctypes.uint64_t;
+	this.unsigned_long = ctypes.unsigned_long;
 	this.void = ctypes.void_t;
 	
 	// ADV C TYPES
@@ -68,11 +69,11 @@ var macTypes = function() {
 	// SIMPLE STRUCTS
 	
 	this.__CFAllocator = ctypes.StructType('__CFAllocator');
-	this.__CFArray = new ctypes.StructType("__CFArray");
-	this.__CFRunLoop = new ctypes.StructType("__CFRunLoop");
+	this.__CFArray = ctypes.StructType("__CFArray");
+	this.__CFRunLoop = ctypes.StructType("__CFRunLoop");
 	this.__CFString = ctypes.StructType('__CFString');
 	this.__CFURL = ctypes.StructType('__CFURL');
-    this.__FSEventStream = new ctypes.StructType("__FSEventStream");
+    this.__FSEventStream = ctypes.StructType("__FSEventStream");
 	this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 		{ ident: this.uintptr_t },
 		{ filter: this.int16_t },
@@ -97,7 +98,7 @@ var macTypes = function() {
 	this.CFURLRef = this.__CFURL.ptr;
 	this.EventRecord = ctypes.StructType("EventRecord", [
 		{ what: this.EventKind },
-		{ message: ctypes.unsigned_long },
+		{ message: this.unsigned_long },
 		{ when: this.UInt32 },
 		{ where: this.Point },
 		{ modifiers: this.EventModifiers }
@@ -128,7 +129,7 @@ var macTypes = function() {
 		{ cancelButton: this.SInt16 },
 		{ position: this.UInt16 }
 	]);
-	this.FSEventStreamContext = new ctypes.StructType("FSEventStreamContext", [
+	this.FSEventStreamContext = ctypes.StructType("FSEventStreamContext", [
 		{version: this.CFIndex},
 		{info: this.void.ptr},
 		{retain: this.CFAllocatorRetainCallBack},

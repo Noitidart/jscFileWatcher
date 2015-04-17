@@ -186,7 +186,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var path_cfStr = ostypes.HELPER.makeCFStr(path_jsStr);
 				
 				try {
-					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback.ptr(_js_fsevents_callback);
+					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(_js_fsevents_callback);
 					var cfArray = ostypes.TYPE.CFStringRef.array(1)([
 						path_cfStr
 					]);
