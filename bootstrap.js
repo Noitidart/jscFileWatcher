@@ -171,62 +171,17 @@ function _FSWatcherWorker_start() {
 		FSWatcherWorker = new PromiseWorker(core.addon.path.content + 'modules/workers/FSWatcherWorker.js');
 		
 		var objCore = { // holds stuff to add to core object in worker
-			os: {},
-			firefox: {}
+			os: {
+				name: core.os.name,
+				version: core.os.version, // exists for winnt and darwin, for others its undefined
+				version_name: core.os.version_name // for winnt
+			},
+			firefox: {
+				//version: core.firefox.version // i dont use this for jscFileWatcher
+			}
 		};
-		switch (core.os.name) {
-			case 'winnt':
-			case 'winmo':
-			case 'wince':
-				objCore.os.version = parseFloat(Services.sysinfo.getProperty('version'));
-				// http://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
-				if (objCore.os.version == 6.0) {
-					objCore.os.isVistaPlus = true;
-				}
-				if (objCore.os.version >= 6.1) {
-					objCore.os.isWin7Plus = true;
-				}
-				if (objCore.os.version == 5.1 || objCore.os.version == 5.2) {
-					objCore.os.isWinXp = true;
-				}
-				break;
-				
-			case 'darwin':
-				var userAgent = myServices.hph.userAgent;
-				//console.info('userAgent:', userAgent);
-				var version_osx = userAgent.match(/Mac OS X 10\.([\d\.]+)/);
-				//console.info('version_osx matched:', version_osx);
-				
-				if (!version_osx) {
-					throw new Error('Could not identify Mac OS X version.');
-				} else {
-					var version_osx_str = version_osx[1];
-					var ints_split = version_osx[1].split('.');
-					if (ints_split.length == 1) {
-						objCore.os.version = parseInt(ints_split[0]);
-					} else if (ints_split.length >= 2) {
-						objCore.os.version = ints_split[0] + '.' + ints_split[1];
-						if (ints_split.length > 2) {
-							objCore.os.version += ints_split.slice(2).join('');
-						}
-						objCore.os.version = parseFloat(objCore.os.version);
-					}
-					// this makes it so that 10.10.0 becomes 10.100
-					// 10.10.1 => 10.101
-					// so can compare numerically, as 10.100 is less then 10.101
-				}
-				break;
-			default:
-				// nothing special
-		}
 		
-		objCore.firefox = {};
-		objCore.firefox.version = Services.appinfo.version;
-		//objCore.firefox.versionIsLessThen30 = Services.vc.compare(Services.appinfo.version, 30) < 0;
-		
-
-		console.log('here going to init');
-		var promise_initWorker = FSWatcherWorker.post('init', [objCore]);
+		var promise_initWorker = initWorkerCore(FSWatcherWorker, objCore);
 		promise_initWorker.then(
 			function(aVal) {
 				console.log('Fullfilled - promise_initWorker - ', aVal);
@@ -816,11 +771,12 @@ Watcher.prototype.waitForNextChange = function() {
 		thisW.FSWPollWorker = new PromiseWorker(core.addon.path.content + 'modules/workers/FSWPollWorker.js');
 		_Watcher_UnterminatedFSWPollWorkers[thisW.id] = thisW.FSWPollWorker;
 		
-		var promise_initPollWorker = thisW.FSWPollWorker.post('init', [{
+		var promise_initPollWorker = initWorkerCore(thisW.FSWPollWorker, {
 			os: {
 				version: core.os.version // used for mac
 			}
-		}]); // just need core.os.version added to PromiseWorker core as i use it for mac
+		}); // just need core.os.version added to PromiseWorker core as i use it for mac
+		
 		promise_initPollWorker.then(
 		  function(aVal) {
 			console.log('Fullfilled - promise_initPollWorker - ', aVal);
@@ -852,7 +808,7 @@ Watcher.prototype.waitForNextChange = function() {
 }
 // end - OS.File.Watcher API
 
-function addToCore() {
+function extendCore() {
 	// adds some properties i use to core
 		switch (core.os.name) {
 			case 'winnt':
@@ -895,7 +851,7 @@ function addToCore() {
 					// 10.10.1 => 10.101
 					// so can compare numerically, as 10.100 is less then 10.101
 					
-					core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
+					//core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 				}
 				break;
 			default:
@@ -915,7 +871,7 @@ function startup(aData, aReason) {
 	console.log('test')
 	//core.addon.aData = aData;
 	
-	addToCore();
+	extendCore();
 	
 	PromiseWorker = Cu.import(core.addon.path.content + 'modules/PromiseWorker.jsm').BasePromiseWorker;
 
@@ -983,5 +939,14 @@ function Deferred() {
 	} else {
 		throw new Error('Promise not available!');
 	}
+}
+
+function initWorkerCore(workerObj, aCore={}) {
+	// aCore is what you want aCore to be populated with
+	
+	// PromiseWorker
+	return workerObj.post('init', [aCore]);
+	
+	// add support and detection for regular ChromeWorker
 }
 // end - common helper functions

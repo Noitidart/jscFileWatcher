@@ -75,12 +75,15 @@ function init(objCore) {
 			importScripts(core.addon.path.content + 'modules/ostypes_nix.jsm');
 			break;
 		case 'darwin':
-			importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
-			core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
+			if (core.os.version < 7) {
+				importScripts(core.addon.path.content + 'modules/ostypes_bsd-mac-kq.jsm');
+			} else {
+				importScripts(core.addon.path.content + 'modules/ostypes_mac.jsm');
+			}
 			break;
 		case 'freebsd':
 		case 'openbsd':
-			importScripts(core.addon.path.content + 'modules/ostypes_bsd.jsm');
+			importScripts(core.addon.path.content + 'modules/ostypes_bsd-mac-kq.jsm');
 			break;
 		default:
 			throw new Error({
@@ -173,6 +176,70 @@ function createWatcher(aWatcherID, aOptions={}) {
 			} else {
 				// its mac and os.version is >= 10.7
 				// use FSEventFramework
+
+				var _js_fsevents_callback = function(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
+					console.error('in _js_fsevents_callback aH!!!');
+					return null;
+				};
+				
+				var path_jsStr = OS.Constants.Path.desktopDir;
+				var path_cfStr = ostypes.HELPER.makeCFStr(path_jsStr);
+				
+				try {
+					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(_js_fsevents_callback);
+					var cfStrArr = ostypes.TYPE.void.ptr.array(1)([
+						path_cfStr
+					]);
+					var cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.CONST.kCFTypeArrayCallBacks.address());
+					console.info('cfArrRef:', cfArrRef.toString());
+					if (cfArrRef.isNull()) {
+						console.error('Failed cfArrRef');
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed CFArrayCreate'
+						});
+					}
+					
+					var cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
+					console.info('cId:', cId.toString());
+					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArrRef, cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
+					console.info('fsstream:', fsstream.toString(), uneval(fsstream));
+
+					var rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
+					console.info('rez_CFRunLoopGetCurrent:', rez_CFRunLoopGetCurrent.toString());
+					
+					ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
+					
+					var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart')(fsstream);
+					if (!rez_FSEventStreamStart) {
+						console.error('Failed FSEventStreamStart');
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed FSEventStreamStart'
+						});
+					}
+					
+					console.log('succsefuly started stream:', rez_FSEventStreamStart.toString());
+					
+					console.log('going to start runLoopRun');
+					
+					ostypes.API('CFRunLoopRun')(); // returns void
+					
+					console.log('run loop run started!!!');
+				} catch(ex) {
+					ostypes.API('CFRelease')(path_cfStr); // returns void
+					
+					if (fsstream && !fsstream.isNull()) {
+						console.log('need to clean up fsstream');
+						ostypes.API('FSEventStreamInvalidate')(fsstream);
+						ostypes.API('FSEventStreamRelease')(fsstream);
+						console.log('done cleaning up fsstream');
+					}
+					
+					throw ex;
+				}
+				
+				
 			}
 
 		break;
