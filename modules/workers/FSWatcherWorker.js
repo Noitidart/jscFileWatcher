@@ -187,7 +187,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				
 				try {
 					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback.ptr(_js_fsevents_callback);
-					var cfArray = ostypes.TYPE.__CFString.array()([
+					var cfArray = ostypes.TYPE.CFStringRef.array(1)([
 						path_cfStr
 					]);
 					var cId = ostypes.API('FSEventsGetCurrentEventId')(); //ostypes.CONST.kFSEventStreamEventIdSinceNow; //ostypes.TYPE.FSEventStreamEventId(); //
