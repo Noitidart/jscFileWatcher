@@ -219,7 +219,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 						});
 					}
 					
-					console.log('succsefuly started stream:', rez_FSEventStreamStart);
+					console.log('succsefuly started stream:', rez_FSEventStreamStart.toString());
 				} catch(ex) {
 					var rez_CFRelease = ostypes.API('CFRelease')(path_cfStr); // returns void
 					
