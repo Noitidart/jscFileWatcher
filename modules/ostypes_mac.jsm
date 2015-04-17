@@ -288,7 +288,7 @@ var macInit = function() {
 		FSEventsCopyUUIDForDevice: function() {},
 		FSEventsGetCurrentEventId: function() {
 			return lib('CarbonCore').declare("FSEventsGetCurrentEventId", self.TYPE.ABI,
-				this.FSEventStreamEventId
+				self.TYPE.FSEventStreamEventId
 			);
 		},
 		FSEventsGetLastEventIdForDeviceBeforeTime: function() {},
