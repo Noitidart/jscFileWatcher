@@ -197,7 +197,7 @@ var macInit = function() {
 		kFSEventStreamCreateFlagWatchRoot: 4,
 		kFSEventStreamEventIdSinceNow: -1,
 		
-		kCFTypeArrayCallBacks: lib('CoreFoundation').declare("kCFTypeArrayCallBacks", self.TYPE.CFArrayCallBacks);
+		kCFTypeArrayCallBacks: lib('CoreFoundation').declare("kCFTypeArrayCallBacks", self.TYPE.CFArrayCallBacks)
 	};
 	
 	// start - function declares
