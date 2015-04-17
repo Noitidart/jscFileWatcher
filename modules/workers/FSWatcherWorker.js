@@ -190,7 +190,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					var cfStrArr = ostypes.TYPE.void.ptr.array(1)([
 						path_cfStr
 					]);
-					var cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.API('kCFTypeArrayCallBacks')());
+					var cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.API('kCFTypeArrayCallBacks')().address());
 					console.info('cfArrRef:', cfArrRef.toString());
 					if (cfArrRef.isNull()) {
 						console.error('Failed cfArrRef');
