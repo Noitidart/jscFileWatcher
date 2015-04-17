@@ -190,7 +190,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					var cfStrArr = ostypes.TYPE.CFStringRef.array(1)([
 						path_cfStr
 					]);
-					var cfArr = ctypes.cast(cfStrArr, ostypes.TYPE.CFArrayRef);
+					var cfArray = ctypes.cast(cfStrArr, ostypes.TYPE.CFArrayRef);
 					
 					var cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
 					console.info('cId:', cId.toString());
