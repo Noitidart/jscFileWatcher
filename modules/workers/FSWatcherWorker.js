@@ -178,7 +178,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				// use FSEventFramework
 
 				var _js_fsevents_callback = function(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
-					
+					console.error('in _js_fsevents_callback aH!!!');
 					return null;
 				};
 				
