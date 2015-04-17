@@ -218,6 +218,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 							message: 'Failed FSEventStreamStart'
 						});
 					}
+					
+					console.log('succsefuly started stream:' rez_FSEventStreamStart);
 				} catch(ex) {
 					var rez_CFRelease = ostypes.API('CFRelease')(path_cfStr); // returns void
 					
