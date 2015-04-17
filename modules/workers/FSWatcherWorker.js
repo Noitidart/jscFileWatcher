@@ -204,20 +204,30 @@ function createWatcher(aWatcherID, aOptions={}) {
 					console.info('cId:', cId.toString());
 					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArrRef, cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 					console.info('fsstream:', fsstream.toString(), uneval(fsstream));
-					/*
-					if (ctypes.errno != 0) {
-						console.error('Failed fsstream, errno:', ctypes.errno);
+
+					var rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
+					console.info('rez_CFRunLoopGetCurrent:', rez_CFRunLoopGetCurrent.toString());
+					
+					ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
+					
+					var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart', fsstream);
+					if (!rez_FSEventStreamStart) {
+						console.error('Failed FSEventStreamStart');
 						throw new Error({
 							name: 'os-api-error',
-							message: 'Failed fsstream',
-							unixErrno: ctypes.errno
+							message: 'Failed FSEventStreamStart'
 						});
 					}
-					*/
-					
-					//var rez_FSEventStreamScheduleWithRunLoop = ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, DirectoryWatch.EventThread.loop, ostypes.CONST.kCFRunLoopDefaultMode)
 				} catch(ex) {
 					var rez_CFRelease = ostypes.API('CFRelease')(path_cfStr); // returns void
+					
+					if (fsstream && !fsstream.isNull()) {
+						console.log('need to clean up fsstream');
+						ostypes.API('FSEventStreamInvalidate')(fsstream);
+						ostypes.API('FSEventStreamRelease')(fsstream);
+						console.log('done cleaning up fsstream');
+					}
+					
 					throw ex;
 				}
 				
