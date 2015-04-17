@@ -147,14 +147,6 @@ var macInit = function() {
 	this.IS64BIT = is64bit;
 	
 	this.TYPE = new macTypes();
-
-	// CONSTANTS
-	this.CONST = {
-		kCFAllocatorDefault: null, // 0
-		kFSEventStreamCreateFlagFileEvents: 16, // https://github.com/bizonix/DropBoxLibrarySRC/blob/2e4a151caa88b48653f31a22cb207fff851b75f8/pyc_decrypted/latest/pymac/constants.py#L165
-		kFSEventStreamCreateFlagWatchRoot: 4,
-		kFSEventStreamEventIdSinceNow: -1
-	};
 	
 	var _lib = {}; // cache for lib
 	var lib = function(path) {
@@ -196,6 +188,16 @@ var macInit = function() {
 			}
 		}
 		return _lib[path];
+	};
+	
+	// CONSTANTS
+	this.CONST = {
+		kCFAllocatorDefault: null, // 0
+		kFSEventStreamCreateFlagFileEvents: 16, // https://github.com/bizonix/DropBoxLibrarySRC/blob/2e4a151caa88b48653f31a22cb207fff851b75f8/pyc_decrypted/latest/pymac/constants.py#L165
+		kFSEventStreamCreateFlagWatchRoot: 4,
+		kFSEventStreamEventIdSinceNow: -1,
+		
+		kCFTypeArrayCallBacks: lib('CoreFoundation').declare("kCFTypeArrayCallBacks", self.TYPE.CFArrayCallBacks);
 	};
 	
 	// start - function declares
