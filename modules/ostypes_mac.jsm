@@ -198,7 +198,7 @@ var macInit = function() {
 		get kCFRunLoopDefaultMode () { if (!('kCFRunLoopDefaultMode' in _const)) { _const['kCFRunLoopDefaultMode'] = lib('CoreFoundation').declare('kCFRunLoopDefaultMode', self.TYPE.CFStringRef); } return _const['kCFRunLoopDefaultMode']; },
 		kFSEventStreamCreateFlagFileEvents: 16, // https://github.com/bizonix/DropBoxLibrarySRC/blob/2e4a151caa88b48653f31a22cb207fff851b75f8/pyc_decrypted/latest/pymac/constants.py#L165
 		kFSEventStreamCreateFlagWatchRoot: 4,
-		kFSEventStreamEventIdSinceNow: -1,
+		kFSEventStreamEventIdSinceNow: -1
 	};
 	
 	// start - function declares
@@ -236,7 +236,7 @@ var macInit = function() {
 			return lib('CoreFoundation').declare("CFRunLoopGetCurrent", self.TYPE.ABI,
 				self.TYPE.CFRunLoopRef
 			);
-		}
+		},
 		CFStringCreateWithCharacters: function() {
 			/* https://developer.apple.com/library/mac/documentation/CoreFoundation/Reference/CFStringRef/#//apple_ref/c/func/CFStringCreateWithCharacters
 			 * CFStringRef CFStringCreateWithCharacters (
