@@ -221,6 +221,11 @@ var macInit = function() {
 				self.TYPE.CFArrayCallBacks.ptr
 			);
 		},
+		CFRunLoopRun: function() {
+			return lib('CoreFoundation').declare("CFRunLoopRun", self.TYPE.ABI,
+				self.TYPE.void
+			);
+		},
 		CFRelease: function() {
 			/* https://developer.apple.com/library/mac/documentation/CoreFoundation/Reference/CFTypeRef/#//apple_ref/c/func/CFRelease
 			 * void CFRelease (

@@ -220,8 +220,14 @@ function createWatcher(aWatcherID, aOptions={}) {
 					}
 					
 					console.log('succsefuly started stream:', rez_FSEventStreamStart.toString());
+					
+					console.log('going to start runLoopRun');
+					
+					ostypes.API('CFRunLoopRun')(); // returns void
+					
+					console.log('run loop run started!!!');
 				} catch(ex) {
-					var rez_CFRelease = ostypes.API('CFRelease')(path_cfStr); // returns void
+					ostypes.API('CFRelease')(path_cfStr); // returns void
 					
 					if (fsstream && !fsstream.isNull()) {
 						console.log('need to clean up fsstream');
