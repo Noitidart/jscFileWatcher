@@ -203,7 +203,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					var cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
 					console.info('cId:', cId.toString());
 					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArrRef, cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
-					console.info('fsstream:', fsstream, fsstream.toString(), uneval(fsstream));
+					console.info('fsstream:', fsstream.toString(), uneval(fsstream));
 					/*
 					if (ctypes.errno != 0) {
 						console.error('Failed fsstream, errno:', ctypes.errno);

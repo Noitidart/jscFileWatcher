@@ -197,7 +197,7 @@ var macInit = function() {
 		kFSEventStreamCreateFlagFileEvents: 16, // https://github.com/bizonix/DropBoxLibrarySRC/blob/2e4a151caa88b48653f31a22cb207fff851b75f8/pyc_decrypted/latest/pymac/constants.py#L165
 		kFSEventStreamCreateFlagWatchRoot: 4,
 		kFSEventStreamEventIdSinceNow: -1,
-		kCFTypeArrayCallBacks() { if (kCFTypeArrayCallBacks in self._CONST) { self._CONST.kCFTypeArrayCallBacks = lib('CoreFoundation').declare('kCFTypeArrayCallBacks', self.TYPE.CFArrayCallBacks); console.error('defined it i ncache'); }  return self._CONST.kCFTypeArrayCallBacks },
+		kCFTypeArrayCallBacks() { if ('kCFTypeArrayCallBacks' in self._CONST) { self._CONST['kCFTypeArrayCallBacks'] = lib('CoreFoundation').declare('kCFTypeArrayCallBacks', self.TYPE.CFArrayCallBacks); console.error('defined it i ncache'); }  return self._CONST['kCFTypeArrayCallBacks']; },
 	};
 	
 	// start - function declares
