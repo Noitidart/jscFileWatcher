@@ -455,6 +455,7 @@ function poll(aArgs) {
 											aOSPath_parentDir_identifier: wd,
 											aOld: {
 												nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+												aFileName: fileName
 											}
 										}
 									}
