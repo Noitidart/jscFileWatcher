@@ -647,12 +647,14 @@ function convertFlagsToAEventStr(flags) {
 		
 				var default_flags = { // shoud be whatever is passed in FSWatcherWorker.js addPathToWatcher function
 					IN_CLOSE_WRITE: 'contents-modified',
-					IN_MOVED_TO: 'renamed-to',
-					IN_DELETE: 'deleted',
-					IN_MOVED_FROM: 'renamed-from',
-					IN_CREATE: 'created'
+					IN_MOVED_TO: 'renamed-to', // can also be a added
+					IN_DELETE: 'removed',
+					IN_MOVED_FROM: 'renamed-from', // can also be a removed
+					IN_CREATE: 'added'
 				};
+				
 				/*
+				default_flags.IN_MODIFY = 'modded';
 				var allFlags = '';
 				for (var f in default_flags) {
 					if (flags & ostypes.CONST[f]) {
