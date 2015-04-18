@@ -692,6 +692,56 @@ function managePoll(instanceWatcher) {
 	}
 	// console.error('ok going to os specific');
 	switch (core.os.name) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+				
+				var do_winPoll = function() {
+					thisW.pollBeingManaged = true;
+					if (thisW.readyState == 2 || thisW.readyState == 3) {
+						// watcher was closed so stop polling
+						thisW.pollBeingManaged = false;
+						return; // to prevent deeper exec
+					}
+					var promise_winPoll = waitForNextChange(thisW);
+					promise_winPoll.then(
+					  function(aVal) {
+						console.log('Fullfilled - promise_winPoll - ', aVal);
+						// start - do stuff here - promise_winPoll
+							// handle thisW.cb triggering
+							// do_winPoll(); // restart poll
+						// end - do stuff here - promise_winPoll
+					  },
+					  function(aReason) {
+						if (aReason.name == 'poll-aborted-nopaths') {
+							// poll aborted due to no paths being watched
+							thisW.pollBeingManaged = false;
+							if (Object.keys(thisW.paths_watched).length > 0) {
+								aReason.API_ERROR = {
+									name: 'watcher-api-error',
+									message: 'Poll aborted with error reason 0 indicating no more paths being watched, however thisW.paths_watched has paths in it',
+									extra: JSON.stringify(thisW.paths_watched),
+								}
+							}
+						}
+						var rejObj = {name:'promise_winPoll', aReason:aReason};
+						console.warn('Rejected - promise_winPoll - ', rejObj);
+						//deferred_createProfile.reject(rejObj);
+						//do_winPoll();
+					  }
+					).catch(
+					  function(aCaught) {
+						  thisW.pollBeingManaged = false;
+						var rejObj = {name:'promise_winPoll', aCaught:aCaught};
+						console.error('Caught - promise_winPoll - ', rejObj);
+						//deferred_createProfile.reject(rejObj);
+						//do_winPoll();
+					  }
+					);
+				};
+				do_winPoll();
+				
+			break;
 		case 'darwin':
 		case 'freebsd':
 		case 'openbsd':
@@ -710,7 +760,7 @@ function managePoll(instanceWatcher) {
 							thisW.pollBeingManaged = false;
 							return; // to prevent deeper exec
 						}
-						var promise_kqPoll = thisW.waitForNextChange();
+						var promise_kqPoll = waitForNextChange(thisW);
 						promise_kqPoll.then(
 						  function(aVal) {
 							console.log('Fullfilled - promise_kqPoll - ', aVal);
@@ -769,7 +819,7 @@ function managePoll(instanceWatcher) {
 						thisW.pollBeingManaged = false;
 						return; // to prevent deeper exec
 					}
-					var promise_nixPoll = thisW.waitForNextChange();
+					var promise_nixPoll = waitForNextChange(thisW);
 					promise_nixPoll.then(
 					  function(aVal) {
 						console.log('Fullfilled - promise_nixPoll - ', aVal);
@@ -865,7 +915,7 @@ function managePoll(instanceWatcher) {
 				
 			break;
 		default:
-			// do nothing special
+			throw new Error('poll management for os not yet impelmented');
 	}
 }
 function waitForNextChange(instanceWatcher) {

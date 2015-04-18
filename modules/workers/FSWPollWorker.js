@@ -119,7 +119,7 @@ function init(objCore) {
 
 				winStuff.handles_watched = {}; // key is cutils.strOfPtr(hDirectory) and value is its overlapped struct as i need to reuse that in the callback to restart the watch, so setting it to 1 for now
 				winStuff.handles_watched_jsArr = []; // array of hDirectory , not the pointer strings!
-				winStuff.handles_watched_cArr;
+				winStuff.handles_watched_cArr = undefined;
 				
 				winStuff.handles_pending_add = [];
 				
@@ -139,28 +139,34 @@ function poll(aArgs) {
 		case 'winmo':
 		case 'wince':
 				
-				var numHandlesWaitingAdd = ctypes.int.cast(ctypes.UInt64(aArgs.numHandlesWaitingAdd_ptrStr));
-				if (numHandlesWaitingAdd.contents > 0) {
-					var cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(Watcher.cStrOfHandlePtrStrsWaitingAdd));
-					var jsStrOfHandlePtrStrsWaitingAdd = cStrOfHandlePtrStrsWaitingAdd.contents.readString();
-					var jsArrOfHandlePtrStrsWaitingAdd = old_cStrOfHandlePtrStrsWaitingAdd.split(',');
+				console.error('here in poll');
+				
+				if (!('numHandlesWaitingAdd' in winStuff)) {
+					winStuff.numHandlesWaitingAdd = ctypes.int.ptr(ctypes.UInt64(aArgs.numHandlesWaitingAdd_ptrStr));
+					winStuff.cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(aArgs.strOfHandlePtrStrsWaitingAdd_ptrStr));
+				}
+				if (winStuff.numHandlesWaitingAdd.contents > 0) { // i dont do .contents.value because .contents makesit primitive per @arai on irc #jsctypes
+					var jsStrOfHandlePtrStrsWaitingAdd = winStuff.cStrOfHandlePtrStrsWaitingAdd.contents.readString();
+					console.info('jsStrOfHandlePtrStrsWaitingAdd:', jsStrOfHandlePtrStrsWaitingAdd);
+					var jsArrOfHandlePtrStrsWaitingAdd = jsStrOfHandlePtrStrsWaitingAdd.split(',');
+					
 					if (jsArrOfHandlePtrStrsWaitingAdd.length == 0) {
 						throw new Error('what on earth this should never happen as numHandlesWaitingAdd increments only when there is contents in this cStr');
 					}
 					
 					// blank the str
-					cutils.modifyCStr(cStrOfHandlePtrStrsWaitingAdd.contents, new_jsStr_cStrOfHandlePtrStrsWaitingAdd);
-					numHandlesWaitingAdd.contents = 0;
+					cutils.modifyCStr(winStuff.cStrOfHandlePtrStrsWaitingAdd.contents, '');
+					winStuff.numHandlesWaitingAdd.contents = 0;
 					
 					for (var i=0; i<jsArrOfHandlePtrStrsWaitingAdd.length; i++) {
 						let iHoisted = i;
 						var hDirectory_ptrStr = jsArrOfHandlePtrStrsWaitingAdd[iHoisted];
-						var hDirectory = ostypes.HANDLE.ptr(hDirectory_ptrStr).contents;
+						var hDirectory = ostypes.TYPE.HANDLE.ptr(ctypes.UInt64(hDirectory_ptrStr)).contents;
 						
 						winStuff.handles_watched_jsArr.push(hDirectory);
 						
 						var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
-						handles_watched[hDirectory_ptrStr] = o;
+						winStuff.handles_watched[hDirectory_ptrStr] = o;
 						
 						var notif_buf = ostypes.TYPE.DWORD.array(winStuff.NOTIFICATION_BUFFER_SIZE)(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
 						var notif_buf_size = notif_buf.constructor.size; // obeys length of .array //ostypes.TYPE.DWORD(notif_buf.constructor.size); // will be same as winStuff.NOTIFICATION_BUFFER_SIZE duhhh
@@ -168,7 +174,7 @@ function poll(aArgs) {
 						
 						o.hEvent = notif_buf.address();
 						
-						//console.error('will not hang, as async');
+						console.error('will not hang, as async, hDirectory:', hDirectory.toString());
 						var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, notif_buf.address(), notif_buf_size, false, winStuff.changes_to_watch, null, o.address(), winStuff.lpCompletionRoutine);
 						console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
 
@@ -184,6 +190,8 @@ function poll(aArgs) {
 						}
 						
 					}
+					
+					winStuff.handles_watched_cArr = ostypes.TYPE.VOID.ptr.array()(winStuff.handles_watched_jsArr);
 				}
 				
 				var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(winStuff.handles_watched_cArr.length, winStuff.handles_watched_cArr, false, 10000 /*in ship product set this to half a second, so 500ms*/, true);

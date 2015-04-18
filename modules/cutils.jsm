@@ -207,6 +207,14 @@ function utilsInit() {
 		 *   readIntPtr // CData { contents: 5 }
 		 */
 		 
+		/* EXAMPLE 3 - with string
+		 * var a = ctypes.char.array(100).ptr(ctypes.UInt64('0x1cf1e710')); // you must know the length, like i knew it was 100
+		 * a.contents.readString(); //gives you value
+		 * // modify it by doing:
+		 * a.contents.addressOfElement(0).contents = 97
+		 * // or use cutils.modifyCStr
+		 */
+		 
 		var ptrStr = ptr.toString().match(/.*"(.*?)"/); // can alternatively do `'0x' + ctypes.cast(num_files.address(), ctypes.uintptr_t).value.toString(16)`
 		
 		if (!ptrStr) {

@@ -120,14 +120,11 @@ function createWatcher(aWatcherID, aOptions={}) {
 				Watcher.numHandlesWaitingAdd = ctypes.int(0);
 				Watcher.cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd)(); // join the hDirectory with a comma, FSWPollWorker will split it and add them into its cache // :note:important:warning: this can fill up, which is bad, i hope it doesnt
 
-				Watcher.numHandlesWaitingAdd_ptrStr = cutils.strOfPtr(Watcher.numHandlesWaitingAdd.address());
-				Watcher.strOfHandlePtrStrsWaitingAdd_ptrStr = cutils.strOfPtr(Watcher.cStrOfHandlePtrStrsWaitingAdd.address());
-				
 				Watcher.paths_watched = {};
 				
 				var argsForPoll = {
-					numHandlesWaitingAdd_ptrStr: Watcher.numHandlesWaitingAdd_ptrStr,
-					strOfHandlePtrStrsWaitingAdd_ptrStr: Watcher.strOfHandlePtrStrsWaitingAdd_ptrStr
+					numHandlesWaitingAdd_ptrStr: cutils.strOfPtr(Watcher.numHandlesWaitingAdd.address()),
+					strOfHandlePtrStrsWaitingAdd_ptrStr: cutils.strOfPtr(Watcher.cStrOfHandlePtrStrsWaitingAdd.address())
 				};
 				
 				return argsForPoll;
@@ -336,21 +333,21 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				}
 				Watcher.paths_watched[aOSPath] = hDirectory; // close this with CancelIo on watcher.close()
 				
+				/* test to modify from other threads to see if it affects in here, in my test i modified from mainthread browser console
 				setInterval(function() {
 					Watcher.numHandlesWaitingAdd.value = Watcher.numHandlesWaitingAdd.value + 1;
-					console.error('val from FSWatcherWorker of numHandlesWaitingAdd:', Watcher.numHandlesWaitingAdd.value);
+					//console.error('val from FSWatcherWorker of numHandlesWaitingAdd:', Watcher.numHandlesWaitingAdd.value);
+					console.error('val from FSWatcherWorker of cStrOfHandlePtrStrsWaitingAdd:', Watcher.cStrOfHandlePtrStrsWaitingAdd.readString());
 				}, 5000);
+				*/
 				
-				/*
-				var old_numHandlesWaitingAdd = ctypes.int.ptr(ctypes.UInt64(Watcher.numHandlesWaitingAdd_ptrStr)).contents;
-				if (old_numHandlesWaitingAdd == 0) {
+				if (Watcher.numHandlesWaitingAdd.value == 0) {
 					var jsArrOfHandlePtrStrsWaitingAdd = [];
 				} else {
-					var old_cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(Watcher.cStrOfHandlePtrStrsWaitingAdd)).contents.readString();
-					var jsArrOfHandlePtrStrsWaitingAdd = old_cStrOfHandlePtrStrsWaitingAdd.split(',');
+					var jsArrOfHandlePtrStrsWaitingAdd = Watcher.cStrOfHandlePtrStrsWaitingAdd.readString().split(',');
 				}
 				
-				jsArrOfHandlePtrStrsWaitingAdd.push(cutils.strOfPtr(hDirectory));
+				jsArrOfHandlePtrStrsWaitingAdd.push(cutils.strOfPtr(hDirectory.address()));
 				var new_jsStr_cStrOfHandlePtrStrsWaitingAdd = jsArrOfHandlePtrStrsWaitingAdd.join(',');
 				try {
 					cutils.modifyCStr(Watcher.cStrOfHandlePtrStrsWaitingAdd, new_jsStr_cStrOfHandlePtrStrsWaitingAdd);
@@ -362,7 +359,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				}
 				
 				Watcher.numHandlesWaitingAdd.value = Watcher.numHandlesWaitingAdd.value + 1; // i dont change this till after i added into str because otherwise FSWPollWorker will react before i modded the string
-				*/
+				
 				/*
 				try {
 					
