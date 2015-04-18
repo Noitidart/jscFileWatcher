@@ -136,6 +136,7 @@ function init(objCore) {
 		case 'webos': // Palm Pre
 		case 'android':
 		
+				nixStuff = {};
 				nixStuff._cache_aRenamed = {}; // key is cookie and val is aExtra of rename-from, and on reanmed-to, it finds the cookie and deletes it and triggers callback with renamed-to with aExtra holding oldFileName
 		
 			break;
