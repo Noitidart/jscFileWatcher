@@ -676,6 +676,7 @@ Watcher.prototype.close = function() {
 }
 // helper functions for Watcher, not putting into prototype as i dont want to expose these functions to devusers
 function managePoll(instanceWatcher) {
+	// managePoll used to be called waitForNextChange
 	// does not return anything
 	
 	// this function ensures that the poll is running, and keeps it going as needed
@@ -689,185 +690,65 @@ function managePoll(instanceWatcher) {
 		// poll is already being managed
 		return;
 	}
-	// console.error('ok going to os specific');
-	switch (core.os.name) {
-		case 'winnt':
-		case 'winmo':
-		case 'wince':
-		case 'linux':
-		case 'webos': // Palm Pre
-		case 'android':
-				
-				var do_winPoll = function() {
-					thisW.pollBeingManaged = true;
-					if (thisW.readyState == 2 || thisW.readyState == 3) {
-						// watcher was closed so stop polling
-						thisW.pollBeingManaged = false;
-						return; // to prevent deeper exec
-					}
-					var promise_winPoll = waitForNextChange(thisW);
-					promise_winPoll.then(
-					  function(aVal) {
-						console.log('Fullfilled - promise_winPoll - ', aVal);
-						// start - do stuff here - promise_winPoll
-							// handle thisW.cb triggering
-							for (var i=0; i<aVal.length; i++) {
-								let iHoisted = i;
-								var cVal = aVal[iHoisted];
-								cVal.aExtra.aOSPath_parentDir = undefined;
-								for (var cOSPath in thisW.paths_watched) {
-									console.log('comparing:', thisW.paths_watched[cOSPath], cVal.aExtra.aOSPath_parentDir_identifier);
-									if (thisW.paths_watched[cOSPath] == cVal.aExtra.aOSPath_parentDir_identifier) {
-										cVal.aExtra.aOSPath_parentDir = cOSPath;
-										break;
-									}
-								}
-								delete cVal.aExtra.aOSPath_parentDir_identifier;
-								thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
-							}
-							do_winPoll(); // restart poll
-						// end - do stuff here - promise_winPoll
-					  },
-					  function(aReason) {
-						if (aReason.name == 'poll-aborted-nopaths') {
-							// poll aborted due to no paths being watched
-							thisW.pollBeingManaged = false;
-							if (Object.keys(thisW.paths_watched).length > 0) {
-								aReason.API_ERROR = {
-									name: 'watcher-api-error',
-									message: 'Poll aborted with error reason 0 indicating no more paths being watched, however thisW.paths_watched has paths in it',
-									extra: JSON.stringify(thisW.paths_watched),
-								}
-							}
-						}
-						var rejObj = {name:'promise_winPoll', aReason:aReason};
-						console.warn('Rejected - promise_winPoll - ', rejObj);
-						//deferred_createProfile.reject(rejObj);
-						//do_winPoll();
-					  }
-					).catch(
-					  function(aCaught) {
-						  thisW.pollBeingManaged = false;
-						var rejObj = {name:'promise_winPoll', aCaught:aCaught};
-						console.error('Caught - promise_winPoll - ', rejObj);
-						//deferred_createProfile.reject(rejObj);
-						//do_winPoll();
-					  }
-					);
-				};
-				do_winPoll();
-				
-			break;
-		case 'darwin':
-		case 'freebsd':
-		case 'openbsd':
-		
-				// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
-				console.error('core.os.version:', core.os.version, 'core.os.version < 10.7', core.os.version < 7);
-				if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
-					
-					// kqueue
-					// start the poll
-					var do_kqPoll = function() {
-						
-						thisW.pollBeingManaged = true;
-						if (thisW.readyState == 2 || thisW.readyState == 3) {
-							// watcher was closed so stop polling
-							thisW.pollBeingManaged = false;
-							return; // to prevent deeper exec
-						}
-						var promise_kqPoll = waitForNextChange(thisW);
-						promise_kqPoll.then(
-						  function(aVal) {
-							console.log('Fullfilled - promise_kqPoll - ', aVal);
-							// start - do stuff here - promise_kqPoll
-								// handle thisW.cb triggering
-								do_kqPoll(); // restart poll
-							// end - do stuff here - promise_kqPoll
-						  },
-						  function(aReason) {
-							if (aReason.name == 'poll-aborted-nopaths') {
-								// poll aborted due to no paths being watched
-								thisW.pollBeingManaged = false;
-								if (Object.keys(thisW.paths_watched).length > 0) {
-									aReason.API_ERROR = {
-										name: 'watcher-api-error',
-										message: 'Poll aborted with error reason 0 indicating no more paths being watched, however thisW.paths_watched has paths in it',
-										extra: JSON.stringify(thisW.paths_watched),
-									}
-								}
-							}
-							var rejObj = {name:'promise_kqPoll', aReason:aReason};
-							console.warn('Rejected - promise_kqPoll - ', rejObj);
-							//deferred_createProfile.reject(rejObj);
-							//do_kqPoll();
-						  }
-						).catch(
-						  function(aCaught) {
-							  thisW.pollBeingManaged = false;
-							var rejObj = {name:'promise_kqPoll', aCaught:aCaught};
-							console.error('Caught - promise_kqPoll - ', rejObj);
-							//deferred_createProfile.reject(rejObj);
-							//do_kqPoll();
-						  }
-						);
-					};
-					do_kqPoll();
-					
-				} else {
-					
-					// its mac and os.version is >= 10.7
-					// use FSEventFramework
-					
-				}
-					
-			break;
-		default:
-			throw new Error('poll management for os not yet impelmented');
-	}
-}
-function waitForNextChange(instanceWatcher) {
-	// returns promise
-	// stats FSWPollWorker thread if not yet started for this watcher
 	
-	var deferredMain_Watcher_waitForNextChange = new Deferred();
-	
-	var thisW = instanceWatcher;
-	
-	var do_poll = function() {
-		var promise_poll = thisW.FSWPollWorker.post('poll', [thisW.argsForPoll]);
-		promise_poll.then(
+	var do_waitForNextChange = function() {
+		thisW.pollBeingManaged = true;
+		if (thisW.readyState == 2 || thisW.readyState == 3) {
+			// watcher was closed so stop polling
+			thisW.pollBeingManaged = false;
+			return; // to prevent deeper exec
+		}
+		var promise_waitForNextChange = thisW.FSWPollWorker.post('poll', [thisW.argsForPoll]);
+		promise_waitForNextChange.then(
 		  function(aVal) {
-			console.log('Fullfilled - promise_poll - ', aVal);
-			// start - do stuff here - promise_poll
-			deferredMain_Watcher_waitForNextChange.resolve(aVal);
-			// end - do stuff here - promise_poll
+			console.log('Fullfilled - promise_waitForNextChange - ', aVal);
+			// start - do stuff here - promise_waitForNextChange
+				// handle thisW.cb triggering
+				for (var i=0; i<aVal.length; i++) {
+					let iHoisted = i;
+					var cVal = aVal[iHoisted];
+					cVal.aExtra.aOSPath_parentDir = undefined;
+					for (var cOSPath in thisW.paths_watched) {
+						console.log('comparing:', thisW.paths_watched[cOSPath], cVal.aExtra.aOSPath_parentDir_identifier);
+						if (thisW.paths_watched[cOSPath] == cVal.aExtra.aOSPath_parentDir_identifier) {
+							cVal.aExtra.aOSPath_parentDir = cOSPath;
+							break;
+						}
+					}
+					delete cVal.aExtra.aOSPath_parentDir_identifier;
+					thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
+				}
+				do_waitForNextChange(); // restart poll
+			// end - do stuff here - promise_waitForNextChange
 		  },
 		  function(aReason) {
-			var rejObj = {name:'promise_poll', aReason:aReason};
-			console.warn('Rejected - promise_poll - ', rejObj);
-			deferredMain_Watcher_waitForNextChange.reject(rejObj);
+			if (aReason.name == 'poll-aborted-nopaths') {
+				// poll aborted due to no paths being watched
+				thisW.pollBeingManaged = false;
+				if (Object.keys(thisW.paths_watched).length > 0) {
+					aReason.API_ERROR = {
+						name: 'watcher-api-error',
+						message: 'Poll aborted with error reason 0 indicating no more paths being watched, however thisW.paths_watched has paths in it',
+						extra: JSON.stringify(thisW.paths_watched),
+					}
+				}
+			}
+			var rejObj = {name:'promise_waitForNextChange', aReason:aReason};
+			console.warn('Rejected - promise_waitForNextChange - ', rejObj);
+			//deferred_createProfile.reject(rejObj);
+			//do_waitForNextChange();
 		  }
 		).catch(
 		  function(aCaught) {
-			var rejObj = {name:'promise_poll', aCaught:aCaught};
-			console.error('Caught - promise_poll - ', rejObj);
-			deferredMain_Watcher_waitForNextChange.reject(rejObj);
+			  thisW.pollBeingManaged = false;
+			var rejObj = {name:'promise_waitForNextChange', aCaught:aCaught};
+			console.error('Caught - promise_waitForNextChange - ', rejObj);
+			//deferred_createProfile.reject(rejObj);
+			//do_waitForNextChange();
 		  }
 		);
 	};
-	
-	if (!thisW.FSWPollWorker) {
-		throw new Error('FSWPollWorker not started!!!!!!!');
-	} else {
-		do_poll();
-	}
-	
-	return deferredMain_Watcher_waitForNextChange.promise;
-	
-	// for winnt, if ReadDirectoryChangesW only supports one path per, this func should do a promise for each path to FSWPollWorker. a FSWPollWorker must be created for each callback as when want to close, to abort all of the promises i can terminate the worker, then itterate through the promises and reject them for reason of Watcher closed.
-	// actually i think for all OS'es each callback should get its own FSWPollWorker
-	// question to p0lip: regrading kqueue and inotify, if currently in a poll loop, if addPath do i have to abort the poll and restart it? or will the pre-existing poll also now trigger when the new added path change happens? because this is for case where pre-existing poll is watching dir1, and then addPath(dir2) and then change in dir2 happens, will the prexisting poll fire?
+	do_waitForNextChange();
 }
 // end - OS.File.Watcher API
 
