@@ -125,6 +125,8 @@ function init(objCore) {
 				
 				winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd = 100;
 				
+				winStuff.didCBHap = 0;
+				
 			break;
 		default:
 			// do nothing special
@@ -198,6 +200,7 @@ function poll(aArgs) {
 				console.error('hang completed for WaitForMultipleObjectsEx');
 				winStuff.numberNotifReceived = 0;
 				winStuff.numberNotifLpRoutinedFor = 0; // once these are equal then i should return this promise some how // maybe wait with SleepEx not sure
+				console.error('value of did callback happen first:', winStuff.didCBHap); // learned that WaitForMultipleObjectsEx un-blocks/hangs after the callback ran, this is perfect aH! so now i can return the promise with the callbacks work, just store it to global then return it here (clear global so future functions wont double return)
 				
 				if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_FAILED)) {
 					console.error('Failed rez_WaitForMultipleObjectsEx, winLastError:', ctypes.winLastError);
@@ -422,6 +425,7 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 	winStuff.numberNotifLpRoutinedFor++;
 	
 	console.error('in callback!');
+	winStuff.didCBHap++;
 	console.info('dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped.contents:', lpOverlapped.contents.toString());
 	
 	var casted = ctypes.cast(lpOverlapped.contents.hEvent, ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
