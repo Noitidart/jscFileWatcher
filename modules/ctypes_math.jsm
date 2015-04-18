@@ -1,3 +1,5 @@
+/* Thanks to @arai */
+
 var EXPORTED_SYMBOLS = ['ctypes_math'];
 
 var ctypes_math = (function() {

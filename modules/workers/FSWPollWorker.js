@@ -126,6 +126,7 @@ function init(objCore) {
 				winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd = 100;
 				
 				winStuff.didCBHap = 0;
+				winStuff.FSChanges = [];
 				
 			break;
 		default:
@@ -135,6 +136,11 @@ function init(objCore) {
 	return true;
 }
 
+var _nextPathId = 0;
+function getPathId() {
+	_nextPathId++;
+	return _nextPathId-1;
+}
 function poll(aArgs) {
 	switch (core.os.name) {
 		case 'winnt':
@@ -143,89 +149,96 @@ function poll(aArgs) {
 				
 				console.error('here in poll');
 				
-				if (!('numHandlesWaitingAdd' in winStuff)) {
-					winStuff.numHandlesWaitingAdd = ctypes.int.ptr(ctypes.UInt64(aArgs.numHandlesWaitingAdd_ptrStr));
-					winStuff.cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(aArgs.strOfHandlePtrStrsWaitingAdd_ptrStr));
-				}
-				if (winStuff.numHandlesWaitingAdd.contents > 0) { // i dont do .contents.value because .contents makesit primitive per @arai on irc #jsctypes
-					var jsStrOfHandlePtrStrsWaitingAdd = winStuff.cStrOfHandlePtrStrsWaitingAdd.contents.readString();
-					console.info('jsStrOfHandlePtrStrsWaitingAdd:', jsStrOfHandlePtrStrsWaitingAdd);
-					var jsArrOfHandlePtrStrsWaitingAdd = jsStrOfHandlePtrStrsWaitingAdd.split(',');
-					
-					if (jsArrOfHandlePtrStrsWaitingAdd.length == 0) {
-						throw new Error('what on earth this should never happen as numHandlesWaitingAdd increments only when there is contents in this cStr');
+				while (true) {
+					console.log('top of loop');
+					if (!('numHandlesWaitingAdd' in winStuff)) {
+						winStuff.numHandlesWaitingAdd = ctypes.int.ptr(ctypes.UInt64(aArgs.numHandlesWaitingAdd_ptrStr));
+						winStuff.cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(aArgs.strOfHandlePtrStrsWaitingAdd_ptrStr));
 					}
-					
-					// blank the str
-					cutils.modifyCStr(winStuff.cStrOfHandlePtrStrsWaitingAdd.contents, '');
-					winStuff.numHandlesWaitingAdd.contents = 0;
-					
-					for (var i=0; i<jsArrOfHandlePtrStrsWaitingAdd.length; i++) {
-						let iHoisted = i;
-						var hDirectory_ptrStr = jsArrOfHandlePtrStrsWaitingAdd[iHoisted];
-						var hDirectory = ostypes.TYPE.HANDLE.ptr(ctypes.UInt64(hDirectory_ptrStr)).contents;
+					if (winStuff.numHandlesWaitingAdd.contents > 0) { // i dont do .contents.value because .contents makesit primitive per @arai on irc #jsctypes
+						var jsStrOfHandlePtrStrsWaitingAdd = winStuff.cStrOfHandlePtrStrsWaitingAdd.contents.readString();
+						console.info('jsStrOfHandlePtrStrsWaitingAdd:', jsStrOfHandlePtrStrsWaitingAdd);
+						var jsArrOfHandlePtrStrsWaitingAdd = jsStrOfHandlePtrStrsWaitingAdd.split(',');
 						
-						winStuff.handles_watched_jsArr.push(hDirectory);
-						
-						var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
-						winStuff.handles_watched[hDirectory_ptrStr] = o;
-						
-						var notif_buf = ostypes.TYPE.DWORD.array(winStuff.NOTIFICATION_BUFFER_SIZE)(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
-						var notif_buf_size = notif_buf.constructor.size; // obeys length of .array //ostypes.TYPE.DWORD(notif_buf.constructor.size); // will be same as winStuff.NOTIFICATION_BUFFER_SIZE duhhh
-						console.info('notif_buf.constructor.size:', notif_buf.constructor.size);
-						
-						o.hEvent = notif_buf.address();
-						
-						console.error('will not hang, as async, hDirectory:', hDirectory.toString());
-						var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, notif_buf.address(), notif_buf_size, false, winStuff.changes_to_watch, null, o.address(), winStuff.lpCompletionRoutine);
-						console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
-
-						//console.error('ok got here didnt hang, this is good as i wanted it async');
-						
-						if (rez_RDC == false || ctypes.winLastError != 0) {
-							console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
-							throw new Error({
-								name: 'os-api-error',
-								message: 'Failed to ReadDirectoryChanges on handle: ' + hDirectory_ptrStr,
-								winLastError: ctypes.winLastError
-							});
+						if (jsArrOfHandlePtrStrsWaitingAdd.length == 0) {
+							throw new Error('what on earth this should never happen as numHandlesWaitingAdd increments only when there is contents in this cStr');
 						}
 						
+						// blank the str
+						cutils.modifyCStr(winStuff.cStrOfHandlePtrStrsWaitingAdd.contents, '');
+						winStuff.numHandlesWaitingAdd.contents = 0;
+						
+						for (var i=0; i<jsArrOfHandlePtrStrsWaitingAdd.length; i++) {
+							let iHoisted = i;
+							var hDirectory_ptrStr = jsArrOfHandlePtrStrsWaitingAdd[iHoisted];
+							var hDirectory = ostypes.TYPE.HANDLE.ptr(ctypes.UInt64(hDirectory_ptrStr)).contents;
+							
+							winStuff.handles_watched_jsArr.push(hDirectory);
+							
+							var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
+							
+							var notif_buf = ostypes.TYPE.DWORD.array(winStuff.NOTIFICATION_BUFFER_SIZE)(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
+							var notif_buf_size = notif_buf.constructor.size; // obeys length of .array //ostypes.TYPE.DWORD(notif_buf.constructor.size); // will be same as winStuff.NOTIFICATION_BUFFER_SIZE duhhh
+							console.info('notif_buf.constructor.size:', notif_buf.constructor.size);
+
+							winStuff.handles_watched[hDirectory_ptrStr] = {
+								o: o,
+								notif_buf: notif_buf,
+								path_id: getPathId()
+							};
+							o.hEvent = ctypes.int(winStuff.handles_watched[hDirectory_ptrStr].path_id).address(); //notif_buf.address(); 
+							
+							console.error('will not hang, as async, hDirectory:', hDirectory.toString());
+							var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, notif_buf.address(), notif_buf_size, false, winStuff.changes_to_watch, null, o.address(), winStuff.lpCompletionRoutine);
+							console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
+
+							//console.error('ok got here didnt hang, this is good as i wanted it async');
+							
+							if (rez_RDC == false || ctypes.winLastError != 0) {
+								console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
+								throw new Error({
+									name: 'os-api-error',
+									message: 'Failed to ReadDirectoryChanges on handle: ' + hDirectory_ptrStr,
+									winLastError: ctypes.winLastError
+								});
+							}
+							
+						}
+						
+						winStuff.handles_watched_cArr = ostypes.TYPE.VOID.ptr.array()(winStuff.handles_watched_jsArr);
 					}
 					
-					winStuff.handles_watched_cArr = ostypes.TYPE.VOID.ptr.array()(winStuff.handles_watched_jsArr);
-				}
-				
-				var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(winStuff.handles_watched_cArr.length, winStuff.handles_watched_cArr, false, 10000 /*in ship product set this to half a second, so 500ms*/, true);
-				console.error('hang completed for WaitForMultipleObjectsEx');
-				winStuff.numberNotifReceived = 0;
-				winStuff.numberNotifLpRoutinedFor = 0; // once these are equal then i should return this promise some how // maybe wait with SleepEx not sure
-				console.error('value of did callback happen first:', winStuff.didCBHap); // learned that WaitForMultipleObjectsEx un-blocks/hangs after the callback ran, this is perfect aH! so now i can return the promise with the callbacks work, just store it to global then return it here (clear global so future functions wont double return)
-				
-				if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_FAILED)) {
-					console.error('Failed rez_WaitForMultipleObjectsEx, winLastError:', ctypes.winLastError);
-					throw new Error({
-						name: 'os-api-error',
-						message: 'Failed to rez_WaitForMultipleObjectsEx',
-						winLastError: ctypes.winLastError
-					});
-				} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_IO_COMPLETION)) {
-					console.error('The wait was ended by one or more user-mode asynchronous procedure calls (APC) queued to the thread.');
-				} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_TIMEOUT)) {
-					console.error('The time-out interval elapsed, the conditions specified by the bWaitAll parameter were not satisfied, and no completion routines are queued.');
-					// scratch this comment to right maybe, this really just means timeout // ill get here if there are no paths being watched, like (1) on creat of watcher and addPath hasnt been called yet, or (2) all paths that were added were removed
-				} else {
-					// either nCount number of object  ABANDONDED or SATISFIED
-					var nCount = handles.length;
-					var postSubtract = ctypes_math.UInt64.sub(rez_WaitForMultipleObjectsEx, nCount - 1);
-					
-					if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_ABANDONED_0)) {
-						console.error('This is not an error I just made it this so I can notice in browser console logs, likely I did .removePath so its callback was abandoned. The lpHandles array index of ' + nCount + ' was the abandoned mutex object.');
-					} else if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_OBJECT_0)) {
-						console.info('The lpHandles array index of ' + nCount + ' was the signaled with some file event!!');
+					winStuff.FSChanges = [];
+					var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(winStuff.handles_watched_cArr.length, winStuff.handles_watched_cArr, false, 10000 /*in ship product set this to half a second, so 500ms*/, true);
+					console.error('hang completed for WaitForMultipleObjectsEx');
+					//console.error('value of did callback happen first:', winStuff.didCBHap); // learned that WaitForMultipleObjectsEx un-blocks/hangs after the callback ran, this is perfect aH! so now i can return the promise with the callbacks work, just store it to global then return it here (clear global so future functions wont double return)
+					if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_FAILED)) {
+						console.error('Failed rez_WaitForMultipleObjectsEx, winLastError:', ctypes.winLastError);
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed to rez_WaitForMultipleObjectsEx',
+							winLastError: ctypes.winLastError
+						});
+					} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_IO_COMPLETION)) {
+						console.error('The wait was ended by one or more user-mode asynchronous procedure calls (APC) queued to the thread.');
+						console.error('winStuff.FSChanges should have been populated by all the callbacks, as WaitForMultipleObjectsEx unhangs after all callbacks complete, i learned this from testing. winStuff.FSChanges:', JSON.stringify(winStuff.FSChanges));
+						return winStuff.FSChanges;
+					} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_TIMEOUT)) {
+						console.error('The time-out interval elapsed, the conditions specified by the bWaitAll parameter were not satisfied, and no completion routines are queued.');
+						// scratch this comment to right maybe, this really just means timeout // ill get here if there are no paths being watched, like (1) on creat of watcher and addPath hasnt been called yet, or (2) all paths that were added were removed
+					} else {
+						// either nCount number of object ABANDONDED or SATISFIED
+						var nCount = handles.length;
+						var postSubtract = ctypes_math.UInt64.sub(rez_WaitForMultipleObjectsEx, nCount - 1);
+						
+						if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_ABANDONED_0)) {
+							console.error('This is not an error I just made it this so I can notice in browser console logs, likely I did .removePath so its callback was abandoned. The lpHandles array index of ' + nCount + ' was the abandoned mutex object.');
+						} else if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_OBJECT_0)) {
+							console.info('The lpHandles array index of ' + nCount + ' was the signaled with some file event!!');
+						}
 					}
 				}
-			
+				
 			break;
 		case 'darwin':
 		case 'freebsd':
@@ -422,16 +435,60 @@ function poll(aArgs) {
 function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 	// for Windows only
 	
-	winStuff.numberNotifLpRoutinedFor++;
-	
 	console.error('in callback!');
-	winStuff.didCBHap++;
-	console.info('dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped.contents:', lpOverlapped.contents.toString());
 	
-	var casted = ctypes.cast(lpOverlapped.contents.hEvent, ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
-	console.info('casted:', casted.toString());
-	
+	console.info('dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped.contents:', lpOverlapped.contents.toString());	
 	// create new buffer, and re-run ReadDirectoryChangesW
+	
+	console.info('lpOverlapped.contents.hEvent:', lpOverlapped.contents.hEvent.toString());
+	
+	//var casted = ctypes.cast(lpOverlapped.contents.hEvent, ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+	var path_id = ctypes.cast(lpOverlapped.contents.hEvent, ctypes.int.ptr).contents;
+	console.info('path_id:', path_id.toString());
+	
+	var hDir_ptrStr = 0;
+	for (var p in winStuff.handles_watched) {
+		if (winStuff.handles_watched[p].path_id == path_id) {
+			hDir_ptrStr = p;
+			break;
+		}
+	}
+	
+	if (hDir_ptrStr == 0) {
+		throw new Error('could not find path_id, this is watcher-api-error');
+	}
+	
+	console.info('found hDir_ptrStr:', hDir_ptrStr.toString());
+	var notif_buf = winStuff.handles_watched[hDir_ptrStr].notif_buf;
+	console.log('notif_buf:', notif_buf.toString());
+	var cPos = 0;
+	
+	do {
+		var fni = ctypes.cast(notif_buf.addressOfElement(cPos), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+		console.log(cPos, 'fni:', fni.toString());
+		var fileNameLen = parseInt(fni.FileNameLength) / ostypes.TYPE.WCHAR.size;
+		console.log('fileNameLen', fileNameLen);
+		var filenamePtr = ctypes.cast(fni.FileName.address(), ostypes.TYPE.WCHAR.array(fileNameLen).ptr);
+		console.info('filenamePtr:', filenamePtr.toString());
+		var filename = filenamePtr.contents.readString();
+		console.info('filename:', filename.toString());
+		return;
+		/*
+		if (!cutils.jscEqual(fni.NextEntryOffset, 0)) {
+			//console.error('WARNING: multiple notifications returned i should get them all, i havent implemented this yet');
+		}
+		*/
+		var fileName = cutils.readAsChar8ThenAsChar16(fni.FileName, parseInt(cutils.jscGetDeepest(fni.FileNameLength)) / 2, true); //fni.FileName.readString();
+		
+		var rezObj = {
+			aFileName: fileName,
+			aEvent: convertFlagsToAEventStr(fni.Action)
+		};
+		
+		winStuff.FSChanges.push(rezObj);
+		
+		cPos = parseInt(cutils.jscGetDeepest(fni.NextEntryOffset)) / ostypes.TYPE.DWORD.size;
+	} while (cPos != 0);
 	
 	return null;
 }
@@ -439,6 +496,25 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 
 function convertFlagsToAEventStr(flags) {
 	switch (core.os.name) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+				
+				var default_flags = {
+					FILE_ACTION_ADDED: 'added',
+					FILE_ACTION_REMOVED: 'removed',
+					FILE_ACTION_MODIFIED: 'contents-modified',
+					FILE_ACTION_RENAMED_OLD_NAME: 'renamed-from',
+					FILE_ACTION_RENAMED_NEW_NAME: 'renamed-to'
+				};
+				for (var f in default_flags) {
+					if (flags & ostypes.CONST[f]) {
+						return default_flags[f];
+					}
+				}
+				return 'UNKNOWN FLAG';
+				
+			break;
 		case 'darwin':
 		case 'freebsd':
 		case 'openbsd':

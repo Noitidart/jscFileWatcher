@@ -135,7 +135,7 @@ function utilsInit() {
 	this.readAsChar8ThenAsChar16 = function(stringPtr, known_len, jschar) {
 		// when reading as jschar it assumes max length of 500
 
-		// stringPtr is either char or jschar, if you know its jschar for sure, pass 2nd arg as true
+		// stringPtr is either char or jschar, if you know its jschar for sure, pass 3rd arg as true
 		// if known_len is passed, then assumption is not made, at the known_len position in array we will see a null char
 		// i tried getting known_len from stringPtr but its not possible, it has be known, i tried this:
 			//"stringPtr.contents.toString()" "95"
