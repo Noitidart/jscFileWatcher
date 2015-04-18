@@ -379,109 +379,111 @@ function poll(aArgs) {
 				
 				console.log('starting the loop, fd:', fd, 'count:', count);
 				count = ostypes.TYPE.size_t(count); // for use with read
-				let length = ostypes.API('read')(fd, buf, count);
+				while (true) {
+					let length = ostypes.API('read')(fd, buf, count);
 
-				length = parseInt(cutils.jscGetDeepest(length));
-				console.info('length read:', length, length.toString(), uneval(length));
-				
-				if (cutils.jscEqual(length, -1)) {
-					throw new Error({
-						name: 'os-api-error',
-						message: 'Failed to read during poll',
-						uniEerrno: ctypes.errno
-					});
-				} else if (!cutils.jscEqual(length, 0)) {
-					// then its > 0 as its not -1
-					// something happend, read struct
-					let FSChanges = [];
-					var i = 0;
-					var numElementsRead = 0;
-					console.error('starting loop');
 					length = parseInt(cutils.jscGetDeepest(length));
-					do {
-						let iHoisted = i;
-						numElementsRead++;
-						var casted = ctypes.cast(buf.addressOfElement(iHoisted), ostypes.TYPE.inotify_event.ptr).contents;
-						console.log('casted:', casted.toString());
-						var fileName = casted.addressOfField('name').contents.readString();
-						var mask = casted.addressOfField('mask').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-						var len = casted.addressOfField('len').contents; // need to iterate to next item that was read in // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-						var cookie = cutils.jscGetDeepest(casted.addressOfField('cookie').contents); // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-						var wd = casted.addressOfField('wd').contents; // ostypes.TYPE.int which is ctypes.int so no need to get deepest, its already a number
-						
-						var aEvent = convertFlagsToAEventStr(mask);
-						
-						console.info('aFileName:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
-						
-						if (aEvent == 'renamed-to') {
-							if (cookie in nixStuff._cache_aRenamed) {
-								// renamed-to message came second, so obtain the renamed-from from the _cache_aRenamed and push a rezObj
-								var rezObj = nixStuff._cache_aRenamed[cookie];
-								delete nixStuff._cache_aRenamed[cookie];
-								
-								rezObj.aFileName = fileName;
-								FSChanges.push(rezObj);
-							} else {
-								// renamed-to message came first, so just store in _cache_aRenamed
-								var rezObj = {
-									aFileName: fileName,
-									aEvent: 'renamed',
-									aExtra: {
-										aOSPath_parentDir_identifier: wd,
-										nixInotifyFlags: mask // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
-										//aOld: {}
-									}
-								}
-								nixStuff._cache_aRenamed[cookie] = rezObj;
-							}
-						} else if (aEvent == 'renamed-from') {
-							if (cookie in nixStuff._cache_aRenamed) {
-								// renamed-from message came second, so obtain the renamed-to from the _cache_aRenamed and push a rezObj
-								var rezObj = nixStuff._cache_aRenamed[cookie];
-								delete nixStuff._cache_aRenamed[cookie];
-								
-								rezObj.aExtra.aOld = {
-									aFileName: fileName,
-									nixInotifyFlags: mask
-								};
-								FSChanges.push(rezObj);
-							} else {
-								// renamed-from message came first, so just store in _cache_aRenamed
-								var rezObj = {
-									//aFileName: fileName,
-									aEvent: 'renamed',
-									aExtra: {
-										aOSPath_parentDir_identifier: wd,
-										aOld: {
-											nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+					console.info('length read:', length, length.toString(), uneval(length));
+					
+					if (cutils.jscEqual(length, -1)) {
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed to read during poll',
+							uniEerrno: ctypes.errno
+						});
+					} else if (!cutils.jscEqual(length, 0)) {
+						// then its > 0 as its not -1
+						// something happend, read struct
+						let FSChanges = [];
+						var i = 0;
+						var numElementsRead = 0;
+						console.error('starting loop');
+						length = parseInt(cutils.jscGetDeepest(length));
+						do {
+							let iHoisted = i;
+							numElementsRead++;
+							var casted = ctypes.cast(buf.addressOfElement(iHoisted), ostypes.TYPE.inotify_event.ptr).contents;
+							console.log('casted:', casted.toString());
+							var fileName = casted.addressOfField('name').contents.readString();
+							var mask = casted.addressOfField('mask').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+							var len = casted.addressOfField('len').contents; // need to iterate to next item that was read in // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+							var cookie = cutils.jscGetDeepest(casted.addressOfField('cookie').contents); // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+							var wd = casted.addressOfField('wd').contents; // ostypes.TYPE.int which is ctypes.int so no need to get deepest, its already a number
+							
+							var aEvent = convertFlagsToAEventStr(mask);
+							
+							console.info('aFileName:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
+							
+							if (aEvent == 'renamed-to') {
+								if (cookie in nixStuff._cache_aRenamed) {
+									// renamed-to message came second, so obtain the renamed-from from the _cache_aRenamed and push a rezObj
+									var rezObj = nixStuff._cache_aRenamed[cookie];
+									delete nixStuff._cache_aRenamed[cookie];
+									
+									rezObj.aFileName = fileName;
+									FSChanges.push(rezObj);
+								} else {
+									// renamed-to message came first, so just store in _cache_aRenamed
+									var rezObj = {
+										aFileName: fileName,
+										aEvent: 'renamed',
+										aExtra: {
+											aOSPath_parentDir_identifier: wd,
+											nixInotifyFlags: mask // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+											//aOld: {}
 										}
 									}
+									nixStuff._cache_aRenamed[cookie] = rezObj;
 								}
-								nixStuff._cache_aRenamed[cookie] = rezObj;
-							}							
-						} else {
-							var rezObj = {
-								aFileName: fileName,
-								aEvent: aEvent,
-								aExtra: {
-									nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
-									aOSPath_parentDir_identifier: wd
+							} else if (aEvent == 'renamed-from') {
+								if (cookie in nixStuff._cache_aRenamed) {
+									// renamed-from message came second, so obtain the renamed-to from the _cache_aRenamed and push a rezObj
+									var rezObj = nixStuff._cache_aRenamed[cookie];
+									delete nixStuff._cache_aRenamed[cookie];
+									
+									rezObj.aExtra.aOld = {
+										aFileName: fileName,
+										nixInotifyFlags: mask
+									};
+									FSChanges.push(rezObj);
+								} else {
+									// renamed-from message came first, so just store in _cache_aRenamed
+									var rezObj = {
+										//aFileName: fileName,
+										aEvent: 'renamed',
+										aExtra: {
+											aOSPath_parentDir_identifier: wd,
+											aOld: {
+												nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+											}
+										}
+									}
+									nixStuff._cache_aRenamed[cookie] = rezObj;
+								}							
+							} else {
+								var rezObj = {
+									aFileName: fileName,
+									aEvent: aEvent,
+									aExtra: {
+										nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+										aOSPath_parentDir_identifier: wd
+									}
 								}
+								FSChanges.push(rezObj);
 							}
-							FSChanges.push(rezObj);
-						}
+							
+							if (len == 0) {
+								break;
+							};
+							i += sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len);
+							console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len)));
+						} while (i < length);
 						
-						if (len == 0) {
-							break;
-						};
-						i += sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len);
-						console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len)));
-					} while (i < length);
-					
-					console.error('loop ended:', 'numElementsRead:', numElementsRead);
-					
-					if (FSChanges.length > 0) {
-						return FSChanges;
+						console.error('loop ended:', 'numElementsRead:', numElementsRead);
+						
+						if (FSChanges.length > 0) {
+							return FSChanges;
+						}
 					}
 				}
 			}
