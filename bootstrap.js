@@ -292,7 +292,7 @@ function Watcher(aCallback) {
 	  function(aVal) {
 		console.log('Fullfilled - promiseAll_watcherBasis - ', aVal);
 		// start - do stuff here - promiseAll_watcherBasis
-		//do_createWatcher();
+		deferred_initialized.resolve(true);
 		// end - do stuff here - promiseAll_watcherBasis
 	  },
 	  function(aReason) {
