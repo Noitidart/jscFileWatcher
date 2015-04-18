@@ -709,7 +709,12 @@ function managePoll(instanceWatcher) {
 						console.log('Fullfilled - promise_winPoll - ', aVal);
 						// start - do stuff here - promise_winPoll
 							// handle thisW.cb triggering
-							// do_winPoll(); // restart poll
+							for (var i=0; i<aVal.length; i++) {
+								let iHoisted = i;
+								var cVal = aVal[iHoisted];
+								thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
+							}
+							do_winPoll(); // restart poll
 						// end - do stuff here - promise_winPoll
 					  },
 					  function(aReason) {

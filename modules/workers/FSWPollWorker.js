@@ -186,7 +186,8 @@ function poll(aArgs) {
 							winStuff.handles_watched[hDirectory_ptrStr] = {
 								o: o,
 								notif_buf: notif_buf,
-								path_id: getPathId()
+								path_id: getPathId(),
+								hDirectory: hDirectory
 							};
 							o.hEvent = ctypes.int(winStuff.handles_watched[hDirectory_ptrStr].path_id).address(); //notif_buf.address(); 
 							
@@ -230,8 +231,8 @@ function poll(aArgs) {
 						// scratch this comment to right maybe, this really just means timeout // ill get here if there are no paths being watched, like (1) on creat of watcher and addPath hasnt been called yet, or (2) all paths that were added were removed
 					} else {
 						// either nCount number of object ABANDONDED or SATISFIED
-						var nCount = handles.length;
-						var postSubtract = ctypes_math.UInt64.sub(rez_WaitForMultipleObjectsEx, nCount - 1);
+						var nCount = winStuff.handles_watched_cArr.length;
+						var postSubtract = ctypes_math.UInt64.sub(ctypes.UInt64(cutils.jscGetDeepest(rez_WaitForMultipleObjectsEx)), ctypes.UInt64(nCount - 1));
 						
 						if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_ABANDONED_0)) {
 							console.error('This is not an error I just made it this so I can notice in browser console logs, likely I did .removePath so its callback was abandoned. The lpHandles array index of ' + nCount + ' was the abandoned mutex object.');
@@ -478,16 +479,46 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 		}
 		console.info('filename:', filename);
 
-		var rezObj = {
-			aFileName: filename,
-			aEvent: convertFlagsToAEventStr(fni.Action)
-		};
+		var aEvent = convertFlagsToAEventStr(fni.Action);
 		
-		winStuff.FSChanges.push(rezObj);
+		if (aEvent == 'renamed-from') {
+			var rezObj = {
+				aExtra: {
+					aOld: {
+						aFileName: filename
+					}
+				},
+				aEvent: 'renamed'
+			};
+			winStuff.FSChanges.push(rezObj);
+		} else if (aEvent == 'renamed-to') {
+			winStuff.FSChanges[winStuff.FSChanges.length-1].aFileName = filename;
+		} else {
+			var rezObj = {
+				aFileName: filename,
+				aEvent: convertFlagsToAEventStr(fni.Action)
+			};
+			winStuff.FSChanges.push(rezObj);
+		}
 		
 		cPos = parseInt(cutils.jscGetDeepest(fni.NextEntryOffset)) / ostypes.TYPE.DWORD.size;
 	} while (cPos != 0);
 	
+	// restart listen
+	//winStuff.handles_watched[hDir_ptrStr].notif_buf = ostypes.TYPE.DWORD.array(winStuff.NOTIFICATION_BUFFER_SIZE)();
+	var rez_RDC = ostypes.API('ReadDirectoryChanges')(winStuff.handles_watched[hDir_ptrStr].hDirectory, winStuff.handles_watched[hDir_ptrStr].notif_buf.address(), winStuff.handles_watched[hDir_ptrStr].notif_buf.constructor.size, false, winStuff.changes_to_watch, null, winStuff.handles_watched[hDir_ptrStr].o.address(), winStuff.lpCompletionRoutine);
+	console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
+
+	//console.error('ok got here didnt hang, this is good as i wanted it async');
+	
+	if (rez_RDC == false || ctypes.winLastError != 0) {
+		console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
+		throw new Error({
+			name: 'os-api-error',
+			message: 'Failed to ReadDirectoryChanges on handle: ' + hDirectory_ptrStr,
+			winLastError: ctypes.winLastError
+		});
+	}
 	return null;
 }
 // END - OS Specific - helpers for windows
