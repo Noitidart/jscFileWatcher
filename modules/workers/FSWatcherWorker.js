@@ -385,7 +385,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				}
 				*/
 		
-				return true;
+				return jsArrOfHandlePtrStrsWaitingAdd[jsArrOfHandlePtrStrsWaitingAdd.length-1];
 				
 			break;
 		case 'darwin':

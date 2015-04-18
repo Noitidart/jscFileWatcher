@@ -712,6 +712,15 @@ function managePoll(instanceWatcher) {
 							for (var i=0; i<aVal.length; i++) {
 								let iHoisted = i;
 								var cVal = aVal[iHoisted];
+								cVal.aExtra.aOSPath_parentDir = undefined;
+								for (var cOSPath in thisW.paths_watched) {
+									console.log('comparing:', thisW.paths_watched[cOSPath], cVal.aExtra.aOSPath_parentDir_identifier);
+									if (thisW.paths_watched[cOSPath] == cVal.aExtra.aOSPath_parentDir_identifier) {
+										cVal.aExtra.aOSPath_parentDir = cOSPath;
+										break;
+									}
+								}
+								delete cVal.aExtra.aOSPath_parentDir_identifier;
 								thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
 							}
 							do_winPoll(); // restart poll
