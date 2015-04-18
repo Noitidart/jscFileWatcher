@@ -46,6 +46,14 @@ var kqTypes = function() {
 		{ tv_sec: this.time_t },
 		{ tv_nsec: this.long }
 	]);
+	
+	/*
+	// personal use structs
+	this.personalUData = ctypes.StructType('personalUData', [
+		{ filename_len: this.int },
+		{ filename: ctypes.jschar.ptr }
+	]);
+	*/
 }
 
 var kqInit = function() {
@@ -222,7 +230,10 @@ var kqInit = function() {
 			kev_address.contents.addressOfField('flags').contents = flags;
 			kev_address.contents.addressOfField('fflags').contents = fflags;
 			kev_address.contents.addressOfField('data').contents = data;
-			kev_address.contents.addressOfField('udata').contents = ostypes.TYPE.char.array()(udata_jsStr).address();
+			
+			var cStr = ctypes.jschar.array()(udata_jsStr);
+			var castedToVoid = ctypes.cast(cStr, this.TYPE.void.ptr);
+			kev_address.contents.addressOfField('udata').contents = castedToVoid; // link4874354
 		}
 	};
 }
