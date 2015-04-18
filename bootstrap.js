@@ -234,7 +234,6 @@ function Watcher(aCallback) {
 		// 2 - closed due to user calling Watcher.prototype.close
 		// 3 - closed due to failed to initialize
 	thisW.cb = aCallback;
-	thisW._cache_aRenamed_callbackArgsObj = {}; // key is cookie and val is aExtra of rename-from, and on reanmed-to, it finds the cookie and deletes it and triggers callback with renamed-to with aExtra holding oldFileName
 	/*
 	thisW.cbQueue = []; //array of functions that pass the args from worker to the aCallback
 	
@@ -695,6 +694,9 @@ function managePoll(instanceWatcher) {
 		case 'winnt':
 		case 'winmo':
 		case 'wince':
+		case 'linux':
+		case 'webos': // Palm Pre
+		case 'android':
 				
 				var do_winPoll = function() {
 					thisW.pollBeingManaged = true;
@@ -819,114 +821,6 @@ function managePoll(instanceWatcher) {
 					
 				}
 					
-			break;
-		case 'linux':
-		case 'webos': // Palm Pre
-		case 'android':
-		
-				// start the poll
-				var do_nixPoll = function() {
-					
-					thisW.pollBeingManaged = true;
-					if (thisW.readyState == 2 || thisW.readyState == 3) {
-						// watcher was closed so stop polling
-						thisW.pollBeingManaged = false;
-						return; // to prevent deeper exec
-					}
-					var promise_nixPoll = waitForNextChange(thisW);
-					promise_nixPoll.then(
-					  function(aVal) {
-						console.log('Fullfilled - promise_nixPoll - ', aVal);
-						// start - do stuff here - promise_nixPoll
-						/*
-						thisW.cbQueue.push(function() {
-							thisW.cb(aVal.aFileName, aVal.aEvent);
-						});
-						thisW.timer.initWithCallback(thisW.timerEvent_triggerCallback, 0, Ci.nsITimer.TYPE_ONE_SHOT); // trigger callback
-						*/
-						// i was doing timer event because i didnt want body of aCallback to finish before next poll because i was worried it would miss a change, but it doesnt miss any change, as changes are fed to the file, and its their waiting when i start the next poll
-						// when renamed, renamed-from fires first, then renamed-to
-						// aVal is an array of rezObj's
-						for (var i=0; i<aVal.length; i++) {
-							let iHoisted = i;
-							var cVal = aVal[iHoisted];
-							var thisWd = cVal.aExtra.nixInotifyWd;
-							console.info('thisWd:', thisWd);
-							delete cVal.aExtra.nixInotifyWd;
-							cVal.aExtra.aOSPath_parentDir = undefined;
-							for (var cOSPath in thisW.paths_watched) {
-								console.log('compareing:', thisW.paths_watched[cOSPath], thisWd);
-								if (thisW.paths_watched[cOSPath] == thisWd) {
-									cVal.aExtra.aOSPath_parentDir = cOSPath;
-									break;
-								}
-							}
-							if (cVal.aEvent == 'renamed-to') {
-								var cArgsObj = cVal;
-								var cCookie = cArgsObj.aExtra.nixInotifyCookie;
-								delete cArgsObj.aExtra.nixInotifyCookie;
-								if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
-									// renamed-to message came first (before the related renamed-from)
-									console.log('got renamed-to event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-from event');
-									thisW._cache_aRenamed_callbackArgsObj[cCookie] = cArgsObj; // cached rename-to
-								} else {
-									// renamed-to message came second (after the related renamed-from)
-									console.log('got renamed-to event, this is the related event, the renamed-from event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
-									
-									var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-from
-									var aOld = cachedArgsObj; // aOld should be set to renamed-from
-									delete aOld.aEvent; // deleting renamed-from
-									
-									cArgsObj.aExtra.aOld = aOld;
-									
-									thisW.cb(cArgsObj.aFileName, 'renamed', cArgsObj.aExtra);
-								}
-							} else if (cVal.aEvent == 'renamed-from') {
-								var cArgsObj = cVal;
-								var cCookie = cArgsObj.aExtra.nixInotifyCookie;
-								delete cArgsObj.aExtra.nixInotifyCookie;
-								if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
-									// renamed-from message came first (before the related renamed-to)
-									console.log('got renamed-from event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-to event');
-									thisW._cache_aRenamed_callbackArgsObj[cCookie] = cArgsObj; // cached rename-from
-								} else {
-									// renamed-from message came second (after the related renamed-to)
-									console.log('got renamed-from event, this is the related event, the renamed-to event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
-									
-									var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-to
-									var aOld = cArgsObj; // aOld should be set to renamed-from
-									delete aOld.aEvent; // deleting renamed-from
-									
-									cArgsObj.aExtra.aOld = aOld;
-									
-									thisW.cb(cArgsObj.aFileName, 'renamed', cArgsObj.aExtra);
-								}
-							} else {
-								thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
-							}
-						}
-						do_nixPoll(); // restart poll
-						// end - do stuff here - promise_nixPoll
-					  },
-					  function(aReason) {
-						  thisW.pollBeingManaged = false;
-						var rejObj = {name:'promise_nixPoll', aReason:aReason};
-						console.warn('Rejected - promise_nixPoll - ', rejObj);
-						//deferred_createProfile.reject(rejObj);
-						//do_nixPoll();
-					  }
-					).catch(
-					  function(aCaught) {
-						  thisW.pollBeingManaged = false;
-						var rejObj = {name:'promise_nixPoll', aCaught:aCaught};
-						console.error('Caught - promise_nixPoll - ', rejObj);
-						//deferred_createProfile.reject(rejObj);
-						//do_nixPoll();
-					  }
-					);
-				};
-				do_nixPoll();
-				
 			break;
 		default:
 			throw new Error('poll management for os not yet impelmented');

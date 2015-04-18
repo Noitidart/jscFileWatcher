@@ -22,6 +22,7 @@ const core = { // have to set up the main keys
 
 // START - OS Specific - used by Windows only
 var winStuff;
+var nixStuff;
 // END - OS Specific - used by Windows only
 
 // Imports that use stuff defined in chrome
@@ -130,6 +131,13 @@ function init(objCore) {
 				winStuff.didCBHap = 0;
 				winStuff.FSChanges = [];
 				
+			break;
+		case 'linux':
+		case 'webos': // Palm Pre
+		case 'android':
+		
+				nixStuff._cache_aRenamed = {}; // key is cookie and val is aExtra of rename-from, and on reanmed-to, it finds the cookie and deletes it and triggers callback with renamed-to with aExtra holding oldFileName
+		
 			break;
 		default:
 			// do nothing special
@@ -384,35 +392,84 @@ function poll(aArgs) {
 				} else if (!cutils.jscEqual(length, 0)) {
 					// then its > 0 as its not -1
 					// something happend, read struct
-					let changes = [];
-					let i = 0;
+					let FSChanges = [];
+					var i = 0;
 					var numElementsRead = 0;
 					console.error('starting loop');
 					length = parseInt(cutils.jscGetDeepest(length));
 					do {
+						let iHoisted = i;
 						numElementsRead++;
-						let casted = ctypes.cast(buf.addressOfElement(i), ostypes.TYPE.inotify_event.ptr).contents;
+						var casted = ctypes.cast(buf.addressOfElement(iHoisted), ostypes.TYPE.inotify_event.ptr).contents;
 						console.log('casted:', casted.toString());
-						let fileName = casted.addressOfField('name').contents.readString();
-						let mask = casted.addressOfField('mask').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-						let len = casted.addressOfField('len').contents; // need to iterate to next item that was read in // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-						let cookie = casted.addressOfField('cookie').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-						let wd = casted.addressOfField('wd').contents; // ostypes.TYPE.int which is ctypes.int so no need to get deepest, its already a number
+						var fileName = casted.addressOfField('name').contents.readString();
+						var mask = casted.addressOfField('mask').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+						var len = casted.addressOfField('len').contents; // need to iterate to next item that was read in // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+						var cookie = cutils.jscGetDeepest(casted.addressOfField('cookie').contents); // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+						var wd = casted.addressOfField('wd').contents; // ostypes.TYPE.int which is ctypes.int so no need to get deepest, its already a number
+						
+						var aEvent = convertFlagsToAEventStr(mask);
 						
 						console.info('aFileName:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
-						let rezObj = {
-							aFileName: fileName,
-							aEvent: convertFlagsToAEventStr(mask),
-							aExtra: {
-								nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
-								nixInotifyWd: wd
+						
+						if (aEvent == 'renamed-to') {
+							if (cookie in nixStuff._cache_aRenamed) {
+								// renamed-to message came second, so obtain the renamed-from from the _cache_aRenamed and push a rezObj
+								var rezObj = nixStuff._cache_aRenamed[cookie];
+								delete nixStuff._cache_aRenamed[cookie];
+								
+								rezObj.aFileName = fileName;
+								FSChanges.push(rezObj);
+							} else {
+								// renamed-to message came first, so just store in _cache_aRenamed
+								var rezObj = {
+									aFileName: fileName,
+									aEvent: 'renamed',
+									aExtra: {
+										aOSPath_parentDir_identifier: wd,
+										nixInotifyFlags: mask // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+										//aOld: {}
+									}
+								}
+								nixStuff._cache_aRenamed[cookie] = rezObj;
 							}
+						} else if (aEvent == 'renamed-from') {
+							if (cookie in nixStuff._cache_aRenamed) {
+								// renamed-from message came second, so obtain the renamed-to from the _cache_aRenamed and push a rezObj
+								var rezObj = nixStuff._cache_aRenamed[cookie];
+								delete nixStuff._cache_aRenamed[cookie];
+								
+								rezObj.aExtra.aOld = {
+									aFileName: fileName,
+									nixInotifyFlags: mask
+								};
+								FSChanges.push(rezObj);
+							} else {
+								// renamed-from message came first, so just store in _cache_aRenamed
+								var rezObj = {
+									//aFileName: fileName,
+									aEvent: 'renamed',
+									aExtra: {
+										aOSPath_parentDir_identifier: wd,
+										aOld: {
+											nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+										}
+									}
+								}
+								nixStuff._cache_aRenamed[cookie] = rezObj;
+							}							
+						} else {
+							var rezObj = {
+								aFileName: fileName,
+								aEvent: aEvent,
+								aExtra: {
+									nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+									aOSPath_parentDir_identifier: wd
+								}
+							}
+							FSChanges.push(rezObj);
 						}
-
-						if (cookie !== 0) {
-							rezObj.aExtra.nixInotifyCookie = cookie;
-						}
-						changes.push(rezObj);
+						
 						if (len == 0) {
 							break;
 						};
@@ -422,7 +479,9 @@ function poll(aArgs) {
 					
 					console.error('loop ended:', 'numElementsRead:', numElementsRead);
 					
-					return changes;
+					if (FSChanges.length > 0) {
+						return FSChanges;
+					}
 				}
 			}
 			break;
@@ -486,7 +545,8 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 				aExtra: {
 					aOld: {
 						aFileName: filename
-					}
+					},
+					aOSPath_parentDir_identifier: hDir_ptrStr
 				},
 				aEvent: 'renamed'
 			};
@@ -496,7 +556,10 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 		} else {
 			var rezObj = {
 				aFileName: filename,
-				aEvent: convertFlagsToAEventStr(fni.Action)
+				aEvent: convertFlagsToAEventStr(fni.Action),
+				aExtra: {
+					aOSPath_parentDir_identifier: hDir_ptrStr
+				}
 			};
 			winStuff.FSChanges.push(rezObj);
 		}
