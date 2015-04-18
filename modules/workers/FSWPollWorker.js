@@ -100,9 +100,10 @@ function init(objCore) {
 				
 				winStuff = {};
 
-				winStuff.WATCHED_RES_MAXIMUM_NOTIFICATIONS = 10; // 100; Dexter uses 100
-				//winStuff.NOTIFICATION_BUFFER_SIZE; // = ostypes.TYPE.FILE_NOTIFY_INFORMATION.size; // WATCHED_RES_MAXIMUM_NOTIFICATIONS * ostypes.TYPE.FILE_NOTIFY_INFORMATION.size;
+				winStuff.WATCHED_RES_MAXIMUM_NOTIFICATIONS = 100; // 100; Dexter uses 100
+				winStuff.NOTIFICATION_BUFFER_SIZE = ostypes.TYPE.FILE_NOTIFY_INFORMATION.size * winStuff.WATCHED_RES_MAXIMUM_NOTIFICATIONS; // WATCHED_RES_MAXIMUM_NOTIFICATIONS * ostypes.TYPE.FILE_NOTIFY_INFORMATION.size;
 
+				/*
 				// start - calc NOTIFICATION_BUFFER_SIZE
 				var dummyForSize = ostypes.TYPE.FILE_NOTIFY_INFORMATION.array(winStuff.WATCHED_RES_MAXIMUM_NOTIFICATIONS)();
 				console.log('dummyForSize.constructor.size:', dummyForSize.constructor.size);
@@ -113,7 +114,8 @@ function init(objCore) {
 				console.log('dummyForSize.constructor.size / ostypes.TYPE.DWORD.size:', dummyForSize_DIVIDED_BY_DwordSize, Math.ceil(dummyForSize_DIVIDED_BY_DwordSize)); // should be whole int but lets round up with Math.ceil just in case
 				winStuff.NOTIFICATION_BUFFER_SIZE = Math.ceil(dummyForSize_DIVIDED_BY_DwordSize);
 				// end - calc NOTIFICATION_BUFFER_SIZE
-
+				*/
+				
 				winStuff.lpCompletionRoutine = ostypes.TYPE.FileIOCompletionRoutine.ptr(lpCompletionRoutine_js);
 				winStuff.changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; // this is what @Dexter used
 
@@ -466,22 +468,18 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 	do {
 		var fni = ctypes.cast(notif_buf.addressOfElement(cPos), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
 		console.log(cPos, 'fni:', fni.toString());
-		var fileNameLen = parseInt(fni.FileNameLength) / ostypes.TYPE.WCHAR.size;
+		var fileNameLen = parseInt(cutils.jscGetDeepest(fni.FileNameLength)) / ostypes.TYPE.WCHAR.size;
 		console.log('fileNameLen', fileNameLen);
 		var filenamePtr = ctypes.cast(fni.FileName.address(), ostypes.TYPE.WCHAR.array(fileNameLen).ptr);
 		console.info('filenamePtr:', filenamePtr.toString());
-		var filename = filenamePtr.contents.readString();
-		console.info('filename:', filename.toString());
-		return;
-		/*
-		if (!cutils.jscEqual(fni.NextEntryOffset, 0)) {
-			//console.error('WARNING: multiple notifications returned i should get them all, i havent implemented this yet');
+		var filename = '';
+		for (var i=0; i<fileNameLen; i++) {
+			filename += filenamePtr.contents[i];
 		}
-		*/
-		var fileName = cutils.readAsChar8ThenAsChar16(fni.FileName, parseInt(cutils.jscGetDeepest(fni.FileNameLength)) / 2, true); //fni.FileName.readString();
-		
+		console.info('filename:', filename);
+
 		var rezObj = {
-			aFileName: fileName,
+			aFileName: filename,
 			aEvent: convertFlagsToAEventStr(fni.Action)
 		};
 		
@@ -508,7 +506,7 @@ function convertFlagsToAEventStr(flags) {
 					FILE_ACTION_RENAMED_NEW_NAME: 'renamed-to'
 				};
 				for (var f in default_flags) {
-					if (flags & ostypes.CONST[f]) {
+					if (flags == ostypes.CONST[f]) {
 						return default_flags[f];
 					}
 				}
