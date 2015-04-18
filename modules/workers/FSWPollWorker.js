@@ -652,6 +652,17 @@ function convertFlagsToAEventStr(flags) {
 					IN_MOVED_FROM: 'renamed-from',
 					IN_CREATE: 'created'
 				};
+				/*
+				var allFlags = '';
+				for (var f in default_flags) {
+					if (flags & ostypes.CONST[f]) {
+						allFlags += default_flags[f];
+						//return default_flags[f];
+					}
+				}
+				return allFlags;
+				*/
+				
 				for (var f in default_flags) {
 					if (flags & ostypes.CONST[f]) {
 						return default_flags[f];
