@@ -20,10 +20,11 @@ const core = { // have to set up the main keys
 	firefox: {}
 };
 
-// START - OS Specific - used by Windows only
+// START - OS Specific
 var winStuff;
 var nixStuff;
-// END - OS Specific - used by Windows only
+var bsd_mac_kqStuff;
+// END - OS Specific
 
 // Imports that use stuff defined in chrome
 // I don't import ostypes_*.jsm yet as I want to init core first, as they use core stuff like core.os.isWinXP etc
@@ -139,6 +140,14 @@ function init(objCore) {
 				nixStuff = {};
 				nixStuff._cache_aRenamed = {}; // key is cookie and val is aExtra of rename-from, and on reanmed-to, it finds the cookie and deletes it and triggers callback with renamed-to with aExtra holding oldFileName
 		
+			break;
+		case 'darwin':
+		case 'freebsd':
+		case 'openbsd':
+		
+				bsd_mac_kqStuff = {};
+				bsd_mac_kqStuff.evtMtrPtrStr_len = 50; // change in FSWatcherWorker too
+				
 			break;
 		default:
 			// do nothing special
@@ -264,6 +273,11 @@ function poll(aArgs) {
 				console.error('poll kq');
 				var kq = aArgs.kq;
 
+				if (!('events_to_monitor' in bsd_mac_kqStuff)) {
+					bsd_mac_kqStuff.cStr_evtMtrPtrStr = ctypes.char.array(bsd_mac_kqStuff.evtMtrPtrStr_len).ptr(ctypes.UInt64(aArgs.ptStr_cStringOfPtrStrToEventsToMonitorArr));
+					bsd_mac_kqStuff.num_files = ostypes.TYPE.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr));
+				}
+				
 				// Set the timeout to wake us every half second.
 				var timeout = ostypes.TYPE.timespec();
 				var useSec = 0;
@@ -275,7 +289,6 @@ function poll(aArgs) {
 				var last_eventsToMonitorPtrStr;
 				console.info('last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr);
 				var last_num_files = -1;
-				var num_files;
 				
 				var events_to_monitor;
 				var event_data;// = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_SLOTS)();
@@ -283,21 +296,19 @@ function poll(aArgs) {
 				var continue_loop = Infinity; // monitor forever // 40; // Monitor for twenty seconds. // ostypes.TYPE.int
 				var FSChanges = 0; // object to deliever back to main thread
 				while (--continue_loop) {
-					var now_eventsToMonitorPtrStr = ctypes.char.array(50).ptr(ctypes.UInt64(aArgs.ptStr_cStringOfPtrStrToEventsToMonitorArr)).contents.readString(); // using ctypes.char and NOT ostypes.TYPE.char as this is depending on cutils.modifyCStr (which says use ctypes.char) // link87354 50 cuz thats what i set it to
+					var now_eventsToMonitorPtrStr = bsd_mac_kqStuff.cStr_evtMtrPtrStr.contents.readString(); // using ctypes.char and NOT ostypes.TYPE.char as this is depending on cutils.modifyCStr (which says use ctypes.char) // link87354 50 cuz thats what i set it to
 					if (now_eventsToMonitorPtrStr != last_eventsToMonitorPtrStr) { // link584732
 						// so paths were added or removed OR added and remove you get what im trying to say
 						console.info('CHANGE ON last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr, 'now one is:', now_eventsToMonitorPtrStr);
 						last_eventsToMonitorPtrStr = now_eventsToMonitorPtrStr;
 						
-						console.info('num_files.value BEFORE re reading ptr:', uneval(num_files)); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
-						num_files = ostypes.TYPE.int.ptr(ctypes.UInt64(aArgs.num_files_ptrStr)).contents;
-						console.info('num_files AFTER re reading ptr:', uneval(num_files));
+						console.info('num_files.contents:', bsd_mac_kqStuff.num_files.contents); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
 						
-						events_to_monitor = ostypes.TYPE.kevent.array(num_files).ptr(ctypes.UInt64(now_eventsToMonitorPtrStr)).contents;
-						event_data = ostypes.TYPE.kevent.array(num_files)();
+						events_to_monitor = ostypes.TYPE.kevent.array(bsd_mac_kqStuff.num_files.contents).ptr(ctypes.UInt64(now_eventsToMonitorPtrStr)).contents;
+						event_data = ostypes.TYPE.kevent.array(events_to_monitor.length)();
 					}
-					if (num_files == 0) {
-						// num_files is 0 so no need to make call to kevent
+					if (events_to_monitor.length == 0) {
+						// no pahts to watch
 						// lets quit polling as its useless overhead
 						//FSChanges = 0;
 						throw new Error({
@@ -307,7 +318,7 @@ function poll(aArgs) {
 					} else {
 						// commented out as otherwise i have to make it setTimeout for half second // i also dont want to make this an infinite poll, as after addPath i need to update kevent arguments, which i do by reading hte num_files_ptrStr
 						// there is at least 1 file to watch
-						var event_count = ostypes.API('kevent')(kq, events_to_monitor/*.address()*/, num_files, event_data/*.address()*/, num_files, timeout.address());
+						var event_count = ostypes.API('kevent')(kq, events_to_monitor/*.address()*/, events_to_monitor.length, event_data/*.address()*/, num_files, timeout.address());
 						console.info('event_count:', event_count.toString(), uneval(event_count));
 						if (ctypes.errno !== 0) {
 							console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
