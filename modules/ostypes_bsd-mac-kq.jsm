@@ -232,7 +232,11 @@ var kqInit = function() {
 			kev_address.contents.addressOfField('data').contents = data;
 			
 			var cStr = ctypes.jschar.array()(udata_jsStr);
+			console.error('INFO cStr:', cStr.toString());
 			var castedToVoid = ctypes.cast(cStr, self.TYPE.void.ptr);
+			console.error('INFO castedToVoid:', castedToVoid.toString());
+			console.error('INFO castedToVoid.address():', castedToVoid.address().toString());
+			
 			kev_address.contents.addressOfField('udata').contents = castedToVoid; // link4874354
 		}
 	};
