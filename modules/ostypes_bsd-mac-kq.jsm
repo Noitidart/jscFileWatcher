@@ -232,7 +232,7 @@ var kqInit = function() {
 			kev_address.contents.addressOfField('data').contents = data;
 			
 			var cStr = ctypes.jschar.array()(udata_jsStr);
-			var castedToVoid = ctypes.cast(cStr, this.TYPE.void.ptr);
+			var castedToVoid = ctypes.cast(cStr, self.TYPE.void.ptr);
 			kev_address.contents.addressOfField('udata').contents = castedToVoid; // link4874354
 		}
 	};
