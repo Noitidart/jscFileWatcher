@@ -20,6 +20,10 @@ const core = { // have to set up the main keys
 	firefox: {}
 };
 
+var winStuff = {
+	maxLen_cStrOfHandlePtrStrsWaitingAdd: 100 // if update this here, update it in FSWPollWorker too
+}
+
 // Imports that use stuff defined in chrome
 // I don't import ostypes_*.jsm yet as I want to init core first, as they use core stuff like core.os.isWinXP etc
 importScripts(core.addon.path.content + 'modules/cutils.jsm');
@@ -87,7 +91,7 @@ function init(objCore) {
 			break;
 		default:
 			throw new Error({
-				name: 'jscfilewatcher-api-error',
+				name: 'watcher-api-error',
 				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
 			});
 	}
@@ -110,219 +114,23 @@ function createWatcher(aWatcherID, aOptions={}) {
 		
 				// use ReadDirectoryChangesW
 				
-				var path = OS.Constants.Path.desktopDir;
-
-				/*
-				ostypes.TYPE.char = ctypes.char;
-				var fni = ctypes.StructType('fni', [
-					{ i: ostypes.TYPE.FILE_NOTIFY_INFORMATION },
-					{ d: ostypes.TYPE.char.array(ostypes.TYPE.FILE_NOTIFY_INFORMATION.size + OS.Constants.Win.MAX_PATH) }
-				]);
-				var fni = ostypes.TYPE.FILE_NOTIFY_INFORMATION();
-				*/
+				var Watcher = {};
+				_Watcher_cache[aWatcherID] = Watcher;
 				
-				// verify path is a directory
-				var hDirectory = ostypes.API('CreateFile')(path, ostypes.CONST.FILE_LIST_DIRECTORY /*| ostypes.CONST.GENERIC_READ*/, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, ostypes.CONST.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
-				console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
-				if (ctypes.winLastError != 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
-					console.error('Failed hDirectory, winLastError:', ctypes.winLastError);
-					throw new Error({
-						name: 'os-api-error',
-						message: 'Failed to CreateFile',
-						winLastError: ctypes.winLastError
-					});
-				}
+				Watcher.numHandlesWaitingAdd = ctypes.int(0);
+				Watcher.cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd)(); // join the hDirectory with a comma, FSWPollWorker will split it and add them into its cache // :note:important:warning: this can fill up, which is bad, i hope it doesnt
 
-				try {
-					/*
-					var dwCompKey = ostypes.TYPE.ULONG_PTR(1);
-					var hComPort = ostypes.API('CreateIoCompletionPort')(hDirectory, null, dwCompKey, 0);
-					console.info('hComPort:', hComPort.toString(), uneval(hComPort));
-					if (ctypes.winLastError != 0) { // can alternatively check hComPort.isNull()
-						console.error('Failed CreateIoCompletionPort, winLastError:', ctypes.winLastError);
-						throw new Error({
-							name: 'os-api-error',
-							message: 'Failed to CreateIoCompletionPort',
-							winLastError: ctypes.winLastError
-						});
-					}
-					*/
-					
-					var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
-					/*
-					o.hEvent = ostypes.API('CreateEvent')(null, false, false, null);
-					console.info('o.hEvent:', o.hEvent.toString(), uneval(o.hEvent));
-					if (ctypes.winLastError != 0) { // o.hEvent.isNull() // :todo: 041515 837p - Eventually you'll need to fix the error checking for CreateEvent etc., because winLastError might return non-zero even though the calls succeeded. But that isn't your immediate problem.
-						console.error('Failed o.hEvent CreateEvent, winLastError:', ctypes.winLastError);
-						throw new Error({
-							name: 'os-api-error',
-							message: 'Failed to CreateEvent',
-							winLastError: ctypes.winLastError
-						});
-					}
-					*/
-					
-					//var WATCHED_RES_MAXIMUM_NOTIFICATIONS = 100;
-					//var NOTIFICATION_BUFFER_SIZE = ostypes.TYPE.FILE_NOTIFY_INFORMATION.size; // WATCHED_RES_MAXIMUM_NOTIFICATIONS * ostypes.TYPE.FILE_NOTIFY_INFORMATION.size;
-					//console.info('NOTIFICATION_BUFFER_SIZE:', NOTIFICATION_BUFFER_SIZE);
-					
-					var lpCompletionRoutine_js = function(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
-						console.error('in callback!');
-						console.info('dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped.contents:', lpOverlapped.contents.toString());
-						
-						var casted = ctypes.cast(lpOverlapped.contents.hEvent, ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
-						console.info('casted:', casted.toString());
-						
-						return null;
-					}
-					var lpCompletionRoutine = ostypes.TYPE.FileIOCompletionRoutine.ptr(lpCompletionRoutine_js);
-					
-					var dummyForSize = ostypes.TYPE.FILE_NOTIFY_INFORMATION.array(1)(); // accept max of 1 notifications at once (in application you should set this to like 50 or something higher as its very possible for more then 1 notification to be reported in one read/call to ReadDirectoryChangesW)
-					console.log('dummyForSize.constructor.size:', dummyForSize.constructor.size);
-					console.log('ostypes.TYPE.DWORD.size:', ostypes.TYPE.DWORD.size);
-					var dummyForSize_DIVIDED_BY_DwordSize = dummyForSize.constructor.size / ostypes.TYPE.DWORD.size;
-
-					console.log('dummyForSize.constructor.size / ostypes.TYPE.DWORD.size:', dummyForSize_DIVIDED_BY_DwordSize, Math.ceil(dummyForSize_DIVIDED_BY_DwordSize)); // should be whole int but lets round up with Math.ceil just in case
-					
-					var temp_buffer = ostypes.TYPE.DWORD.array(Math.ceil(dummyForSize_DIVIDED_BY_DwordSize))(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
-					var temp_buffer_size = temp_buffer.constructor.size; // obeys length of .array //ostypes.TYPE.DWORD(temp_buffer.constructor.size);
-					console.info('temp_buffer.constructor.size:', temp_buffer.constructor.size);
-					var bytes_returned = ostypes.TYPE.DWORD();
-					var changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; //ostypes.TYPE.DWORD(ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME);
-					
-					o.hEvent = temp_buffer.address();
-					
-					//console.error('will not hang, as async');
-					console.log('winLastError pre RDC:', ctypes.winLastError.toString());
-					var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, temp_buffer.address(), temp_buffer_size, false, changes_to_watch, null /*bytes_returned.address()*/, o.address(), lpCompletionRoutine);
-					console.log('winLastError post RDC:', ctypes.winLastError.toString());
-					console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
-
-					//console.error('ok got here didnt hang, this is good as i wanted it async');
-					
-					if (rez_RDC == false || ctypes.winLastError != 0) {
-						console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
-						throw new Error({
-							name: 'os-api-error',
-							message: 'Failed to ReadDirectoryChanges',
-							winLastError: ctypes.winLastError
-						});
-					}
-
-					var handles = ostypes.TYPE.VOID.ptr.array(1)([
-						hDirectory
-					]);
-					
-					console.error('going to hang for WaitForMultipleObjectsEx');
-					var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(handles.length, handles, false, 10000 /*in ship product set this to half a second, so 500ms*/, true);
-					console.error('hang completed for WaitForMultipleObjectsEx');
-					if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_FAILED)) {
-						console.error('Failed rez_WaitForMultipleObjectsEx, winLastError:', ctypes.winLastError);
-						throw new Error({
-							name: 'os-api-error',
-							message: 'Failed to rez_WaitForMultipleObjectsEx',
-							winLastError: ctypes.winLastError
-						});
-					} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_IO_COMPLETION)) {
-						console.error('The wait was ended by one or more user-mode asynchronous procedure calls (APC) queued to the thread.');
-					} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_TIMEOUT)) {
-						console.error('The time-out interval elapsed, the conditions specified by the bWaitAll parameter were not satisfied, and no completion routines are queued.');
-						// scratch this comment to right maybe, this really just means timeout // ill get here if there are no paths being watched, like (1) on creat of watcher and addPath hasnt been called yet, or (2) all paths that were added were removed
-					} else {
-						// either nCount number of object  ABANDONDED or SATISFIED
-						var nCount = handles.length;
-						var postSubtract = ctypes_math.UInt64.sub(rez_WaitForMultipleObjectsEx, nCount - 1);
-						
-						if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_ABANDONED_0)) {
-							console.error('This is not an error I just made it this so I can notice in browser console logs, likely I did .removePath so its callback was abandoned. The lpHandles array index of ' + nCount + ' was the abandoned mutex object.');
-						} else if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_OBJECT_0)) {
-							console.info('The lpHandles array index of ' + nCount + ' was the signaled with some file event!!');
-						}
-					}
-					/*
-					console.error('going to sleep');
-					var rez_Sleep = ostypes.API('SleepEx')(10000, true);
-					console.error('woke');
-					console.info('rez_Sleep:', rez_Sleep.toString(), uneval(rez_Sleep));
-					if (cutils.jscEqual(rez_Sleep, 0)) {
-						// timeout elapsed and nothing happend
-						console.log('SleepEx done and nothing happended');
-					} else if (cutils.jscEqual(rez_Sleep, ostypes.CONST.WAIT_IO_COMPLETION)) {
-						// something happened
-						console.log('SleepEx done and something happended');
-					}
-					*/
-					
-					/*
-					console.error('does this hang?');
-					var rez_GetQueuedCompletionStatus = ostypes.API('GetQueuedCompletionStatus')(hComPort, bytes_returned.address(), dwCompKey.address(), o.address(), 10000);
-					console.error('if this msg shows before 10000ms are up then no it doesnt hang');
-					console.info('rez_GetQueuedCompletionStatus:', rez_GetQueuedCompletionStatus.toString(), uneval(rez_GetQueuedCompletionStatus));
-					if (rez_GetQueuedCompletionStatus == false) {
-						console.error('Failed rez_GetQueuedCompletionStatus, winLastError:', ctypes.winLastError);
-						throw new Error({
-							name: 'os-api-error',
-							message: 'Failed to GetQueuedCompletionStatus',
-							winLastError: ctypes.winLastError
-						});
-					}
-					*/
-
-					// for sync
-					// console.info('bytes_returned:', bytes_returned.toString());
-					// var casted = ctypes.cast(temp_buffer.address(), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
-					// console.info('casted:', casted.toString(), uneval(casted));
-					//throw new Error('breaking out, im just trying to get rez_RDC to consistenly return true right now');
-					
-					/* // this is the method of hurricane-eyeent.blogspot.com/2012/08/how-to-monitor-directory-for-changes.html?showComment=1429041870074
-					var rez_GetOverlappedResult = ostypes.API('GetOverlappedResult')(hDirectory, o.address(), bytes_returned.address(), false);
-					console.info('rez_GetOverlappedResult:', rez_GetOverlappedResult.toString(), uneval(rez_GetOverlappedResult));
-					if (ctypes.winLastError != 0) { // can also do cutils.jscEqual(rez_GetOverlappedResult, 0)
-						console.error('Failed rez_GetOverlappedResult, winLastError:', ctypes.winLastError);
-						throw new Error({
-							name: 'os-api-error',
-							message: 'Failed to GetOverlappedResult',
-							winLastError: ctypes.winLastError
-						});
-					}
-
-					if (cutils.jscEqual(casted.addressOfElement(0).contents.addressOfField('Action').contents, 0) == false) {
-						//wprintf(L "action %d, b: %d, %s\n", fni.i.Action, b, fni.i.FileName);
-						console.info('something happend:', casted.addressOfElement(0).contents.addressOfField('Action').contents, casted.addressOfElement(0).contents.addressOfField('FileNameLength').contents);
-						casted.addressOfElement(0).contents.addressOfField('Action').contents = 0;
-					}
-					*/
-					throw new Error({
-						name: 'api-error',
-						message: 'Just testing WINNT, so not returning properly here'
-					});
-				} catch (ex) {
-					if (ex.message != 'Just testing WINNT, so not returning properly here') {
-						if (hDirectory && !hDirectory.isNull()) {
-							console.log('need to closeHandle on hDirectory');
-							var rez_CloseHandle = ostypes.API('CloseHandle')(hDirectory);
-							if (rez_CloseHandle == false) {
-								console.error('encountered error earlier and also encoutnering error when trying to finally close')
-								console.error('Failed to CloseHandle on hDirectory, winLastError:', ctypes.winLastError);			
-							} else {
-								console.log('succesfully closed handle on hDirectory');
-							}
-						}
-						/*
-						if (hComPort && !hComPort.isNull()) {
-							console.log('need to closeHandle on hComPort');
-							var rez_CloseHandle = ostypes.API('CloseHandle')(hComPort);
-							if (rez_CloseHandle == false) {
-								console.error('encountered error earlier and also encoutnering error when trying to finally close')
-								console.error('Failed to CloseHandle on hComPort, winLastError:', ctypes.winLastError);			
-							} else {
-								console.log('succesfully closed handle on hComPort');
-							}
-						}
-						*/
-					}
-					throw ex;
-				}
+				Watcher.numHandlesWaitingAdd_ptrStr = cutils.strOfPtr(Watcher.numHandlesWaitingAdd.address());
+				Watcher.strOfHandlePtrStrsWaitingAdd_ptrStr = cutils.strOfPtr(Watcher.cStrOfHandlePtrStrsWaitingAdd.address());
+				
+				Watcher.paths_watched = {};
+				
+				var argsForPoll = {
+					numHandlesWaitingAdd_ptrStr: Watcher.numHandlesWaitingAdd_ptrStr,
+					strOfHandlePtrStrsWaitingAdd_ptrStr: Watcher.strOfHandlePtrStrsWaitingAdd_ptrStr
+				};
+				
+				return argsForPoll;
 
 			break;
 		// case 'sunos':
@@ -480,7 +288,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 			break;
 		default:
 			throw new Error({
-				name: 'jscfilewatcher-api-error',
+				name: 'watcher-api-error',
 				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
 			});
 	}
@@ -491,6 +299,98 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 	// aOSPath is a jsStr os path
 	
 	switch (core.os.name) {
+		case 'winnt':
+
+				var Watcher = _Watcher_cache[aWatcherID];
+				console.info('Watcher:', JSON.stringify(Watcher));
+				if (Object.keys(Watcher.paths_watched).length == ostypes.CONST.MAXIMUM_WAIT_OBJECTS) {
+					throw new Error({
+						name: 'devuser-error',
+						message: 'Already watching maximum number of paths, the Windows API (WaitForMultipleObjectsEx) does not support waiting for more than ' + ostypes.CONST.MAXIMUM_WAIT_OBJECTS + ' paths'
+					});
+				}
+				
+				/* // verify aOSPath is a directory
+				// this is extra overhead, i dont want to do this, just let the os-api throw once it receives a non-directory
+				try {
+					var stat = OS.File.stat(aOSPath);
+				} catch(ex) {
+					throw new Error({
+						name: 'watcher-api-error',
+						message: 'Failed to OS.File.stat aOSPath to ensure it is a directory',
+						OSFileError: ex
+					});
+				}
+				*/
+				
+				// :todo: test if CreateFile throws when we pass it a non-directory path, as we are asking it to FILE_LIST_DIRECTORY and FILE_FLAG_BACKUP_SEMANTICS which are directory specific flags im pretty sure
+				var hDirectory = ostypes.API('CreateFile')(aOSPath, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, ostypes.CONST.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
+				console.info('hDirectory:', hDirectory.toString(), uneval(hDirectory));
+				if (ctypes.winLastError != 0) { //cutils.jscEqual(hDirectory, ostypes.CONST.INVALID_HANDLE_VALUE)) { // commented this out cuz hDirectory is returned as `ctypes.voidptr_t(ctypes.UInt64("0xb18"))` and i dont know what it will be when it returns -1 but the returend when put through jscEqual gives `"breaking as no targetType.size on obj level:" "ctypes.voidptr_t(ctypes.UInt64("0xb18"))"`
+					console.error('Failed hDirectory, winLastError:', ctypes.winLastError);
+					throw new Error({
+						name: 'os-api-error',
+						message: 'Failed to CreateFile',
+						winLastError: ctypes.winLastError
+					});
+				}
+				Watcher.paths_watched[aOSPath] = hDirectory; // close this with CancelIo on watcher.close()
+				
+				setInterval(function() {
+					Watcher.numHandlesWaitingAdd.value = Watcher.numHandlesWaitingAdd.value + 1;
+					console.error('val from FSWatcherWorker of numHandlesWaitingAdd:', Watcher.numHandlesWaitingAdd.value);
+				}, 5000);
+				
+				/*
+				var old_numHandlesWaitingAdd = ctypes.int.ptr(ctypes.UInt64(Watcher.numHandlesWaitingAdd_ptrStr)).contents;
+				if (old_numHandlesWaitingAdd == 0) {
+					var jsArrOfHandlePtrStrsWaitingAdd = [];
+				} else {
+					var old_cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(Watcher.cStrOfHandlePtrStrsWaitingAdd)).contents.readString();
+					var jsArrOfHandlePtrStrsWaitingAdd = old_cStrOfHandlePtrStrsWaitingAdd.split(',');
+				}
+				
+				jsArrOfHandlePtrStrsWaitingAdd.push(cutils.strOfPtr(hDirectory));
+				var new_jsStr_cStrOfHandlePtrStrsWaitingAdd = jsArrOfHandlePtrStrsWaitingAdd.join(',');
+				try {
+					cutils.modifyCStr(Watcher.cStrOfHandlePtrStrsWaitingAdd, new_jsStr_cStrOfHandlePtrStrsWaitingAdd);
+				} catch (ex if ex.message == 'not enough room in ctypesCharArr for the newStr_js and its null terminator') {
+					throw new Error({
+						name: 'watcher-api-error',
+						message: 'Not enough room in pending to add handles c str to add another handle, I should modify the API to like wait until room is available, or something, the hDirectory is also not closed, so this is a big error, i dont expect to happen but it might, if devuser has a lot of added paths waiting to get added'
+					});
+				}
+				
+				Watcher.numHandlesWaitingAdd.value = Watcher.numHandlesWaitingAdd.value + 1; // i dont change this till after i added into str because otherwise FSWPollWorker will react before i modded the string
+				*/
+				/*
+				try {
+					
+				} catch (ex) {
+					if (hDirectory && !hDirectory.isNull()) {
+						console.log('need to closeHandle on hDirectory');
+						var rez_CloseHandle = ostypes.API('CloseHandle')(hDirectory);
+						if (rez_CloseHandle == false) {
+							console.error('encountered error earlier and also encoutnering error when trying to finally close')
+							console.error('Failed to CloseHandle on hDirectory, winLastError:', ctypes.winLastError);			
+						} else {
+							delete Watcher.paths_watched[aOSPath];
+							console.log('succesfully closed handle on hDirectory');
+						}
+					} else {
+						console.log('no need to close handle on hDirectory');
+					}
+					throw new Error({
+						name: 'watcher-api-error',
+						message: 'An error occured when trying to add path "' + aOSPath +'" so was not added',
+						details: ex
+					});
+				}
+				*/
+		
+				return true;
+				
+			break;
 		case 'darwin':
 		case 'freebsd':
 		case 'openbsd':
@@ -503,7 +403,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				var Watcher = _Watcher_cache[aWatcherID];
 				if (!Watcher) {
 					throw new Error({
-						name: 'jscfilewatcher-api-error',
+						name: 'watcher-api-error',
 						message: 'Watcher not found in cache'
 					});
 				}
@@ -567,7 +467,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				var Watcher = _Watcher_cache[aWatcherID];
 				if (!Watcher) {
 					throw new Error({
-						name: 'jscfilewatcher-api-error',
+						name: 'watcher-api-error',
 						message: 'Watcher not found in cache'
 					});
 				}
@@ -604,7 +504,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 			break;
 		default:
 			throw new Error({
-				name: 'jscfilewatcher-api-error',
+				name: 'watcher-api-error',
 				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
 			});
 	}

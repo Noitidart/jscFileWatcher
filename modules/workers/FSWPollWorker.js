@@ -20,10 +20,14 @@ const core = { // have to set up the main keys
 	firefox: {}
 };
 
+// START - OS Specific - used by Windows only
+var winStuff;
+// END - OS Specific - used by Windows only
+
 // Imports that use stuff defined in chrome
 // I don't import ostypes_*.jsm yet as I want to init core first, as they use core stuff like core.os.isWinXP etc
 importScripts(core.addon.path.content + 'modules/cutils.jsm');
-
+importScripts(core.addon.path.content + 'modules/ctypes_math.jsm');
 
 // Setup PromiseWorker
 var PromiseWorker = require(core.addon.path.content + 'modules/workers/PromiseWorker.js');
@@ -83,16 +87,135 @@ function init(objCore) {
 			break;
 		default:
 			throw new Error({
-				name: 'jscfilewatcher-api-error',
+				name: 'watcher-api-error',
 				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
 			});
 	}
+	
+	// OS Specific Init
+	switch (core.os.name) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+				
+				winStuff = {};
+
+				winStuff.WATCHED_RES_MAXIMUM_NOTIFICATIONS = 10; // 100; Dexter uses 100
+				//winStuff.NOTIFICATION_BUFFER_SIZE; // = ostypes.TYPE.FILE_NOTIFY_INFORMATION.size; // WATCHED_RES_MAXIMUM_NOTIFICATIONS * ostypes.TYPE.FILE_NOTIFY_INFORMATION.size;
+
+				// start - calc NOTIFICATION_BUFFER_SIZE
+				var dummyForSize = ostypes.TYPE.FILE_NOTIFY_INFORMATION.array(winStuff.WATCHED_RES_MAXIMUM_NOTIFICATIONS)();
+				console.log('dummyForSize.constructor.size:', dummyForSize.constructor.size);
+				console.log('ostypes.TYPE.DWORD.size:', ostypes.TYPE.DWORD.size);
+				var dummyForSize_DIVIDED_BY_DwordSize = dummyForSize.constructor.size / ostypes.TYPE.DWORD.size;
+				dummyForSize = null;
+
+				console.log('dummyForSize.constructor.size / ostypes.TYPE.DWORD.size:', dummyForSize_DIVIDED_BY_DwordSize, Math.ceil(dummyForSize_DIVIDED_BY_DwordSize)); // should be whole int but lets round up with Math.ceil just in case
+				winStuff.NOTIFICATION_BUFFER_SIZE = Math.ceil(dummyForSize_DIVIDED_BY_DwordSize);
+				// end - calc NOTIFICATION_BUFFER_SIZE
+
+				winStuff.lpCompletionRoutine = ostypes.TYPE.FileIOCompletionRoutine.ptr(lpCompletionRoutine_js);
+				winStuff.changes_to_watch = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; // this is what @Dexter used
+
+				winStuff.handles_watched = {}; // key is cutils.strOfPtr(hDirectory) and value is its overlapped struct as i need to reuse that in the callback to restart the watch, so setting it to 1 for now
+				winStuff.handles_watched_jsArr = []; // array of hDirectory , not the pointer strings!
+				winStuff.handles_watched_cArr;
+				
+				winStuff.handles_pending_add = [];
+				
+				winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd = 100;
+				
+			break;
+		default:
+			// do nothing special
+	}	
 
 	return true;
 }
 
 function poll(aArgs) {
 	switch (core.os.name) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+				
+				var numHandlesWaitingAdd = ctypes.int.cast(ctypes.UInt64(aArgs.numHandlesWaitingAdd_ptrStr));
+				if (numHandlesWaitingAdd.contents > 0) {
+					var cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(Watcher.cStrOfHandlePtrStrsWaitingAdd));
+					var jsStrOfHandlePtrStrsWaitingAdd = cStrOfHandlePtrStrsWaitingAdd.contents.readString();
+					var jsArrOfHandlePtrStrsWaitingAdd = old_cStrOfHandlePtrStrsWaitingAdd.split(',');
+					if (jsArrOfHandlePtrStrsWaitingAdd.length == 0) {
+						throw new Error('what on earth this should never happen as numHandlesWaitingAdd increments only when there is contents in this cStr');
+					}
+					
+					// blank the str
+					cutils.modifyCStr(cStrOfHandlePtrStrsWaitingAdd.contents, new_jsStr_cStrOfHandlePtrStrsWaitingAdd);
+					numHandlesWaitingAdd.contents = 0;
+					
+					for (var i=0; i<jsArrOfHandlePtrStrsWaitingAdd.length; i++) {
+						let iHoisted = i;
+						var hDirectory_ptrStr = jsArrOfHandlePtrStrsWaitingAdd[iHoisted];
+						var hDirectory = ostypes.HANDLE.ptr(hDirectory_ptrStr).contents;
+						
+						winStuff.handles_watched_jsArr.push(hDirectory);
+						
+						var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
+						handles_watched[hDirectory_ptrStr] = o;
+						
+						var notif_buf = ostypes.TYPE.DWORD.array(winStuff.NOTIFICATION_BUFFER_SIZE)(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
+						var notif_buf_size = notif_buf.constructor.size; // obeys length of .array //ostypes.TYPE.DWORD(notif_buf.constructor.size); // will be same as winStuff.NOTIFICATION_BUFFER_SIZE duhhh
+						console.info('notif_buf.constructor.size:', notif_buf.constructor.size);
+						
+						o.hEvent = notif_buf.address();
+						
+						//console.error('will not hang, as async');
+						var rez_RDC = ostypes.API('ReadDirectoryChanges')(hDirectory, notif_buf.address(), notif_buf_size, false, winStuff.changes_to_watch, null, o.address(), winStuff.lpCompletionRoutine);
+						console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
+
+						//console.error('ok got here didnt hang, this is good as i wanted it async');
+						
+						if (rez_RDC == false || ctypes.winLastError != 0) {
+							console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
+							throw new Error({
+								name: 'os-api-error',
+								message: 'Failed to ReadDirectoryChanges on handle: ' + hDirectory_ptrStr,
+								winLastError: ctypes.winLastError
+							});
+						}
+						
+					}
+				}
+				
+				var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(winStuff.handles_watched_cArr.length, winStuff.handles_watched_cArr, false, 10000 /*in ship product set this to half a second, so 500ms*/, true);
+				console.error('hang completed for WaitForMultipleObjectsEx');
+				winStuff.numberNotifReceived = 0;
+				winStuff.numberNotifLpRoutinedFor = 0; // once these are equal then i should return this promise some how // maybe wait with SleepEx not sure
+				
+				if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_FAILED)) {
+					console.error('Failed rez_WaitForMultipleObjectsEx, winLastError:', ctypes.winLastError);
+					throw new Error({
+						name: 'os-api-error',
+						message: 'Failed to rez_WaitForMultipleObjectsEx',
+						winLastError: ctypes.winLastError
+					});
+				} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_IO_COMPLETION)) {
+					console.error('The wait was ended by one or more user-mode asynchronous procedure calls (APC) queued to the thread.');
+				} else if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_TIMEOUT)) {
+					console.error('The time-out interval elapsed, the conditions specified by the bWaitAll parameter were not satisfied, and no completion routines are queued.');
+					// scratch this comment to right maybe, this really just means timeout // ill get here if there are no paths being watched, like (1) on creat of watcher and addPath hasnt been called yet, or (2) all paths that were added were removed
+				} else {
+					// either nCount number of object  ABANDONDED or SATISFIED
+					var nCount = handles.length;
+					var postSubtract = ctypes_math.UInt64.sub(rez_WaitForMultipleObjectsEx, nCount - 1);
+					
+					if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_ABANDONED_0)) {
+						console.error('This is not an error I just made it this so I can notice in browser console logs, likely I did .removePath so its callback was abandoned. The lpHandles array index of ' + nCount + ' was the abandoned mutex object.');
+					} else if (cutils.jscEqual(postSubtract, ostypes.CONST.WAIT_OBJECT_0)) {
+						console.info('The lpHandles array index of ' + nCount + ' was the signaled with some file event!!');
+					}
+				}
+			
+			break;
 		case 'darwin':
 		case 'freebsd':
 		case 'openbsd':
@@ -122,6 +245,7 @@ function poll(aArgs) {
 				var event_data;// = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_SLOTS)();
 				
 				var continue_loop = Infinity; // monitor forever // 40; // Monitor for twenty seconds. // ostypes.TYPE.int
+				var FSChanges = 0; // object to deliever back to main thread
 				while (--continue_loop) {
 					var now_eventsToMonitorPtrStr = ctypes.char.array(50).ptr(ctypes.UInt64(aArgs.ptStr_cStringOfPtrStrToEventsToMonitorArr)).contents.readString(); // using ctypes.char and NOT ostypes.TYPE.char as this is depending on cutils.modifyCStr (which says use ctypes.char) // link87354 50 cuz thats what i set it to
 					if (now_eventsToMonitorPtrStr != last_eventsToMonitorPtrStr) { // link584732
@@ -136,12 +260,16 @@ function poll(aArgs) {
 						events_to_monitor = ostypes.TYPE.kevent.array(num_files).ptr(ctypes.UInt64(now_eventsToMonitorPtrStr)).contents;
 						event_data = ostypes.TYPE.kevent.array(num_files)();
 					}
-					/*
 					if (num_files == 0) {
 						// num_files is 0 so no need to make call to kevent
-						continue;
+						// lets quit polling as its useless overhead
+						//FSChanges = 0;
+						throw new Error({
+							name: 'poll-aborted-nopaths',
+							message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+						});
 					} else {
-					*/ // commented out as otherwise i have to make it setTimeout for half second // i also dont want to make this an infinite poll, as after addPath i need to update kevent arguments, which i do by reading hte num_files_ptrStr
+						// commented out as otherwise i have to make it setTimeout for half second // i also dont want to make this an infinite poll, as after addPath i need to update kevent arguments, which i do by reading hte num_files_ptrStr
 						// there is at least 1 file to watch
 						var event_count = ostypes.API('kevent')(kq, events_to_monitor/*.address()*/, num_files, event_data/*.address()*/, num_files, timeout.address());
 						console.info('event_count:', event_count.toString(), uneval(event_count));
@@ -173,12 +301,10 @@ function poll(aArgs) {
 						// Reset the timeout. In case of a signal interrruption, the values may change.
 						timeout.tv_sec = useSec; // 0 seconds
 						timeout.tv_nsec = useNsec; // 500 milliseconds
-					/*
 					}
-					*/
 				}
 				ostypes.API('close')(event_fd);
-				return 0;
+				return FSChanges;
 				
 			// end kqueue
 			} else {
@@ -275,11 +401,29 @@ function poll(aArgs) {
 			break;
 		default:
 			throw new Error({
-				name: 'jscfilewatcher-api-error',
+				name: 'watcher-api-error',
 				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
 			});
 	}
 }
+
+// START - OS Specific - helpers for windows
+function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
+	// for Windows only
+	
+	winStuff.numberNotifLpRoutinedFor++;
+	
+	console.error('in callback!');
+	console.info('dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped.contents:', lpOverlapped.contents.toString());
+	
+	var casted = ctypes.cast(lpOverlapped.contents.hEvent, ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+	console.info('casted:', casted.toString());
+	
+	// create new buffer, and re-run ReadDirectoryChangesW
+	
+	return null;
+}
+// END - OS Specific - helpers for windows
 
 function convertFlagsToAEventStr(flags) {
 	switch (core.os.name) {
@@ -334,7 +478,7 @@ function convertFlagsToAEventStr(flags) {
 			break;
 		default:
 			throw new Error({
-				name: 'jscfilewatcher-api-error',
+				name: 'watcher-api-error',
 				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
 			});
 	}

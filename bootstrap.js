@@ -247,7 +247,18 @@ function Watcher(aCallback) {
 	*/
 	
 	//thisW.paths_watched = []; // array of cased OS paths (as inputed by devuser) that are being watched
-	thisW.paths_watched = {}; // changed to obj as its easier to delete // also for linux/inotify i use this to link a callback to aOSPath_parentDir, as value is set to the watched_fd
+	thisW.paths_watched = {}; // changed to obj as its easier to delete
+	/* OS Specific Values on thisW.paths_watched
+	 * // linux/inotify
+	 *    i use this to link a callback to aOSPath_parentDir, as value is set to the watched_fd
+	 *    :todo: ask p0lip if i need to close this descriptor on thisW.close()
+	 * // windows
+	 *    //Value holds string pointer of the hDirectory which is handle to the directory, on thisW.close() this handle must be closed
+	 *    Never mind, value is not used
+	 * // kqueue
+	 *    Value is not used
+	 *    :todo: ask p0lip if i need to close descriptor on thisW.close() but i think i wont have to put it here as i hold it already in the array struct
+	 */
 	
 	thisW.pendingAdds = {}; // object with key aOSPath
 	thisW.adds_pendingAddC = {}; // as if user calls removePath while the c is running, it will think that path was never added
@@ -255,10 +266,67 @@ function Watcher(aCallback) {
 	
 	// todo: work on handling pendingRemoveC ie: thisW.adds_pendingRemoveC and thisW.removes_pendingRemoveC
 	
+	thisW.pollBeingManaged = false;
+	
 	var deferred_initialized = new Deferred();
 	thisW.promise_initialized = deferred_initialized.promise;
 	
+	
+	// logic:
+		// ensure FSWatcherWorker is started
+			// then ensure thisW.FSWPollWorker is created
+				// then create watcher c side
+		// after all 3 done then resolve deferred_initialized
+		
+	var deferred_createWatcher = new Deferred();
+	var deferred_ensureWatcherWorker = new Deferred();
+	var deferred_startWatchersPollWorker = new Deferred();
+	
+	var promiseAllArr_watcherBasis = [
+		deferred_createWatcher.promise,
+		deferred_ensureWatcherWorker.promise,
+		deferred_startWatchersPollWorker.promise
+	];
+	
+	var promiseAll_watcherBasis = Promise.all(promiseAllArr_watcherBasis);
+	promiseAll_watcherBasis.then(
+	  function(aVal) {
+		console.log('Fullfilled - promiseAll_watcherBasis - ', aVal);
+		// start - do stuff here - promiseAll_watcherBasis
+		//do_createWatcher();
+		// end - do stuff here - promiseAll_watcherBasis
+	  },
+	  function(aReason) {
+		thisW.readyState = 3;
+		// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
+		for (var pendingAdd in thisW.pendingAdds) {
+			thisW.pendingAdds[pendingAdd].addIt();
+			// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init, and btw i do set thisW.pendingAdds to null at the end of this for loop (i do this as its uneeded stuff, so maybe save like some bytes of memory haha)
+		}
+		thisW.pendingAdds = null;
+		
+		var rejObj = {name:'promiseAll_watcherBasis', aReason:aReason};
+		console.warn('Rejected - promiseAll_watcherBasis - ', rejObj);
+		deferred_initialized.reject(rejObj);
+	  }
+	).catch(
+	  function(aCaught) {
+		thisW.readyState = 3;
+		// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
+		for (var pendingAdd in thisW.pendingAdds) {
+			thisW.pendingAdds[pendingAdd].addIt();
+			// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init, and btw i do set thisW.pendingAdds to null at the end of this for loop (i do this as its uneeded stuff, so maybe save like some bytes of memory haha)
+		}
+		thisW.pendingAdds = null;
+		
+		var rejObj = {name:'promiseAll_watcherBasis', aCaught:aCaught};
+		console.error('Caught - promiseAll_watcherBasis - ', rejObj);
+		deferred_initialized.reject(rejObj);
+	  }
+	);
+	
 	var do_createWatcher = function() {
+		// creates the watcher on the c side
 		var promise_createWatcher = FSWatcherWorker.post('createWatcher', [thisW.id]);
 		promise_createWatcher.then(
 		  function(aVal) {
@@ -266,7 +334,7 @@ function Watcher(aCallback) {
 			// start - do stuff here - promise_createWatcher
 			thisW.readyState = 1;
 			thisW.argsForPoll = aVal;
-			deferred_initialized.resolve(true);
+			deferred_createWatcher.resolve(true);
 			// add in the paths that are waiting
 			for (var pendingAdd in thisW.pendingAdds) {
 				var addIt = thisW.pendingAdds[pendingAdd].addIt();
@@ -275,163 +343,7 @@ function Watcher(aCallback) {
 			thisW.pendingAdds = null;
 			
 			// start - os specific
-			console.error('ok going to os specific');
-			switch (core.os.name) {
-				case 'darwin':
-				case 'freebsd':
-				case 'openbsd':
-				
-						// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
-						console.error('core.os.version:', core.os.version, 'core.os.version < 10.7', core.os.version < 7);
-						if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
-							// kqueue
-							
-							console.error('here');
-							// start the poll
-							var do_kqPoll = function() {
-								
-								if (thisW.readyState == 2 || thisW.readyState == 3) {
-									// watcher was closed so stop polling
-									return; // to prevent deeper exec
-								}
-								var promise_kqPoll = thisW.waitForNextChange();
-								promise_kqPoll.then(
-								  function(aVal) {
-									console.log('Fullfilled - promise_kqPoll - ', aVal);
-									// start - do stuff here - promise_kqPoll
-									//do_kqPoll(); // restart poll
-									// end - do stuff here - promise_kqPoll
-								  },
-								  function(aReason) {
-									var rejObj = {name:'promise_kqPoll', aReason:aReason};
-									console.warn('Rejected - promise_kqPoll - ', rejObj);
-									//deferred_createProfile.reject(rejObj);
-									//do_kqPoll();
-								  }
-								).catch(
-								  function(aCaught) {
-									var rejObj = {name:'promise_kqPoll', aCaught:aCaught};
-									console.error('Caught - promise_kqPoll - ', rejObj);
-									//deferred_createProfile.reject(rejObj);
-									//do_kqPoll();
-								  }
-								);
-							};
-							do_kqPoll();
-							
-						} else {
-							// its mac and os.version is >= 10.7
-							// use FSEventFramework
-						}
-							
-					break;
-				case 'linux':
-				case 'webos': // Palm Pre
-				case 'android':
-				
-						// start the poll
-						var do_nixPoll = function() {
-							
-							if (thisW.readyState == 2 || thisW.readyState == 3) {
-								// watcher was closed so stop polling
-								return; // to prevent deeper exec
-							}
-							var promise_nixPoll = thisW.waitForNextChange();
-							promise_nixPoll.then(
-							  function(aVal) {
-								console.log('Fullfilled - promise_nixPoll - ', aVal);
-								// start - do stuff here - promise_nixPoll
-								/*
-								thisW.cbQueue.push(function() {
-									thisW.cb(aVal.aFileName, aVal.aEvent);
-								});
-								thisW.timer.initWithCallback(thisW.timerEvent_triggerCallback, 0, Ci.nsITimer.TYPE_ONE_SHOT); // trigger callback
-								*/
-								// i was doing timer event because i didnt want body of aCallback to finish before next poll because i was worried it would miss a change, but it doesnt miss any change, as changes are fed to the file, and its their waiting when i start the next poll
-								// when renamed, renamed-from fires first, then renamed-to
-								// aVal is an array of rezObj's
-								for (var i=0; i<aVal.length; i++) {
-									let iHoisted = i;
-									var cVal = aVal[iHoisted];
-									var thisWd = cVal.aExtra.nixInotifyWd;
-									console.info('thisWd:', thisWd);
-									delete cVal.aExtra.nixInotifyWd;
-									cVal.aExtra.aOSPath_parentDir = undefined;
-									for (var cOSPath in thisW.paths_watched) {
-										console.log('compareing:', thisW.paths_watched[cOSPath], thisWd);
-										if (thisW.paths_watched[cOSPath] == thisWd) {
-											cVal.aExtra.aOSPath_parentDir = cOSPath;
-											break;
-										}
-									}
-									if (cVal.aEvent == 'renamed-to') {
-										var cArgsObj = cVal;
-										var cCookie = cArgsObj.aExtra.nixInotifyCookie;
-										delete cArgsObj.aExtra.nixInotifyCookie;
-										if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
-											// renamed-to message came first (before the related renamed-from)
-											console.log('got renamed-to event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-from event');
-											thisW._cache_aRenamed_callbackArgsObj[cCookie] = cArgsObj; // cached rename-to
-										} else {
-											// renamed-to message came second (after the related renamed-from)
-											console.log('got renamed-to event, this is the related event, the renamed-from event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
-											
-											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-from
-											var aOld = cachedArgsObj; // aOld should be set to renamed-from
-											delete aOld.aEvent; // deleting renamed-from
-											
-											cArgsObj.aExtra.aOld = aOld;
-											
-											thisW.cb(cArgsObj.aFileName, 'renamed', cArgsObj.aExtra);
-										}
-									} else if (cVal.aEvent == 'renamed-from') {
-										var cArgsObj = cVal;
-										var cCookie = cArgsObj.aExtra.nixInotifyCookie;
-										delete cArgsObj.aExtra.nixInotifyCookie;
-										if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
-											// renamed-from message came first (before the related renamed-to)
-											console.log('got renamed-from event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-to event');
-											thisW._cache_aRenamed_callbackArgsObj[cCookie] = cArgsObj; // cached rename-from
-										} else {
-											// renamed-from message came second (after the related renamed-to)
-											console.log('got renamed-from event, this is the related event, the renamed-to event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
-											
-											var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-to
-											var aOld = cArgsObj; // aOld should be set to renamed-from
-											delete aOld.aEvent; // deleting renamed-from
-											
-											cArgsObj.aExtra.aOld = aOld;
-											
-											thisW.cb(cArgsObj.aFileName, 'renamed', cArgsObj.aExtra);
-										}
-									} else {
-										thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
-									}
-								}
-								do_nixPoll(); // restart poll
-								// end - do stuff here - promise_nixPoll
-							  },
-							  function(aReason) {
-								var rejObj = {name:'promise_nixPoll', aReason:aReason};
-								console.warn('Rejected - promise_nixPoll - ', rejObj);
-								//deferred_createProfile.reject(rejObj);
-								do_nixPoll();
-							  }
-							).catch(
-							  function(aCaught) {
-								var rejObj = {name:'promise_nixPoll', aCaught:aCaught};
-								console.error('Caught - promise_nixPoll - ', rejObj);
-								//deferred_createProfile.reject(rejObj);
-								do_nixPoll();
-							  }
-							);
-						};
-						do_nixPoll();
-						
-					break;
-				default:
-					// do nothing special
-			}
+			// moved to managePoll
 			// end - os specific
 			
 			// end - do stuff here - promise_createWatcher
@@ -439,51 +351,74 @@ function Watcher(aCallback) {
 		  function(aReason) {
 			var rejObj = {name:'promise_createWatcher', aReason:aReason};
 			console.warn('Rejected - promise_createWatcher - ', rejObj);
-			thisW.readyState = 3;
-			deferred_initialized.reject(rejObj);
-			// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
-			for (var pendingAdd in thisW.pendingAdds) {
-				thisW.pendingAdds[pendingAdd].addIt();
-				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init, and btw i do set thisW.pendingAdds to null at the end of this for loop (i do this as its uneeded stuff, so maybe save like some bytes of memory haha)
-			}
-			thisW.pendingAdds = null;
+			deferred_createWatcher.reject(rejObj);
 		  }
 		).catch(
 		  function(aCaught) {
 			var rejObj = {name:'promise_createWatcher', aCaught:aCaught};
 			console.error('Caught - promise_createWatcher - ', rejObj);
-			thisW.readyState = 3;
-			deferred_initialized.reject(rejObj);
-			// run through the waiting adds, they are functions which will reject the pending deferred's with .message saying "closed due to readyState 3" as initialization failed
-			for (var pendingAdd in thisW.pendingAdds) {
-				thisW.pendingAdds[pendingAdd].addIt();
-				// i dont care to delete thisW.pendingAdds[pendingAdd] because i only iterate it once, and thats init, and btw i do set thisW.pendingAdds to null at the end of this for loop (i do this as its uneeded stuff, so maybe save like some bytes of memory haha)
-			}
-			thisW.pendingAdds = null;
+			deferred_createWatcher.reject(rejObj);
 		  }
 		);
 	};
 	
-	var promise_ensureFSWatcherWorkerStarted = _FSWatcherWorker_start();
-	promise_ensureFSWatcherWorkerStarted.then(
-	  function(aVal) {
-		console.log('Fullfilled - promise_ensureFSWatcherWorkerStarted - ', aVal);
-		// start - do stuff here - promise_ensureFSWatcherWorkerStarted
-		do_createWatcher();
-		// end - do stuff here - promise_ensureFSWatcherWorkerStarted
-	  },
-	  function(aReason) {
-		var rejObj = {name:'promise_ensureFSWatcherWorkerStarted', aReason:aReason};
-		console.warn('Rejected - promise_ensureFSWatcherWorkerStarted - ', rejObj);
-		deferred_initialized.reject(rejObj);
-	  }
-	).catch(
-	  function(aCaught) {
-		var rejObj = {name:'promise_ensureFSWatcherWorkerStarted', aCaught:aCaught};
-		console.error('Caught - promise_ensureFSWatcherWorkerStarted - ', rejObj);
-		deferred_initialized.reject(rejObj);
-	  }
-	);
+	var doStartWatchersPollWorker = function() {
+		thisW.FSWPollWorker = new PromiseWorker(core.addon.path.content + 'modules/workers/FSWPollWorker.js');
+		_Watcher_UnterminatedFSWPollWorkers[thisW.id] = thisW.FSWPollWorker;
+	
+		var promise_initPollWorker = initWorkerCore(thisW.FSWPollWorker, {
+			os: {
+				version: core.os.version // used for mac, for non-mac this may go in as undefined, but because os key exists in core by default, it wont throw an error
+			}
+		}); // just need core.os.version added to PromiseWorker core as i use it for mac
+		
+		promise_initPollWorker.then(
+		  function(aVal) {
+			console.log('Fullfilled - promise_initPollWorker - ', aVal);
+			// start - do stuff here - promise_initPollWorker
+			deferred_startWatchersPollWorker.resolve(true);
+			do_createWatcher();
+			// end - do stuff here - promise_initPollWorker
+		  },
+		  function(aReason) {
+			var rejObj = {name:'promise_initPollWorker', aReason:aReason};
+			console.warn('Rejected - promise_initPollWorker - ', rejObj);
+			deferred_startWatchersPollWorker.reject(rejObj);
+		  }
+		).catch(
+		  function(aCaught) {
+			var rejObj = {name:'promise_initPollWorker', aCaught:aCaught};
+			console.error('Caught - promise_initPollWorker - ', rejObj);
+			deferred_startWatchersPollWorker.reject(rejObj);
+		  }
+		);
+	};
+	
+	var doEnsureMainWatcher = function() {
+		var promise_ensureFSWatcherWorkerStarted = _FSWatcherWorker_start();
+		promise_ensureFSWatcherWorkerStarted.then(
+		  function(aVal) {
+			console.log('Fullfilled - promise_ensureFSWatcherWorkerStarted - ', aVal);
+			// start - do stuff here - promise_ensureFSWatcherWorkerStarted
+			deferred_ensureWatcherWorker.resolve(true);
+			doStartWatchersPollWorker();
+			// end - do stuff here - promise_ensureFSWatcherWorkerStarted
+		  },
+		  function(aReason) {
+			var rejObj = {name:'promise_ensureFSWatcherWorkerStarted', aReason:aReason};
+			console.warn('Rejected - promise_ensureFSWatcherWorkerStarted - ', rejObj);
+			deferred_ensureWatcherWorker.reject(rejObj);
+		  }
+		).catch(
+		  function(aCaught) {
+			var rejObj = {name:'promise_ensureFSWatcherWorkerStarted', aCaught:aCaught};
+			console.error('Caught - promise_ensureFSWatcherWorkerStarted - ', rejObj);
+			deferred_ensureWatcherWorker.reject(rejObj);
+		  }
+		);
+	};
+	
+	doEnsureMainWatcher();
 	
 }
 Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
@@ -498,6 +433,7 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 	var thisW = this;
 	
 	var do_addPath = function() {
+		// thisW.FSWPollWorker must be started before this is run, unless it is thisW is closed
 		if (thisW.readyState == 2 || thisW.readyState == 3) {
 			// closed either to failed initialization or user called watcher.close
 			deferredMain_Watcher_addPath.reject({
@@ -530,6 +466,8 @@ Watcher.prototype.addPath = function(aOSPath, aOptions = {}) {
 					// do the pending remove if it was there
 					if (aOSPath in thisW.removes_pendingAddC) {
 						thisW.removes_pendingAddC[aOSPath].removeIt();
+					} else {
+						managePoll(thisW);
 					}
 					// end - do stuff here - promise_addPath
 				  },
@@ -737,12 +675,206 @@ Watcher.prototype.close = function() {
 	
 	return deferredMain_Watcher_close.promise;
 }
-Watcher.prototype.waitForNextChange = function() {
+// helper functions for Watcher, not putting into prototype as i dont want to expose these functions to devusers
+function managePoll(instanceWatcher) {
+	// does not return anything
+	
+	// this function ensures that the poll is running, and keeps it going as needed
+	// if poll ends due to no paths being watched, this also quits, and a call to this function must be made to restart poll
+	// should call this function after every addPath, if its already polling it wont do anything
+	
+	// this function also handles calling the mainthread callback
+	
+	var thisW = instanceWatcher;
+	if (thisW.pollBeingManaged) {
+		// poll is already being managed
+		return;
+	}
+	// console.error('ok going to os specific');
+	switch (core.os.name) {
+		case 'darwin':
+		case 'freebsd':
+		case 'openbsd':
+		
+				// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
+				console.error('core.os.version:', core.os.version, 'core.os.version < 10.7', core.os.version < 7);
+				if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
+					
+					// kqueue
+					// start the poll
+					var do_kqPoll = function() {
+						
+						thisW.pollBeingManaged = true;
+						if (thisW.readyState == 2 || thisW.readyState == 3) {
+							// watcher was closed so stop polling
+							thisW.pollBeingManaged = false;
+							return; // to prevent deeper exec
+						}
+						var promise_kqPoll = thisW.waitForNextChange();
+						promise_kqPoll.then(
+						  function(aVal) {
+							console.log('Fullfilled - promise_kqPoll - ', aVal);
+							// start - do stuff here - promise_kqPoll
+								// handle thisW.cb triggering
+								do_kqPoll(); // restart poll
+							// end - do stuff here - promise_kqPoll
+						  },
+						  function(aReason) {
+							if (aReason.name == 'poll-aborted-nopaths') {
+								// poll aborted due to no paths being watched
+								thisW.pollBeingManaged = false;
+								if (Object.keys(thisW.paths_watched).length > 0) {
+									aReason.API_ERROR = {
+										name: 'watcher-api-error',
+										message: 'Poll aborted with error reason 0 indicating no more paths being watched, however thisW.paths_watched has paths in it',
+										extra: JSON.stringify(thisW.paths_watched),
+									}
+								}
+							}
+							var rejObj = {name:'promise_kqPoll', aReason:aReason};
+							console.warn('Rejected - promise_kqPoll - ', rejObj);
+							//deferred_createProfile.reject(rejObj);
+							//do_kqPoll();
+						  }
+						).catch(
+						  function(aCaught) {
+							  thisW.pollBeingManaged = false;
+							var rejObj = {name:'promise_kqPoll', aCaught:aCaught};
+							console.error('Caught - promise_kqPoll - ', rejObj);
+							//deferred_createProfile.reject(rejObj);
+							//do_kqPoll();
+						  }
+						);
+					};
+					do_kqPoll();
+					
+				} else {
+					
+					// its mac and os.version is >= 10.7
+					// use FSEventFramework
+					
+				}
+					
+			break;
+		case 'linux':
+		case 'webos': // Palm Pre
+		case 'android':
+		
+				// start the poll
+				var do_nixPoll = function() {
+					
+					thisW.pollBeingManaged = true;
+					if (thisW.readyState == 2 || thisW.readyState == 3) {
+						// watcher was closed so stop polling
+						thisW.pollBeingManaged = false;
+						return; // to prevent deeper exec
+					}
+					var promise_nixPoll = thisW.waitForNextChange();
+					promise_nixPoll.then(
+					  function(aVal) {
+						console.log('Fullfilled - promise_nixPoll - ', aVal);
+						// start - do stuff here - promise_nixPoll
+						/*
+						thisW.cbQueue.push(function() {
+							thisW.cb(aVal.aFileName, aVal.aEvent);
+						});
+						thisW.timer.initWithCallback(thisW.timerEvent_triggerCallback, 0, Ci.nsITimer.TYPE_ONE_SHOT); // trigger callback
+						*/
+						// i was doing timer event because i didnt want body of aCallback to finish before next poll because i was worried it would miss a change, but it doesnt miss any change, as changes are fed to the file, and its their waiting when i start the next poll
+						// when renamed, renamed-from fires first, then renamed-to
+						// aVal is an array of rezObj's
+						for (var i=0; i<aVal.length; i++) {
+							let iHoisted = i;
+							var cVal = aVal[iHoisted];
+							var thisWd = cVal.aExtra.nixInotifyWd;
+							console.info('thisWd:', thisWd);
+							delete cVal.aExtra.nixInotifyWd;
+							cVal.aExtra.aOSPath_parentDir = undefined;
+							for (var cOSPath in thisW.paths_watched) {
+								console.log('compareing:', thisW.paths_watched[cOSPath], thisWd);
+								if (thisW.paths_watched[cOSPath] == thisWd) {
+									cVal.aExtra.aOSPath_parentDir = cOSPath;
+									break;
+								}
+							}
+							if (cVal.aEvent == 'renamed-to') {
+								var cArgsObj = cVal;
+								var cCookie = cArgsObj.aExtra.nixInotifyCookie;
+								delete cArgsObj.aExtra.nixInotifyCookie;
+								if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
+									// renamed-to message came first (before the related renamed-from)
+									console.log('got renamed-to event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-from event');
+									thisW._cache_aRenamed_callbackArgsObj[cCookie] = cArgsObj; // cached rename-to
+								} else {
+									// renamed-to message came second (after the related renamed-from)
+									console.log('got renamed-to event, this is the related event, the renamed-from event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
+									
+									var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-from
+									var aOld = cachedArgsObj; // aOld should be set to renamed-from
+									delete aOld.aEvent; // deleting renamed-from
+									
+									cArgsObj.aExtra.aOld = aOld;
+									
+									thisW.cb(cArgsObj.aFileName, 'renamed', cArgsObj.aExtra);
+								}
+							} else if (cVal.aEvent == 'renamed-from') {
+								var cArgsObj = cVal;
+								var cCookie = cArgsObj.aExtra.nixInotifyCookie;
+								delete cArgsObj.aExtra.nixInotifyCookie;
+								if (!(cCookie in thisW._cache_aRenamed_callbackArgsObj)) {
+									// renamed-from message came first (before the related renamed-to)
+									console.log('got renamed-from event, so saving its info, and will trigger callback with merged argObj\'s when recieve related (by cookie) renamed-to event');
+									thisW._cache_aRenamed_callbackArgsObj[cCookie] = cArgsObj; // cached rename-from
+								} else {
+									// renamed-from message came second (after the related renamed-to)
+									console.log('got renamed-from event, this is the related event, the renamed-to event objArgs is already saved, so merge them and trigger callback with aEvent==renamed');
+									
+									var cachedArgsObj = thisW._cache_aRenamed_callbackArgsObj[cCookie]; //is renamed-to
+									var aOld = cArgsObj; // aOld should be set to renamed-from
+									delete aOld.aEvent; // deleting renamed-from
+									
+									cArgsObj.aExtra.aOld = aOld;
+									
+									thisW.cb(cArgsObj.aFileName, 'renamed', cArgsObj.aExtra);
+								}
+							} else {
+								thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
+							}
+						}
+						do_nixPoll(); // restart poll
+						// end - do stuff here - promise_nixPoll
+					  },
+					  function(aReason) {
+						  thisW.pollBeingManaged = false;
+						var rejObj = {name:'promise_nixPoll', aReason:aReason};
+						console.warn('Rejected - promise_nixPoll - ', rejObj);
+						//deferred_createProfile.reject(rejObj);
+						//do_nixPoll();
+					  }
+					).catch(
+					  function(aCaught) {
+						  thisW.pollBeingManaged = false;
+						var rejObj = {name:'promise_nixPoll', aCaught:aCaught};
+						console.error('Caught - promise_nixPoll - ', rejObj);
+						//deferred_createProfile.reject(rejObj);
+						//do_nixPoll();
+					  }
+					);
+				};
+				do_nixPoll();
+				
+			break;
+		default:
+			// do nothing special
+	}
+}
+function waitForNextChange(instanceWatcher) {
 	// returns promise
+	// stats FSWPollWorker thread if not yet started for this watcher
 	
 	var deferredMain_Watcher_waitForNextChange = new Deferred();
 	
-	var thisW = this;
+	var thisW = instanceWatcher;
 	
 	var do_poll = function() {
 		var promise_poll = thisW.FSWPollWorker.post('poll', [thisW.argsForPoll]);
@@ -768,34 +900,7 @@ Watcher.prototype.waitForNextChange = function() {
 	};
 	
 	if (!thisW.FSWPollWorker) {
-		thisW.FSWPollWorker = new PromiseWorker(core.addon.path.content + 'modules/workers/FSWPollWorker.js');
-		_Watcher_UnterminatedFSWPollWorkers[thisW.id] = thisW.FSWPollWorker;
-		
-		var promise_initPollWorker = initWorkerCore(thisW.FSWPollWorker, {
-			os: {
-				version: core.os.version // used for mac
-			}
-		}); // just need core.os.version added to PromiseWorker core as i use it for mac
-		
-		promise_initPollWorker.then(
-		  function(aVal) {
-			console.log('Fullfilled - promise_initPollWorker - ', aVal);
-			// start - do stuff here - promise_initPollWorker
-			do_poll();
-			// end - do stuff here - promise_initPollWorker
-		  },
-		  function(aReason) {
-			var rejObj = {name:'promise_initPollWorker', aReason:aReason};
-			console.warn('Rejected - promise_initPollWorker - ', rejObj);
-			deferredMain_Watcher_waitForNextChange.reject(rejObj);
-		  }
-		).catch(
-		  function(aCaught) {
-			var rejObj = {name:'promise_initPollWorker', aCaught:aCaught};
-			console.error('Caught - promise_initPollWorker - ', rejObj);
-			deferredMain_Watcher_waitForNextChange.reject(rejObj);
-		  }
-		);
+		throw new Error('FSWPollWorker not started!!!!!!!');
 	} else {
 		do_poll();
 	}
