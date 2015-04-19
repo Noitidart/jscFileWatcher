@@ -341,7 +341,7 @@ function poll(aArgs) {
 							// something happend
 							console.log('Event ' + cutils.jscGetDeepest(event_data[0].ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data[0].filter) + ', flags ' + cutils.jscGetDeepest(event_data[0].flags) + ', filter flags ' + cutils.jscGetDeepest(event_data[0].fflags) + ', filter data ' + cutils.jscGetDeepest(event_data[0].data) + ', path ' + cutils.jscGetDeepest(event_data[0].udata /*.contents.readString()*/ ));
 							
-							i f(core.os.name == 'darwin') {
+							if (core.os.name == 'darwin') {
 								var ptrStr = ctypes.cast(event_data[0].udata.address(), ctypes.intptr_t.ptr).contents;
 							} else {
 								// bsd
