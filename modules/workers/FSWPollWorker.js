@@ -337,7 +337,11 @@ function poll(aArgs) {
 							});
 						}
 
+						var js_event_count = cutils.jscGetDeepest(event_count);
 						if (!cutils.jscEqual(event_count, 0)) {
+							if (parseInt(js_event_count) > 1) {
+								console.error('not yet implemented::: more then 1 event_count!!');
+							}
 							// something happend
 							console.log('Event ' + cutils.jscGetDeepest(event_data[0].ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data[0].filter) + ', flags ' + cutils.jscGetDeepest(event_data[0].flags) + ', filter flags ' + cutils.jscGetDeepest(event_data[0].fflags) + ', filter data ' + cutils.jscGetDeepest(event_data[0].data) + ', path ' + cutils.jscGetDeepest(event_data[0].udata /*.contents.readString()*/ ));
 							
@@ -351,8 +355,14 @@ function poll(aArgs) {
 							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
 							console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
 							
-							var aOSPath_parentDir = ctypes.cast(event_data[0].udata, ctypes.jschar.ptr); // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
-							console.log('aEvent:', convertFlagsToAEventStr(event_data[0].fflags));
+							var jsStr_cOSPath = '';
+							for (var i=0; i<cStr_cOSPath.contents.length; i++) {
+								jsStr_cOSPath += cStr_cOSPath.contents[i];
+							}
+							
+							var aOSPath_parentDir = jsStr_cOSPath; // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
+							
+							console.log('aEvent:', convertFlagsToAEventStr(event_data[0].fflags), 'aOSPath_parentDir:', aOSPath_parentDir);
 						} else {
 							// No event
 						}
