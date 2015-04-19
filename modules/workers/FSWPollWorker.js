@@ -340,6 +340,7 @@ function poll(aArgs) {
 								// bsd
 								var ptrStr = cutils.jscGetDeepest(event_data[0].udata);
 							}
+							console.info('ptrStr:', ptrStr);
 							var cStr_cOSPath = ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr)); //jschar due to link321354 in FSWatcherWorker
 							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
 							console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
