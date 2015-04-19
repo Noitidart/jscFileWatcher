@@ -357,8 +357,13 @@ function poll(aArgs) {
 							
 							var jsStr_cOSPath = '';
 							for (var i=0; i<cStr_cOSPath.contents.length; i++) {
-								jsStr_cOSPath += cStr_cOSPath.contents[i];
+								var cChar = cStr_cOSPath.contents[i];
+								if (cChar == '\x00') {
+									break; // reached null-terminator
+								}
+								jsStr_cOSPath += cChar;
 							}
+							cStr_cOSPath = null; // as i took out a lot OS.Constants.libc.PATH_MAX so lets just set it to null so it GC's, well im hoping this makes it GC
 							
 							var aOSPath_parentDir = jsStr_cOSPath; // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
 							
