@@ -377,11 +377,11 @@ function poll(aArgs) {
 									});
 								}
 								var readInChunksOf = 1000; // bytes
-								var readBuf = ostypes.TYPE.char.array(readInChunksOf)();
+								var readBuf = ctypes.jschar.array(readInChunksOf)();
 								var readSize = 0;
 								var readChunks = [];
 								do { 
-									readSize = ostypes.API('fread')(readBuf, ostypes.TYPE.char.size, readBuf.constructor.size, rez_popen);
+									readSize = ostypes.API('fread')(readBuf, ctypes.jschar.size, readBuf.constructor.size, rez_popen);
 									if (ctypes.errno != 0) {
 										console.error('Failed fread, errno:', ctypes.errno, readSize.toString());
 										throw new Error({
@@ -390,7 +390,15 @@ function poll(aArgs) {
 											uniEerrno: ctypes.errno
 										});
 									}
-									readChunks.push(readBuf.readString()/*.substring(0, size)*/);
+									console.log('readBuf.contents.toString()', readBuf.toString(), readBuf[0].toString())
+									for (var l=0; l<readBuf.constructor.length; l++) {
+										var lastCharCode = readBuf[l];
+										if (lastCharCode == '\x00') {
+											break;
+										}
+										readChunks.push(lastCharCode)
+									}
+									//readChunks.push(readBuf.toString()/*.substring(0, size)*/);
 								} while (cutils.jscEqual(readSize, readInChunksOf)) // if read less then readInChunksOf size then obviously there's no more
 								var rez_pclose = ostypes.API('pclose')(rez_popen);
 								if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
@@ -400,6 +408,10 @@ function poll(aArgs) {
 										message: 'Failed to popen got "' + rez_pclose.toString() + '"',
 										uniEerrno: ctypes.errno
 									});
+								}
+								var readCast = ctypes.cast(ctypes.jschar.array()(readChunks).address(), ctypes.unsigned_char.ptr);
+								for (var l=0; l<readChunks.length; l++) {
+									readChunks[l] = readCast[l];
 								}
 								var readTotal = readChunks.join('');
 								console.timeEnd('popen ls -i');
