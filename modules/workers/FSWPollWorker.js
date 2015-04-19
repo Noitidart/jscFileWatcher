@@ -310,7 +310,7 @@ function poll(aArgs) {
 				var event_data;// = ostypes.TYPE.kevent.array(ostypes.CONST.NUM_EVENT_SLOTS)();
 				
 				var continue_loop = Infinity; // monitor forever // 40; // Monitor for twenty seconds. // ostypes.TYPE.int
-				var FSChanges = 0; // object to deliever back to main thread
+				var FSChanges = []; // object to deliever back to main thread
 				while (--continue_loop) {
 					var now_eventsToMonitorPtrStr = bsd_mac_kqStuff.cStr_evtMtrPtrStr.contents.readString(); // using ctypes.char and NOT ostypes.TYPE.char as this is depending on cutils.modifyCStr (which says use ctypes.char) // link87354 50 cuz thats what i set it to
 					if (now_eventsToMonitorPtrStr != last_eventsToMonitorPtrStr) { // link584732
@@ -365,7 +365,7 @@ function poll(aArgs) {
 									OSPath: aOSPath_watchedDir, //jsStr
 									dirStat: fetchInodeAndFilenamesInDir(aOSPath_watchedDir)
 								};
-							} else if (bsd_mac_kqStuff.watchedFd[fd] == aOSPath_watchedDir) {
+							} else if (bsd_mac_kqStuff.watchedFd[fd].OSPath == aOSPath_watchedDir) {
 								// the stored js str is same so no need to do anything, the last OS.File.DirectoryIterator is sufficient (as if it did change it was updated from change notification)
 							} else {
 								console.error('WHAAA should never get here', aOSPath_watchedDir, bsd_mac_kqStuff.watchedFd[fd]);
@@ -420,16 +420,17 @@ function poll(aArgs) {
 							
 							var aOSPath_parentDir = bsd_mac_kqStuff.watchedFd[evFd].OSPath;
 							
-							var FSChanges = [];
 							var nowDirStat = fetchInodeAndFilenamesInDir(aOSPath_parentDir);
 							for (var nowInode in nowDirStat) {
+								console.log('checking new inode:', nowInode);
 								if (!(nowInode in bsd_mac_kqStuff.watchedFd[evFd].dirStat)) {
 									// added
+									console.error('added push');
 									FSChanges.push({
 										aFileName: nowDirStat[nowInode].filename,
 										aEvent: 'added',
 										aExtra: {
-											aOSPath_parentDir: aOSPath_parentDir,
+											aOSPath_parentDir: aOSPath_parentDir
 										}
 									});
 								} else {
@@ -440,7 +441,7 @@ function poll(aArgs) {
 											aFileName: nowDirStat[nowInode].filename,
 											aEvent: 'contents-modified',
 											aExtra: {
-												aOSPath_parentDir: aOSPath_parentDir,
+												aOSPath_parentDir: aOSPath_parentDir
 											}
 										});
 									}
@@ -461,7 +462,9 @@ function poll(aArgs) {
 								}
 							}
 							for (var thenInode in bsd_mac_kqStuff.watchedFd[evFd].dirStat) { // check if any inodes remaining
+								console.log('checking removed inode:', thenInode);
 								// removed
+								console.error('removed push');
 								FSChanges.push({
 									aFileName: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].filename,
 									aEvent: 'removed',
@@ -471,7 +474,10 @@ function poll(aArgs) {
 								});
 							}
 							bsd_mac_kqStuff.watchedFd[evFd].dirStat = nowDirStat; // set old dirstat to the new dirstat
-							break;
+							
+							if (FSChanges.length > 0) {
+								return FSChanges;
+							}
 						} else {
 							// No event
 						}
@@ -482,7 +488,7 @@ function poll(aArgs) {
 					}
 				}
 				// ostypes.API('close')(event_fd); // this should not happen here but in watcher1.close()
-				return FSChanges;
+				//return FSChanges;
 				
 			// end kqueue
 			} else {
