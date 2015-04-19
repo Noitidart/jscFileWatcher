@@ -403,10 +403,10 @@ function poll(aArgs) {
 								}
 								var readTotal = readChunks.join('');
 								console.info('readTotal:', readTotal.toString());
-								var inode_and_filename_patt = /^(\d+) (.*?)$/g;
+								var inode_and_filename_patt = /^(\d+) (.*?)$/gm;
 								var inode_and_filename_match;
 								while (inode_and_filename_match = inode_and_filename_patt.exec(readTotal)) {
-									bsd_mac_kqStuff.watchedFd[fd].dirStat[inode_and_filename_match[2]] = inode_and_filename_match[1];
+									bsd_mac_kqStuff.watchedFd[fd].dirStat[inode_and_filename_match[1]] = inode_and_filename_match[2];
 								}
 								console.timeEnd('popen ls -i');
 								console.info(bsd_mac_kqStuff.watchedFd[fd]);
