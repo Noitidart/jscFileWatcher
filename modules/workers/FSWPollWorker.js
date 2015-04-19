@@ -364,7 +364,7 @@ function poll(aArgs) {
 								bsd_mac_kqStuff.watchedFd[fd] = {
 									OSPath: aOSPath_watchedDir, //jsStr
 									dirStat: {}
-								}
+								};
 								// start - reused block link68768431
 								console.error('st opendir');
 								var rez_opendir = ostypes.API('opendir')(aOSPath_watchedDir);

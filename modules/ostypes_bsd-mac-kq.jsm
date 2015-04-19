@@ -191,7 +191,7 @@ var kqInit = function() {
 			 *   DIR *dirp
 			 * );
 			 */
-			return lib('libc').declare('closedir', self.TYPE,ABI,
+			return lib('libc').declare('closedir', self.TYPE.ABI,
 				self.TYPE.int,		// return
 				self.TYPE.DIR.ptr	// *dirp
 			);
@@ -247,7 +247,7 @@ var kqInit = function() {
 			 *   const char *name
 			 * );
 			 */
-			return lib('libc').declare('opendir', self.TYPE,ABI,
+			return lib('libc').declare('opendir', self.TYPE.ABI,
 				self.TYPE.DIR.ptr,		// return
 				self.TYPE.char.ptr		// *name
 			);
@@ -260,7 +260,7 @@ var kqInit = function() {
 			 *   DIR *dirp
 			 * );
 			 */
-			return lib('libc').declare('readdir', self.TYPE,ABI,
+			return lib('libc').declare('readdir', self.TYPE.ABI,
 				self.TYPE.dirent.ptr,	// return
 				self.TYPE.DIR.ptr		// *dirp
 			);
@@ -274,7 +274,7 @@ var kqInit = function() {
 			 *   struct dirent **result
 			 * );
 			 */
-			return lib('libc').declare('readdir_r', self.TYPE,ABI,
+			return lib('libc').declare('readdir_r', self.TYPE.ABI,
 				self.TYPE.int,				// return
 				self.TYPE.DIR.ptr,			// *dirp
 				self.TYPE.dirent.ptr,		// *entry
