@@ -147,6 +147,22 @@ function init(objCore) {
 		
 				bsd_mac_kqStuff = {};
 				bsd_mac_kqStuff.evtMtrPtrStr_len = 50; // change in FSWatcherWorker too
+				bsd_mac_kqStuff.watchedFd = {};
+				/* about bsd_mac_kqStuff.watchedFd
+				keys is fd,
+				val is obj:
+					{
+						jsStr: jsStr of OSPath of watched directory,
+						dirStat: {
+							jsStr_filename_1: {
+								lastModificationDate: js_lastModDate
+							},
+							jsStr_filename_2: {
+								lastModificationDate: js_lastModDate
+							},
+						}
+					}
+				*/
 				
 			break;
 		default:
@@ -306,6 +322,78 @@ function poll(aArgs) {
 						
 						events_to_monitor = ostypes.TYPE.kevent.array(bsd_mac_kqStuff.num_files.contents).ptr(ctypes.UInt64(now_eventsToMonitorPtrStr)).contents;
 						event_data = ostypes.TYPE.kevent.array(events_to_monitor.length)();
+						
+						var accountedFdInArr = [];
+						for (var i=0; i<events_to_monitor.length; i++) {
+							var fd = cutils.jscGetDeepest(events_to_monitor[i].ident);
+							accountedFdInArr.push(fd);
+							if (!(fd in bsd_mac_kqStuff.watchedFd)) {
+								bsd_mac_kqStuff.watchedFd[fd] = 0;
+								console.log('fd of ' + fd + ' was added to watch list');
+							}
+							// start - even if it was there, i want to make sure the path is right
+							// get the cstr
+							if (core.os.name == 'darwin') {
+								var ptrStr = ctypes.cast(event_data[0].udata.address(), ctypes.intptr_t.ptr).contents;
+							} else {
+								// bsd
+								var ptrStr = cutils.jscGetDeepest(event_data[0].udata);
+							}
+							var cStr_cOSPath = ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr)); //jschar due to link321354 in FSWatcherWorker
+							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
+							console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
+							var jsStr_cOSPath = '';
+							for (var i=0; i<cStr_cOSPath.contents.length; i++) {
+								var cChar = cStr_cOSPath.contents[i];
+								if (cChar == '\x00') {
+									break; // reached null-terminator
+								}
+								jsStr_cOSPath += cChar;
+							}
+							cStr_cOSPath = null; // as i took out a lot OS.Constants.libc.PATH_MAX so lets just set it to null so it GC's, well im hoping this makes it GC
+							
+							var aOSPath_watchedDir = jsStr_cOSPath; // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
+							if (bsd_mac_kqStuff.watchedFd[fd] == 0 || bsd_mac_kqStuff.watchedFd[fd] != aOSPath_watchedDir) {
+								if (bsd_mac_kqStuff.watchedFd[fd] != aOSPath_watchedDir) {
+									console.error('WARNING: just note to self, fd got reused (i suspected this was a possibility and this message confirms it), old path was "' + bsd_mac_kqStuff.watchedFd[fd] + '" and now it is updated to "' + aOSPath_watchedDir + '" the fd is: "' + fd + '"');
+								}
+								bsd_mac_kqStuff.watchedFd[fd] = {
+									OSPath: aOSPath_watchedDir, //jsStr
+									dirStat: {}
+								}
+								// start - reused block link68768431
+								// fetch OS.File.DirectoryIterator
+								var iterator_dirStat = new OS.File.DirectoryIterator(aOSPath_watchedDir);
+								try {
+									for (var dirEnt in iterator_dirStat) {
+										var dirEntStat = OS.File.stat(dirEnt.path);
+										bsd_mac_kqStuff.watchedFd[fd].dirStat[dirEntStat.name] = {
+											lastModificationDate: dirEntStat.lastModificationDate, //jsDate
+											creationDate: (dirEntStat.creationDate || dirEntStat.macBirthDate), //jsDate // used for detecting rename
+											lastAccessDate: dirEntStat.lastAccessDate, // used for detecting rename
+											size: dirEntStat.size, // used for detecting rename
+											unixOwner: dirEntStat.unixOwner, // used for detecting rename
+											unixGroup: dirEntStat.unixGroup, // used for detecting rename
+											unixMode: dirEntStat.unixMode // used for detecting rename
+										}
+									}
+								} finally {
+									iterator_dirStat.close();
+								}
+								// end - reused block link68768431
+							} else if (bsd_mac_kqStuff.watchedFd[fd] == aOSPath_watchedDir) {
+								// the stored js str is same so no need to do anything, the last OS.File.DirectoryIterator is sufficient (as if it did change it was updated from change notification)
+							} else {
+								console.error('WHAAA should never get here', aOSPath_watchedDir, bsd_mac_kqStuff.watchedFd[fd]);
+							}
+							// end get the cstr
+							// end - even if it was there, i want to make sure the path is right
+						}
+						for (var fdInObj in bsd_mac_kqStuff.watchedFd) {
+							if (accountedFdInArr.indexOf(fdInObj) == -1) {
+								delete bsd_mac_kqStuff.watchedFd[fdInObj]; // fd was removed by removePath probably so delete it from watched list
+							}
+						}
 					}
 					if (events_to_monitor.length == 0) {
 						// no pahts to watch
@@ -343,29 +431,51 @@ function poll(aArgs) {
 								console.error('not yet implemented::: more then 1 event_count!!');
 							}
 							// something happend
-							console.log('Event ' + cutils.jscGetDeepest(event_data[0].ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data[0].filter) + ', flags ' + cutils.jscGetDeepest(event_data[0].flags) + ', filter flags ' + cutils.jscGetDeepest(event_data[0].fflags) + ', filter data ' + cutils.jscGetDeepest(event_data[0].data) + ', path ' + cutils.jscGetDeepest(event_data[0].udata /*.contents.readString()*/ ));
+							var evFd = cutils.jscGetDeepest(event_data[0].ident);
+							console.log('Event ' + evFd + ' occurred. Filter ' + cutils.jscGetDeepest(event_data[0].filter) + ', flags ' + cutils.jscGetDeepest(event_data[0].flags) + ', filter flags ' + cutils.jscGetDeepest(event_data[0].fflags) + ', filter data ' + cutils.jscGetDeepest(event_data[0].data) + ', path ' + cutils.jscGetDeepest(event_data[0].udata /*.contents.readString()*/ ));
 							
-							if (core.os.name == 'darwin') {
-								var ptrStr = ctypes.cast(event_data[0].udata.address(), ctypes.intptr_t.ptr).contents;
-							} else {
-								// bsd
-								var ptrStr = cutils.jscGetDeepest(event_data[0].udata);
-							}
-							var cStr_cOSPath = ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr));
-							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
-							console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
+							var aOSPath_parentDir = bsd_mac_kqStuff.watchedFd[evFd].OSPath;
 							
-							var jsStr_cOSPath = '';
-							for (var i=0; i<cStr_cOSPath.contents.length; i++) {
-								var cChar = cStr_cOSPath.contents[i];
-								if (cChar == '\x00') {
-									break; // reached null-terminator
+							var FSChanges = [];
+							// start - similar to block link68768431
+							// fetch OS.File.DirectoryIterator
+							var iterator_dirStat = new OS.File.DirectoryIterator(aOSPath_parentDir);
+							try {
+								var nowDirStat = {};
+								for (var dirEnt in iterator_dirStat) {
+									var dirEntStat = OS.File.stat(dirEnt.path);
+									nowDirStat[dirEntStat.name] = {
+										lastModificationDate: dirEntStat.lastModificationDate, //jsDate
+											creationDate: (dirEntStat.creationDate || dirEntStat.macBirthDate), //jsDate // used for detecting rename
+											lastAccessDate: dirEntStat.lastAccessDate, // used for detecting rename
+											size: dirEntStat.size, // used for detecting rename
+											unixOwner: dirEntStat.unixOwner, // used for detecting rename
+											unixGroup: dirEntStat.unixGroup, // used for detecting rename
+											unixMode: dirEntStat.unixMode // used for detecting rename
+									}
 								}
-								jsStr_cOSPath += cChar;
+								// lets now compare old dirstat to new dirstat, then set old dirstat to the new dirstat
+								for (var cFileName in bsd_mac_kqStuff.watchedFd[evFd].dirStat) {
+									if (!(cFileName in nowDirStat)) {
+										// removed OR renamed-from
+									} else {
+										// its there, lets check if it was contents-modified
+										if (bsd_mac_kqStuff.watchedFd[evFd].dirStat[cFileName].lastModificationDate != nowDirStat[cFileName].lastModificationDate) {
+												// contents-modified
+										}
+									}
+								}
+								for (var cFileName in nowDirStat) {
+									if (!(cFileName in bsd_mac_kqStuff.watchedFd[evFd].dirStat)) {
+										// added OR renamed-to
+									}
+								}
+								
+								bsd_mac_kqStuff.watchedFd[evFd].dirStat = nowDirStat; // set old dirstat to the new dirstat
+							} finally {
+								iterator_dirStat.close();
 							}
-							cStr_cOSPath = null; // as i took out a lot OS.Constants.libc.PATH_MAX so lets just set it to null so it GC's, well im hoping this makes it GC
-							
-							var aOSPath_parentDir = jsStr_cOSPath; // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
+							// end - similar to block link68768431
 							
 							console.log('aEvent:', convertFlagsToAEventStr(event_data[0].fflags), 'aOSPath_parentDir:', aOSPath_parentDir);
 						} else {

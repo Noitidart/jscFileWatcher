@@ -229,17 +229,8 @@ var kqInit = function() {
 			kev_address.contents.addressOfField('filter').contents = filter;
 			kev_address.contents.addressOfField('flags').contents = flags;
 			kev_address.contents.addressOfField('fflags').contents = fflags;
-			kev_address.contents.addressOfField('data').contents = data;
-			
-			/*
-			var cStr = ctypes.jschar.array()(udata_jsStr);
-			console.error('INFO cStr:', cStr.toString());
-			var castedToVoid = ctypes.cast(cStr, self.TYPE.void.ptr);
-			console.error('INFO castedToVoid:', castedToVoid.toString());
-			console.error('INFO castedToVoid.address():', castedToVoid.address().toString());
-			*/
-			
-			kev_address.contents.addressOfField('udata').contents = udata; // link4874354
+			kev_address.contents.addressOfField('data').contents = data;			
+			kev_address.contents.addressOfField('udata').contents = udata;
 		}
 	};
 }
