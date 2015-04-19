@@ -395,7 +395,11 @@ function poll(aArgs) {
 										console.log('one past last directory entry'); // from testing i learned that the dirent will be the previous entry (meaning the last entry that it had found)
 										break;
 									} else {
-										var dirent_filename = dirent.d_name.contents.readString();
+										console.info('dirent.d_name:', dirent.d_name.toString());
+										console.info('dirent.d_name.contents:', dirent.d_name.toString());
+										console.info('dirent.contents.getAddressOfField('d_name').readString():', dirent.contents.getAddressOfField('d_name').readString());
+										console.info('dirent.d_name.readString():', dirent.d_name.readString());
+										var dirent_filename = dirent.d_name.readString();
 										var dirent_inode = dirent.d_ino;
 										var dirent_ftype = dirent.d_type;
 										console.info('dirent_filename:', dirent_filename, 'dirent_inode:', dirent_inode);
