@@ -290,8 +290,8 @@ var kqInit = function() {
 			 * );
 			 */
 			return lib('libc').declare('popen', self.TYPE.ABI,
-				self.TYPE.FILE,				// return
-				self.TYPE.char.ptr,			// *command
+				self.TYPE.FILE.ptr,		// return
+				self.TYPE.char.ptr,		// *command
 				self.TYPE.char.ptr		// *type
 			);
 		},
