@@ -276,6 +276,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				_Watcher_cache[aWatcherID] = Watcher;
 				Watcher.fd = fd;
 				Watcher.paths_watched = {}; // casing is whatever devuser passed in, key is aOSPath, and value is watch_fd
+				Watcher.cStr_OSPath_obj = {}; // obj holding cstrs so i can read it in the callback, holding it here so it doesnt get gc'ed
 				
 				var argsForPoll = {
 					fd: parseInt(cutils.jscGetDeepest(fd))
@@ -439,8 +440,13 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				var i = -1;
 				for (var cOSPath in Watcher.paths_watched) {
 					i++;
-					Watcher.cStr_cOSPath = ctypes.jschar.array()(cOSPath);
-					var ptrStr = cutils.strOfPtr(Watcher.cStr_cOSPath.address());
+					// i have to make udata intptr_t as in bsd the field is inptr_t while in mac it is void*
+					
+					if (!(cOSPath in Watcher.cStr_OSPath_obj)) {
+						Watcher.cStr_OSPath_obj[cOSPath] = ctypes.jschar.array()(cOSPath);
+					}
+					var ptrStr = cutils.strOfPtr(Watcher.cStr_OSPath_obj[cOSPath].address()); //strptr to the c string holding the path
+					
 					console.error('INFO ptrStr:', ptrStr.toString());
 					if (core.os.name == 'darwin') {
 						var udata = ctypes.cast(ostypes.TYPE.intptr_t(ptrStr), ostypes.TYPE.void.ptr);

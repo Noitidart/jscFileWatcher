@@ -340,7 +340,18 @@ function poll(aArgs) {
 						if (!cutils.jscEqual(event_count, 0)) {
 							// something happend
 							console.log('Event ' + cutils.jscGetDeepest(event_data[0].ident) + ' occurred. Filter ' + cutils.jscGetDeepest(event_data[0].filter) + ', flags ' + cutils.jscGetDeepest(event_data[0].flags) + ', filter flags ' + cutils.jscGetDeepest(event_data[0].fflags) + ', filter data ' + cutils.jscGetDeepest(event_data[0].data) + ', path ' + cutils.jscGetDeepest(event_data[0].udata /*.contents.readString()*/ ));
-							var aOSPath_parentDir = ctypes.cast(event_data[0].udata.address(), ctypes.jschar.array(3).ptr); // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
+							
+							i f(core.os.name == 'darwin') {
+								var ptrStr = ctypes.cast(event_data[0].udata.address(), ctypes.intptr_t.ptr).contents;
+							} else {
+								// bsd
+								var ptrStr = cutils.jscGetDeepest(event_data[0].udata);
+							}
+							var cStr_cOSPath = ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr));
+							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
+							console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
+							
+							var aOSPath_parentDir = ctypes.cast(event_data[0].udata, ctypes.jschar.ptr); // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
 							console.log('aEvent:', convertFlagsToAEventStr(event_data[0].fflags));
 						} else {
 							// No event
