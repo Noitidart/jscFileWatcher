@@ -391,7 +391,7 @@ function poll(aArgs) {
 										});
 									}
 									readChunks.push(readBuf.readString()/*.substring(0, size)*/);
-								} while (cutils.jscEqual(readSize, readInChunksOf)) { // if read less then readInChunksOf size then obviously there's no more
+								} while (cutils.jscEqual(readSize, readInChunksOf)) // if read less then readInChunksOf size then obviously there's no more
 								var rez_pclose = ostypes.API('pclose')(rez_popen);
 								if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
 									console.error('Failed rez_popen, errno:', ctypes.errno);
