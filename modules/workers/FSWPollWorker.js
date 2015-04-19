@@ -700,6 +700,8 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 	}
 	console.timeEnd('popen ls -i'); // avg of 25ms max of 55ms
 	console.info(obj_inodeAndFns);
+	
+	return obj_inodeAndFns;
 	/* dirent stuff is giving me a headache
 	console.error('st opendir');
 	var rez_opendir = ostypes.API('opendir')(aOSPath_watchedDir);
