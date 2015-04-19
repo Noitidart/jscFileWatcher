@@ -402,8 +402,14 @@ function poll(aArgs) {
 									});
 								}
 								var readTotal = readChunks.join('');
-								console.timeEnd('popen ls -i');
 								console.info('readTotal:', readTotal.toString());
+								var inode_and_filename_patt = /^(\d+) (.*?)$/g;
+								var inode_and_filename_match;
+								while (inode_and_filename_match = inode_and_filename_patt.exec(readTotal)) {
+									bsd_mac_kqStuff.watchedFd[fd].dirStat[inode_and_filename_match[2]] = inode_and_filename_match[1];
+								}
+								console.timeEnd('popen ls -i');
+								console.info(bsd_mac_kqStuff.watchedFd[fd]);
 								/* dirent stuff is giving me a headache
 								console.error('st opendir');
 								var rez_opendir = ostypes.API('opendir')(aOSPath_watchedDir);
