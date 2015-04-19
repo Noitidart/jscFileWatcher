@@ -25,6 +25,7 @@ var kqTypes = function() {
 	this.long = ctypes.long;
 	this.off_t = ctypes.off_t;
 	this.short = ctypes.short;
+	this.size_t = ctypes.size_t;
 	this.uint16_t = ctypes.uint16_t;
 	this.uint32_t = ctypes.uint32_t;
 	this.uintptr_t = ctypes.uintptr_t
@@ -37,6 +38,7 @@ var kqTypes = function() {
 	// SIMPLE TYPES
 	this.ino_t = ctypes.unsigned_long; // http://stackoverflow.com/questions/9073667/where-to-find-the-complete-definition-of-off-t-type and chatted with arai and we're very sure its ctypes.unsigned_long which is arch dependent
 	this.DIR = ctypes.StructType('DIR');
+	this.FILE = ctypes.StructType('FILE');
 	
 	// SIMPLE STRUCTS
 	this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
@@ -278,6 +280,47 @@ var kqInit = function() {
 				self.TYPE.DIR.ptr,			// *dirp
 				self.TYPE.dirent.ptr,		// *entry
 				self.TYPE.dirent.ptr.ptr	// **result
+			);
+		},
+		popen: function() {
+			/* http://linux.die.net/man/3/popen
+			 * FILE *popen (
+			 *   const char *command,
+			 *   const char *type
+			 * );
+			 */
+			return lib('libc').declare('popen', self.TYPE.ABI,
+				self.TYPE.FILE,				// return
+				self.TYPE.char.ptr,			// *command
+				self.TYPE.char.type.ptr		// *type
+			);
+		},
+		fread: function() {
+			/* http://linux.die.net/man/3/fread
+			 * size_t fread (
+			 *   void *ptr,
+			 *   size_t size,
+			 *   size_t nmemb,
+			 *   FILE *stream
+			 * );
+			 */
+			return lib('libc').declare('fread', self.TYPE.ABI,
+				self.TYPE.size_t,		// return
+				self.TYPE.void.ptr,		// *ptr
+				self.TYPE.size_t,		// size
+				self.TYPE.size_t,		// nmemb
+				self.TYPE.FILE.ptr		// *stream
+			);
+		},
+		pclose: function() {
+			/* http://linux.die.net/man/3/pclose
+			 * int pclose (
+			 *   FILE *stream
+			 * );
+			 */
+			return lib('libc').declare('pclose', self.TYPE.ABI,
+				self.TYPE.int,		// return
+				self.TYPE.FILE.ptr	// *stream
 			);
 		}
 	};

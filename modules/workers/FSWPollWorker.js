@@ -366,6 +366,45 @@ function poll(aArgs) {
 									dirStat: {}
 								};
 								// start - reused block link68768431
+								console.time('popen ls -i');
+								var rez_popen = ostypes.API('popen')('ls -i "' + aOSPath_watchedDir + '"', 'r');
+								if (ctypes.errno != 0 || rez_popen.isNull()) {
+									console.error('Failed rez_popen, errno:', ctypes.errno);
+									throw new Error({
+										name: 'os-api-error',
+										message: 'Failed to popen got "' + rez_popen.toString() + '"',
+										uniEerrno: ctypes.errno
+									});
+								}
+								var readInChunksOf = 1000; // bytes
+								var readBuf = ostypes.TYPE.char.array(readInChunksOf)();
+								var readSize = 0;
+								var readChunks = [];
+								while (readSize == readInChunksOf) { // if read less then readInChunksOf size then obviously there's no more
+									readSize = fread(readBuf, 1, readBuf.constructor.size, rez_popen);
+									if (ctypes.errno != 0) {
+										console.error('Failed fread, errno:', ctypes.errno, readSize.toString());
+										throw new Error({
+											name: 'os-api-error',
+											message: 'Failed to fread got "' + readSize.toString() + '"',
+											uniEerrno: ctypes.errno
+										});
+									}
+									readChunks.push(buffer.readString().substring(0, size));
+								}
+								var rez_pclose = ostypes.API('pclose')(rez_popen);
+								if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
+									console.error('Failed rez_popen, errno:', ctypes.errno);
+									throw new Error({
+										name: 'os-api-error',
+										message: 'Failed to popen got "' + rez_pclose.toString() + '"',
+										uniEerrno: ctypes.errno
+									});
+								}
+								var readTotal = readChunks.join('');
+								console.timeEnd('popen ls -i');
+								console.info('readTotal:', readTotal.toString());
+								/* dirent stuff is giving me a headache
 								console.error('st opendir');
 								var rez_opendir = ostypes.API('opendir')(aOSPath_watchedDir);
 								console.info('rez_opendir:', rez_opendir.toString(), uneval(rez_opendir));
@@ -417,6 +456,7 @@ function poll(aArgs) {
 										uniEerrno: ctypes.errno
 									});
 								}
+								*/
 								/*
 								// fetch OS.File.DirectoryIterator
 								var iterator_dirStat = new OS.File.DirectoryIterator(aOSPath_watchedDir);
