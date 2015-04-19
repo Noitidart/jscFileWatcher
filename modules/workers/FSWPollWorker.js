@@ -390,17 +390,16 @@ function poll(aArgs) {
 										});
 									}
 									console.info('dirent_result:', dirent_result.toString());
-									console.info('dirent:', dirent.toString());
+									//console.info('dirent:', dirent.toString());
 									if (dirent_result.isNull()) {
-										console.log('one past last directory entry');
+										console.log('one past last directory entry'); // from testing i learned that the dirent will be the previous entry (meaning the last entry that it had found)
 										break;
 									} else {
-										/*
 										var dirent_filename = dirent.d_name.contents.readString();
 										var dirent_inode = dirent.d_ino;
 										var dirent_isdir = dirent.d_type;
-										bsd_mac_kqStuff.watchedFd[fd].dirStat[dirEntStat.name]
-										*/
+										console.info('dirent_filename:', dirent_filename, 'dirent_inode:', dirent_inode);
+										bsd_mac_kqStuff.watchedFd[fd].dirStat[dirEntStat.name] = {};
 									}
 								}
 								var rez_closedir = ostypes.API('closedir')(rez_opendir);
