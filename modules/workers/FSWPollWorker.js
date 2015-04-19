@@ -395,11 +395,14 @@ function poll(aArgs) {
 										console.log('one past last directory entry'); // from testing i learned that the dirent will be the previous entry (meaning the last entry that it had found)
 										break;
 									} else {
-										var dirent_filename = dirent.d_name.readString();
+										var dirent_filename = dirent.d_name.contents.readString();
 										var dirent_inode = dirent.d_ino;
-										var dirent_isdir = dirent.d_type;
+										var dirent_ftype = dirent.d_type;
 										console.info('dirent_filename:', dirent_filename, 'dirent_inode:', dirent_inode);
-										bsd_mac_kqStuff.watchedFd[fd].dirStat[dirEntStat.name] = {};
+										bsd_mac_kqStuff.watchedFd[fd].dirStat[dirent_filename] = {
+											inode: dirent_inode,
+											type: dirent_ftype
+										};
 									}
 								}
 								var rez_closedir = ostypes.API('closedir')(rez_opendir);
