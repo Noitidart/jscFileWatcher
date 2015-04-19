@@ -381,7 +381,7 @@ function poll(aArgs) {
 								var readSize = 0;
 								var readChunks = [];
 								while (readSize == readInChunksOf) { // if read less then readInChunksOf size then obviously there's no more
-									readSize = fread(readBuf, 1, readBuf.constructor.size, rez_popen);
+									readSize = ostypes.API('fread')(readBuf, 1, readBuf.constructor.size, rez_popen);
 									if (ctypes.errno != 0) {
 										console.error('Failed fread, errno:', ctypes.errno, readSize.toString());
 										throw new Error({
