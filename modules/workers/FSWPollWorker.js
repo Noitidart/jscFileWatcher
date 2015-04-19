@@ -390,19 +390,18 @@ function poll(aArgs) {
 										});
 									}
 									console.info('dirent_result:', dirent_result.toString());
-									console.info('dirent:', dirent.toString());
+									//console.info('dirent:', dirent.toString());
 									if (dirent_result.isNull()) {
 										console.log('one past last directory entry'); // from testing i learned that the dirent will be the previous entry (meaning the last entry that it had found)
 										break;
 									} else {
-										console.info('dirent.d_name:', dirent.d_name.toString());
-										console.info('dirent.d_name.contents:', dirent.d_name.toString());
-										console.info('dirent.contents.getAddressOfField(\'d_name\').readString():', dirent.getAddressOfField('d_name').readString());
-										console.info('dirent.d_name.readString():', dirent.d_name.readString());
+										console.error('HEREEEEEE');
+										//console.info('dirent.d_name:', dirent.addressOfField('d_name').toString());
+										//console.info('dirent.d_name:', dirent.addressOfField('d_name').readString.toString());
 										var dirent_filename = dirent.d_name.readString();
 										var dirent_inode = dirent.d_ino;
 										var dirent_ftype = dirent.d_type;
-										console.info('dirent_filename:', dirent_filename, 'dirent_inode:', dirent_inode);
+										console.info('dirent_filename:', dirent_filename, 'dirent_inode:', dirent_inode.toString());
 										bsd_mac_kqStuff.watchedFd[fd].dirStat[dirent_filename] = {
 											inode: dirent_inode,
 											type: dirent_ftype
