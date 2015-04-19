@@ -292,7 +292,7 @@ var kqInit = function() {
 			return lib('libc').declare('popen', self.TYPE.ABI,
 				self.TYPE.FILE,				// return
 				self.TYPE.char.ptr,			// *command
-				self.TYPE.char.type.ptr		// *type
+				self.TYPE.char.ptr		// *type
 			);
 		},
 		fread: function() {
