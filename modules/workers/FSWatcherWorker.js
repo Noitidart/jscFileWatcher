@@ -161,6 +161,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 				Watcher.paths_watched = {}; // casing is whatever devuser passed in, key is aOSPath and value is fd of the watched file
 				Watcher.vnode_events_for_path = {}; //holds the fflags to monitor for the path, usually should be default, but user can modify it via using options.masks arg of Watcher.prototype.addPath which calls addPathToWatcher in PromiseWorker
 				
+				Watcher.cStr_OSPath_obj = {}; // obj holding cstrs so i can read it in the callback, holding it here so it doesnt get gc'ed
+				
 				var vnode_events = ostypes.CONST.NOTE_DELETE | ostypes.CONST.NOTE_WRITE | ostypes.CONST.NOTE_EXTEND | ostypes.CONST.NOTE_ATTRIB | ostypes.CONST.NOTE_LINK | ostypes.CONST.NOTE_RENAME | ostypes.CONST.NOTE_REVOKE; // ostypes.TYPE.unsigned_int
 				
 				Watcher.num_files = ostypes.TYPE.int(); // defaults to 0 so this is same as doing `ostypes.TYPE.int(0)`
@@ -276,7 +278,6 @@ function createWatcher(aWatcherID, aOptions={}) {
 				_Watcher_cache[aWatcherID] = Watcher;
 				Watcher.fd = fd;
 				Watcher.paths_watched = {}; // casing is whatever devuser passed in, key is aOSPath, and value is watch_fd
-				Watcher.cStr_OSPath_obj = {}; // obj holding cstrs so i can read it in the callback, holding it here so it doesnt get gc'ed
 				
 				var argsForPoll = {
 					fd: parseInt(cutils.jscGetDeepest(fd))
