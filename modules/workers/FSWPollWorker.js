@@ -325,7 +325,8 @@ function poll(aArgs) {
 						
 						var accountedFdInArr = [];
 						for (var i=0; i<events_to_monitor.length; i++) {
-							var fd = cutils.jscGetDeepest(events_to_monitor[i].ident);
+							let iHoisted = i;
+							var fd = cutils.jscGetDeepest(events_to_monitor[iHoisted].ident);
 							accountedFdInArr.push(fd);
 							if (!(fd in bsd_mac_kqStuff.watchedFd)) {
 								bsd_mac_kqStuff.watchedFd[fd] = 0;
@@ -343,8 +344,9 @@ function poll(aArgs) {
 							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
 							console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
 							var jsStr_cOSPath = '';
-							for (var i=0; i<cStr_cOSPath.contents.length; i++) {
-								var cChar = cStr_cOSPath.contents[i];
+							for (var j=0; j<cStr_cOSPath.contents.length; j++) {
+								let jHoisted = j;
+								var cChar = cStr_cOSPath.contents[j];
 								if (cChar == '\x00') {
 									break; // reached null-terminator
 								}
@@ -362,6 +364,52 @@ function poll(aArgs) {
 									dirStat: {}
 								}
 								// start - reused block link68768431
+								var rez_opendir = ostypes.API('opendir')(aOSPath_watchedDir);
+								console.info('rez_opendir:', rez_opendir.toString(), uneval(rez_opendir));
+								if (ctypes.errno != 0 || rez_opendir.isNull()) {
+									console.error('Failed rez_opendir, errno:', ctypes.errno);
+									throw new Error({
+										name: 'os-api-error',
+										message: 'Failed to opendir on "' + aOSPath_watchedDir + '"',
+										uniEerrno: ctypes.errno
+									});
+								}
+								var dirent = ostypes.TYPE.dirent();
+								var dirent_result = ostypes.TYPE.dirent.ptr();
+								while (true) {
+									var rez_readdir = ostypes.API('readdir_r')(rez_opendir, dirent.address(), dirent_result.address());
+									if (ctypes.errno != 0 || !cutils.jscEqual(rez_readdir, 0)) {
+										console.error('Failed readdir_r, errno:', ctypes.errno);
+										throw new Error({
+											name: 'os-api-error',
+											message: 'Failed to readdir_r on "' + aOSPath_watchedDir + '"',
+											uniEerrno: ctypes.errno
+										});
+									}
+									console.info('dirent_result:', dirent_result.toString());
+									console.info('dirent:', dirent.toString());
+									if (dirent_result.isNull()) {
+										console.log('one past last directory entry');
+										break;
+									} else {
+										/*
+										var dirent_filename = dirent.d_name.contents.readString();
+										var dirent_inode = dirent.d_ino;
+										var dirent_isdir = dirent.d_type;
+										bsd_mac_kqStuff.watchedFd[fd].dirStat[dirEntStat.name]
+										*/
+									}
+								}
+								var rez_closedir = ostypes.API('closedir')(rez_opendir);
+								if (ctypes.errno != 0 || !cutils.jscEqual(rez_readdir, 0)) {
+									console.error('Failed closedir, errno:', ctypes.errno);
+									throw new Error({
+										name: 'os-api-error',
+										message: 'Failed to closedir on "' + aOSPath_watchedDir + '"',
+										uniEerrno: ctypes.errno
+									});
+								}
+								/*
 								// fetch OS.File.DirectoryIterator
 								var iterator_dirStat = new OS.File.DirectoryIterator(aOSPath_watchedDir);
 								try {
@@ -380,6 +428,7 @@ function poll(aArgs) {
 								} finally {
 									iterator_dirStat.close();
 								}
+								*/
 								// end - reused block link68768431
 							} else if (bsd_mac_kqStuff.watchedFd[fd] == aOSPath_watchedDir) {
 								// the stored js str is same so no need to do anything, the last OS.File.DirectoryIterator is sufficient (as if it did change it was updated from change notification)
@@ -438,6 +487,7 @@ function poll(aArgs) {
 							
 							var FSChanges = [];
 							// start - similar to block link68768431
+							/*
 							// fetch OS.File.DirectoryIterator
 							var iterator_dirStat = new OS.File.DirectoryIterator(aOSPath_parentDir);
 							try {
@@ -475,6 +525,7 @@ function poll(aArgs) {
 							} finally {
 								iterator_dirStat.close();
 							}
+							*/
 							// end - similar to block link68768431
 							
 							console.log('aEvent:', convertFlagsToAEventStr(event_data[0].fflags), 'aOSPath_parentDir:', aOSPath_parentDir);
