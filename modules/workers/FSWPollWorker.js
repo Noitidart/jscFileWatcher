@@ -689,7 +689,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 	while (inode_and_filename_match = inode_and_filename_patt.exec(readTotal)) {
 		obj_inodeAndFns[inode_and_filename_match[1]] = {
 			filename: inode_and_filename_match[2],
-			lastmod: OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2])).lastModificationDate;
+			lastmod: OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2])).lastModificationDate
 		}
 	}
 	console.timeEnd('popen ls -i'); // avg of 25ms max of 55ms
