@@ -422,10 +422,8 @@ function poll(aArgs) {
 							
 							var nowDirStat = fetchInodeAndFilenamesInDir(aOSPath_parentDir);
 							for (var nowInode in nowDirStat) {
-								console.log('checking new inode:', nowInode);
 								if (!(nowInode in bsd_mac_kqStuff.watchedFd[evFd].dirStat)) {
 									// added
-									console.error('added push');
 									FSChanges.push({
 										aFileName: nowDirStat[nowInode].filename,
 										aEvent: 'added',
@@ -441,7 +439,9 @@ function poll(aArgs) {
 											aFileName: nowDirStat[nowInode].filename,
 											aEvent: 'contents-modified',
 											aExtra: {
-												aOSPath_parentDir: aOSPath_parentDir
+												aOSPath_parentDir: aOSPath_parentDir,
+												previousMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod.toString(),
+												nowMod: nowDirStat[nowInode].lastmod.toString()
 											}
 										});
 									}
@@ -462,7 +462,6 @@ function poll(aArgs) {
 								}
 							}
 							for (var thenInode in bsd_mac_kqStuff.watchedFd[evFd].dirStat) { // check if any inodes remaining
-								console.log('checking removed inode:', thenInode);
 								// removed
 								console.error('removed push');
 								FSChanges.push({
@@ -699,9 +698,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		}
 	}
 	console.timeEnd('popen ls -i'); // avg of 25ms max of 55ms
-	console.info(obj_inodeAndFns);
-	
-	return obj_inodeAndFns;
+
 	/* dirent stuff is giving me a headache
 	console.error('st opendir');
 	var rez_opendir = ostypes.API('opendir')(aOSPath_watchedDir);
@@ -775,6 +772,8 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		iterator_dirStat.close();
 	}
 	*/
+	console.info(obj_inodeAndFns);
+	return obj_inodeAndFns;
 }
 // END - OS Specific - helpers for kqueue
 // START - OS Specific - helpers for windows
