@@ -356,6 +356,7 @@ function poll(aArgs) {
 							
 							var aOSPath_watchedDir = jsStr_cOSPath; // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
 							if (bsd_mac_kqStuff.watchedFd[fd] == 0 || bsd_mac_kqStuff.watchedFd[fd] != aOSPath_watchedDir) {
+								console.error('STARTING READDIR on:', jsStr_cOSPath);
 								if (bsd_mac_kqStuff.watchedFd[fd] != aOSPath_watchedDir) {
 									console.error('WARNING: just note to self, fd got reused (i suspected this was a possibility and this message confirms it), old path was "' + bsd_mac_kqStuff.watchedFd[fd] + '" and now it is updated to "' + aOSPath_watchedDir + '" the fd is: "' + fd + '"');
 								}
