@@ -363,127 +363,8 @@ function poll(aArgs) {
 								}
 								bsd_mac_kqStuff.watchedFd[fd] = {
 									OSPath: aOSPath_watchedDir, //jsStr
-									dirStat: {}
+									dirStat: fetchInodeAndFilenamesInDir(aOSPath_watchedDir)
 								};
-								// start - reused block link68768431
-								console.time('popen ls -i');
-								var rez_popen = ostypes.API('popen')('ls -i "' + aOSPath_watchedDir + '"', 'r');
-								if (ctypes.errno != 0 || rez_popen.isNull()) {
-									console.error('Failed rez_popen, errno:', ctypes.errno);
-									throw new Error({
-										name: 'os-api-error',
-										message: 'Failed to popen got "' + rez_popen.toString() + '"',
-										uniEerrno: ctypes.errno
-									});
-								}
-								var readInChunksOf = 1000; // bytes
-								var readBuf = ostypes.TYPE.char.array(readInChunksOf)();
-								var readSize = 0;
-								var readChunks = [];
-								do { 
-									readSize = ostypes.API('fread')(readBuf, ostypes.TYPE.char.size, readBuf.constructor.size, rez_popen);
-									if (ctypes.errno != 0) {
-										console.error('Failed fread, errno:', ctypes.errno, readSize.toString());
-										throw new Error({
-											name: 'os-api-error',
-											message: 'Failed to fread got "' + readSize.toString() + '"',
-											uniEerrno: ctypes.errno
-										});
-									}
-									readChunks.push(readBuf.readString()/*.substring(0, size)*/);
-								} while (cutils.jscEqual(readSize, readInChunksOf)) // if read less then readInChunksOf size then obviously there's no more
-								var rez_pclose = ostypes.API('pclose')(rez_popen);
-								if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
-									console.error('Failed rez_popen, errno:', ctypes.errno);
-									throw new Error({
-										name: 'os-api-error',
-										message: 'Failed to popen got "' + rez_pclose.toString() + '"',
-										uniEerrno: ctypes.errno
-									});
-								}
-								var readTotal = readChunks.join('');
-								console.info('readTotal:', readTotal.toString());
-								var inode_and_filename_patt = /^(\d+) (.*?)$/gm;
-								var inode_and_filename_match;
-								while (inode_and_filename_match = inode_and_filename_patt.exec(readTotal)) {
-									bsd_mac_kqStuff.watchedFd[fd].dirStat[inode_and_filename_match[1]] = inode_and_filename_match[2];
-								}
-								console.timeEnd('popen ls -i');
-								console.info(bsd_mac_kqStuff.watchedFd[fd]);
-								/* dirent stuff is giving me a headache
-								console.error('st opendir');
-								var rez_opendir = ostypes.API('opendir')(aOSPath_watchedDir);
-								console.info('rez_opendir:', rez_opendir.toString(), uneval(rez_opendir));
-								if (ctypes.errno != 0 || rez_opendir.isNull()) {
-									console.error('Failed rez_opendir, errno:', ctypes.errno);
-									throw new Error({
-										name: 'os-api-error',
-										message: 'Failed to opendir on "' + aOSPath_watchedDir + '"',
-										uniEerrno: ctypes.errno
-									});
-								}
-								var dirent = ostypes.TYPE.dirent();
-								var dirent_result = ostypes.TYPE.dirent.ptr();
-								while (true) {
-									var rez_readdir = ostypes.API('readdir_r')(rez_opendir, dirent.address(), dirent_result.address());
-									if (ctypes.errno != 0 || !cutils.jscEqual(rez_readdir, 0)) {
-										console.error('Failed readdir_r, errno:', ctypes.errno);
-										throw new Error({
-											name: 'os-api-error',
-											message: 'Failed to readdir_r on "' + aOSPath_watchedDir + '"',
-											uniEerrno: ctypes.errno
-										});
-									}
-									console.info('dirent_result:', dirent_result.toString());
-									//console.info('dirent:', dirent.toString());
-									if (dirent_result.isNull()) {
-										console.log('one past last directory entry'); // from testing i learned that the dirent will be the previous entry (meaning the last entry that it had found)
-										break;
-									} else {
-										console.error('HEREEEEEE');
-										//console.info('dirent.d_name:', dirent.addressOfField('d_name').toString());
-										//console.info('dirent.d_name:', dirent.addressOfField('d_name').readString.toString());
-										var dirent_filename = dirent.d_name.readString();
-										var dirent_inode = dirent.d_ino;
-										var dirent_ftype = dirent.d_type;
-										console.info('dirent_filename:', dirent_filename, 'dirent_inode:', dirent_inode.toString());
-										bsd_mac_kqStuff.watchedFd[fd].dirStat[dirent_filename] = {
-											inode: dirent_inode,
-											type: dirent_ftype
-										};
-									}
-								}
-								var rez_closedir = ostypes.API('closedir')(rez_opendir);
-								if (ctypes.errno != 0 || !cutils.jscEqual(rez_readdir, 0)) {
-									console.error('Failed closedir, errno:', ctypes.errno);
-									throw new Error({
-										name: 'os-api-error',
-										message: 'Failed to closedir on "' + aOSPath_watchedDir + '"',
-										uniEerrno: ctypes.errno
-									});
-								}
-								*/
-								/*
-								// fetch OS.File.DirectoryIterator
-								var iterator_dirStat = new OS.File.DirectoryIterator(aOSPath_watchedDir);
-								try {
-									for (var dirEnt in iterator_dirStat) {
-										var dirEntStat = OS.File.stat(dirEnt.path);
-										bsd_mac_kqStuff.watchedFd[fd].dirStat[dirEntStat.name] = {
-											lastModificationDate: dirEntStat.lastModificationDate, //jsDate
-											creationDate: (dirEntStat.creationDate || dirEntStat.macBirthDate), //jsDate // used for detecting rename
-											lastAccessDate: dirEntStat.lastAccessDate, // used for detecting rename
-											size: dirEntStat.size, // used for detecting rename
-											unixOwner: dirEntStat.unixOwner, // used for detecting rename
-											unixGroup: dirEntStat.unixGroup, // used for detecting rename
-											unixMode: dirEntStat.unixMode // used for detecting rename
-										}
-									}
-								} finally {
-									iterator_dirStat.close();
-								}
-								*/
-								// end - reused block link68768431
 							} else if (bsd_mac_kqStuff.watchedFd[fd] == aOSPath_watchedDir) {
 								// the stored js str is same so no need to do anything, the last OS.File.DirectoryIterator is sufficient (as if it did change it was updated from change notification)
 							} else {
@@ -540,49 +421,57 @@ function poll(aArgs) {
 							var aOSPath_parentDir = bsd_mac_kqStuff.watchedFd[evFd].OSPath;
 							
 							var FSChanges = [];
-							// start - similar to block link68768431
-							/*
-							// fetch OS.File.DirectoryIterator
-							var iterator_dirStat = new OS.File.DirectoryIterator(aOSPath_parentDir);
-							try {
-								var nowDirStat = {};
-								for (var dirEnt in iterator_dirStat) {
-									var dirEntStat = OS.File.stat(dirEnt.path);
-									nowDirStat[dirEntStat.name] = {
-										lastModificationDate: dirEntStat.lastModificationDate, //jsDate
-											creationDate: (dirEntStat.creationDate || dirEntStat.macBirthDate), //jsDate // used for detecting rename
-											lastAccessDate: dirEntStat.lastAccessDate, // used for detecting rename
-											size: dirEntStat.size, // used for detecting rename
-											unixOwner: dirEntStat.unixOwner, // used for detecting rename
-											unixGroup: dirEntStat.unixGroup, // used for detecting rename
-											unixMode: dirEntStat.unixMode // used for detecting rename
-									}
-								}
-								// lets now compare old dirstat to new dirstat, then set old dirstat to the new dirstat
-								for (var cFileName in bsd_mac_kqStuff.watchedFd[evFd].dirStat) {
-									if (!(cFileName in nowDirStat)) {
-										// removed OR renamed-from
-									} else {
-										// its there, lets check if it was contents-modified
-										if (bsd_mac_kqStuff.watchedFd[evFd].dirStat[cFileName].lastModificationDate != nowDirStat[cFileName].lastModificationDate) {
-												// contents-modified
+							var nowDirStat = fetchInodeAndFilenamesInDir(aOSPath_parentDir);
+							for (var nowInode in nowDirStat) {
+								if (!(nowInode in bsd_mac_kqStuff.watchedFd[evFd].dirStat)) {
+									// added
+									FSChanges.push({
+										aFileName: nowDirStat[nowInode].filename,
+										aEvent: 'added',
+										aExtra: {
+											aOSPath_parentDir: aOSPath_parentDir,
 										}
+									});
+								} else {
+									// its there, lets check if it was contents-modified and/or renamed
+									if (bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod != nowDirStat[nowInode].lastmod) {
+										// contents-modified
+										FSChanges.push({
+											aFileName: nowDirStat[nowInode].filename,
+											aEvent: 'contents-modified',
+											aExtra: {
+												aOSPath_parentDir: aOSPath_parentDir,
+											}
+										});
 									}
-								}
-								for (var cFileName in nowDirStat) {
-									if (!(cFileName in bsd_mac_kqStuff.watchedFd[evFd].dirStat)) {
-										// added OR renamed-to
+									if (bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].filename != nowDirStat[nowInode].filename) {
+										// renamed
+										FSChanges.push({
+											aFileName: nowDirStat[nowInode].filename,
+											aEvent: 'renamed',
+											aExtra: {
+												aOSPath_parentDir_identifier: aOSPath_parentDir,
+												aOld: {
+													aFileName: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].filename
+												}
+											}
+										});
 									}
+									delete bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode];
 								}
-								
-								bsd_mac_kqStuff.watchedFd[evFd].dirStat = nowDirStat; // set old dirstat to the new dirstat
-							} finally {
-								iterator_dirStat.close();
 							}
-							*/
-							// end - similar to block link68768431
-							
-							console.log('aEvent:', convertFlagsToAEventStr(event_data[0].fflags), 'aOSPath_parentDir:', aOSPath_parentDir);
+							for (var thenInode in bsd_mac_kqStuff.watchedFd[evFd].dirStat) { // check if any inodes remaining
+								// removed
+								FSChanges.push({
+									aFileName: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].filename,
+									aEvent: 'removed',
+									aExtra: {
+										aOSPath_parentDir: aOSPath_parentDir,
+									}
+								});
+							}
+							bsd_mac_kqStuff.watchedFd[evFd].dirStat = nowDirStat; // set old dirstat to the new dirstat
+							break;
 						} else {
 							// No event
 						}
@@ -592,7 +481,7 @@ function poll(aArgs) {
 						timeout.tv_nsec = useNsec; // 500 milliseconds
 					}
 				}
-				ostypes.API('close')(event_fd);
+				// ostypes.API('close')(event_fd); // this should not happen here but in watcher1.close()
 				return FSChanges;
 				
 			// end kqueue
@@ -749,7 +638,137 @@ function poll(aArgs) {
 			});
 	}
 }
+// START - OS Specific - helpers for kqueue
+function fetchInodeAndFilenamesInDir(aOSPath) {
+	// aOSPath must be path to directory
+	// returns object with key as inode and value as obj with {filename: jsStr, lastmod: jsData}
+	// currently filenames must be ctypes.char, i dont know if we need to use ctypes.jschar maybe
+	
+	var obj_inodeAndFns = {};
 
+	// START - popen method
+	console.time('popen ls -i');
+	var rez_popen = ostypes.API('popen')('ls -i "' + aOSPath + '"', 'r');
+	if (ctypes.errno != 0 || rez_popen.isNull()) {
+		console.error('Failed rez_popen, errno:', ctypes.errno);
+		throw new Error({
+			name: 'os-api-error',
+			message: 'Failed to popen got "' + rez_popen.toString() + '"',
+			uniEerrno: ctypes.errno
+		});
+	}
+	var readInChunksOf = 1000; // bytes
+	var readBuf = ctypes.char.array(readInChunksOf)(); // not ostypes.TYPE.char as we are free to use what we want, asit expects a void* link6321887
+	var readSize = 0;
+	var readChunks = [];
+	do { 
+		readSize = ostypes.API('fread')(readBuf, ctypes.char.size, readBuf.constructor.size, rez_popen); // ctypes.char link6321887
+		if (ctypes.errno != 0) {
+			console.error('Failed fread, errno:', ctypes.errno, readSize.toString());
+			throw new Error({
+				name: 'os-api-error',
+				message: 'Failed to fread got "' + readSize.toString() + '"',
+				uniEerrno: ctypes.errno
+			});
+		}
+		readChunks.push(readBuf.readString()/*.substring(0, size)*/); // due to ctypes.char can use readString link6321887
+	} while (cutils.jscEqual(readSize, readInChunksOf)) // if read less then readInChunksOf size then obviously there's no more
+	var rez_pclose = ostypes.API('pclose')(rez_popen);
+	if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
+		console.error('Failed rez_popen, errno:', ctypes.errno);
+		throw new Error({
+			name: 'os-api-error',
+			message: 'Failed to popen got "' + rez_pclose.toString() + '"',
+			uniEerrno: ctypes.errno
+		});
+	}
+	var readTotal = readChunks.join('');
+	//console.info('readTotal:', readTotal.toString());
+	var inode_and_filename_patt = /^(\d+) (.*?)$/gm;
+	var inode_and_filename_match;
+	while (inode_and_filename_match = inode_and_filename_patt.exec(readTotal)) {
+		obj_inodeAndFns[inode_and_filename_match[1]] = {
+			filename: inode_and_filename_match[2],
+			lastmod: OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2])).lastModificationDate;
+		}
+	}
+	console.timeEnd('popen ls -i'); // avg of 25ms max of 55ms
+	console.info(bsd_mac_kqStuff.watchedFd[fd]);
+	/* dirent stuff is giving me a headache
+	console.error('st opendir');
+	var rez_opendir = ostypes.API('opendir')(aOSPath_watchedDir);
+	console.info('rez_opendir:', rez_opendir.toString(), uneval(rez_opendir));
+	if (ctypes.errno != 0 || rez_opendir.isNull()) {
+		console.error('Failed rez_opendir, errno:', ctypes.errno);
+		throw new Error({
+			name: 'os-api-error',
+			message: 'Failed to opendir on "' + aOSPath_watchedDir + '"',
+			uniEerrno: ctypes.errno
+		});
+	}
+	var dirent = ostypes.TYPE.dirent();
+	var dirent_result = ostypes.TYPE.dirent.ptr();
+	while (true) {
+		var rez_readdir = ostypes.API('readdir_r')(rez_opendir, dirent.address(), dirent_result.address());
+		if (ctypes.errno != 0 || !cutils.jscEqual(rez_readdir, 0)) {
+			console.error('Failed readdir_r, errno:', ctypes.errno);
+			throw new Error({
+				name: 'os-api-error',
+				message: 'Failed to readdir_r on "' + aOSPath_watchedDir + '"',
+				uniEerrno: ctypes.errno
+			});
+		}
+		console.info('dirent_result:', dirent_result.toString());
+		//console.info('dirent:', dirent.toString());
+		if (dirent_result.isNull()) {
+			console.log('one past last directory entry'); // from testing i learned that the dirent will be the previous entry (meaning the last entry that it had found)
+			break;
+		} else {
+			console.error('HEREEEEEE');
+			//console.info('dirent.d_name:', dirent.addressOfField('d_name').toString());
+			//console.info('dirent.d_name:', dirent.addressOfField('d_name').readString.toString());
+			var dirent_filename = dirent.d_name.readString();
+			var dirent_inode = dirent.d_ino;
+			var dirent_ftype = dirent.d_type;
+			console.info('dirent_filename:', dirent_filename, 'dirent_inode:', dirent_inode.toString());
+			bsd_mac_kqStuff.watchedFd[fd].dirStat[dirent_filename] = {
+				inode: dirent_inode,
+				type: dirent_ftype
+			};
+		}
+	}
+	var rez_closedir = ostypes.API('closedir')(rez_opendir);
+	if (ctypes.errno != 0 || !cutils.jscEqual(rez_readdir, 0)) {
+		console.error('Failed closedir, errno:', ctypes.errno);
+		throw new Error({
+			name: 'os-api-error',
+			message: 'Failed to closedir on "' + aOSPath_watchedDir + '"',
+			uniEerrno: ctypes.errno
+		});
+	}
+	*/
+	/*
+	// fetch OS.File.DirectoryIterator
+	var iterator_dirStat = new OS.File.DirectoryIterator(aOSPath_watchedDir);
+	try {
+		for (var dirEnt in iterator_dirStat) {
+			var dirEntStat = OS.File.stat(dirEnt.path);
+			bsd_mac_kqStuff.watchedFd[fd].dirStat[dirEntStat.name] = {
+				lastModificationDate: dirEntStat.lastModificationDate, //jsDate
+				creationDate: (dirEntStat.creationDate || dirEntStat.macBirthDate), //jsDate // used for detecting rename
+				lastAccessDate: dirEntStat.lastAccessDate, // used for detecting rename
+				size: dirEntStat.size, // used for detecting rename
+				unixOwner: dirEntStat.unixOwner, // used for detecting rename
+				unixGroup: dirEntStat.unixGroup, // used for detecting rename
+				unixMode: dirEntStat.unixMode // used for detecting rename
+			}
+		}
+	} finally {
+		iterator_dirStat.close();
+	}
+	*/
+}
+// END - OS Specific - helpers for kqueue
 // START - OS Specific - helpers for windows
 function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 	// for Windows only
