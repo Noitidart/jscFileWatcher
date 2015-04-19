@@ -390,7 +390,7 @@ function poll(aArgs) {
 											uniEerrno: ctypes.errno
 										});
 									}
-									readChunks.push(buffer.readString().substring(0, size));
+									readChunks.push(readBuf.readString()/*.substring(0, size)*/);
 								}
 								var rez_pclose = ostypes.API('pclose')(rez_popen);
 								if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
