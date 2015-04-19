@@ -390,12 +390,12 @@ function poll(aArgs) {
 										});
 									}
 									console.info('dirent_result:', dirent_result.toString());
-									//console.info('dirent:', dirent.toString());
+									console.info('dirent:', dirent.toString());
 									if (dirent_result.isNull()) {
 										console.log('one past last directory entry'); // from testing i learned that the dirent will be the previous entry (meaning the last entry that it had found)
 										break;
 									} else {
-										var dirent_filename = dirent.d_name.contents.readString();
+										var dirent_filename = dirent.d_name.readString();
 										var dirent_inode = dirent.d_ino;
 										var dirent_isdir = dirent.d_type;
 										console.info('dirent_filename:', dirent_filename, 'dirent_inode:', dirent_inode);
