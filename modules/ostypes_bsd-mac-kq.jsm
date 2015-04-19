@@ -36,11 +36,11 @@ var kqTypes = function() {
 	// SIMPLE STRUCTS
 	this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 		{ ident: this.uintptr_t },
-		{ filter: this.int16_t },
-		{ flags: this.uint16_t },
+		{ filter: core.os.name == 'darwin' ? this.int16_t : this.uint32_t },
+		{ flags: core.os.name == 'darwin' ? this.uint16_t : this.uint32_t },
 		{ fflags: this.uint32_t },
-		{ data: this.intptr_t },
-		{ udata: this.void.ptr }
+		{ data: core.os.name == 'darwin' ? this.intptr_t : this.int64_t },
+		{ udata: core.os.name == 'darwin' ? this.void.ptr : this.intptr_t }
 	]);
 	this.timespec = ctypes.StructType('timespec', [ // http://www.opensource.apple.com/source/text_cmds/text_cmds-69/sort/timespec.h
 		{ tv_sec: this.time_t },
@@ -220,7 +220,7 @@ var kqInit = function() {
 	// end - function declares
 	
 	this.HELPER = {
-		EV_SET: function EV_SET(kev_address, ident, filter, flags, fflags, data, udata_jsStr) {
+		EV_SET: function EV_SET(kev_address, ident, filter, flags, fflags, data, udata) {
 			// macro
 			// docs say args are: &kev, ident, filter, flags, fflags, data, udata // docs are here: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 			console.info('kev_address:', kev_address.toString(), uneval(kev_address));
@@ -231,13 +231,15 @@ var kqInit = function() {
 			kev_address.contents.addressOfField('fflags').contents = fflags;
 			kev_address.contents.addressOfField('data').contents = data;
 			
+			/*
 			var cStr = ctypes.jschar.array()(udata_jsStr);
 			console.error('INFO cStr:', cStr.toString());
 			var castedToVoid = ctypes.cast(cStr, self.TYPE.void.ptr);
 			console.error('INFO castedToVoid:', castedToVoid.toString());
 			console.error('INFO castedToVoid.address():', castedToVoid.address().toString());
+			*/
 			
-			kev_address.contents.addressOfField('udata').contents = castedToVoid; // link4874354
+			kev_address.contents.addressOfField('udata').contents = udata; // link4874354
 		}
 	};
 }
