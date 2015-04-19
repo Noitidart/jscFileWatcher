@@ -249,8 +249,8 @@ var kqInit = function() {
 			 * );
 			 */
 			return lib('libc').declare('opendir', self.TYPE.ABI,
-				self.TYPE.DIR.ptr,		// return
-				self.TYPE.char.ptr		// *name
+				self.TYPE.DIR.ptr,	// return
+				self.TYPE.char.ptr	// *name
 			);
 		},
 		readdir: function() {
@@ -290,9 +290,9 @@ var kqInit = function() {
 			 * );
 			 */
 			return lib('libc').declare('popen', self.TYPE.ABI,
-				self.TYPE.FILE.ptr,		// return
-				self.TYPE.char.ptr,		// *command
-				self.TYPE.char.ptr		// *type
+				self.TYPE.FILE.ptr,	// return
+				self.TYPE.char.ptr,	// *command
+				self.TYPE.char.ptr	// *type
 			);
 		},
 		fread: function() {
@@ -305,11 +305,11 @@ var kqInit = function() {
 			 * );
 			 */
 			return lib('libc').declare('fread', self.TYPE.ABI,
-				self.TYPE.size_t,		// return
-				self.TYPE.void.ptr,		// *ptr
-				self.TYPE.size_t,		// size
-				self.TYPE.size_t,		// nmemb
-				self.TYPE.FILE.ptr		// *stream
+				self.TYPE.size_t,	// return
+				self.TYPE.void.ptr,	// *ptr
+				self.TYPE.size_t,	// size
+				self.TYPE.size_t,	// nmemb
+				self.TYPE.FILE.ptr	// *stream
 			);
 		},
 		pclose: function() {
