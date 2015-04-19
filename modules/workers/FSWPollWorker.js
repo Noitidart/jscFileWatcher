@@ -397,7 +397,7 @@ function poll(aArgs) {
 									} else {
 										console.info('dirent.d_name:', dirent.d_name.toString());
 										console.info('dirent.d_name.contents:', dirent.d_name.toString());
-										console.info('dirent.contents.getAddressOfField(\'d_name\').readString():', dirent.contents.getAddressOfField('d_name').readString());
+										console.info('dirent.contents.getAddressOfField(\'d_name\').readString():', dirent.getAddressOfField('d_name').readString());
 										console.info('dirent.d_name.readString():', dirent.d_name.readString());
 										var dirent_filename = dirent.d_name.readString();
 										var dirent_inode = dirent.d_ino;
