@@ -60,9 +60,8 @@ var kqTypes = function() {
 		dirent_extra_size = 255;
 	}
 	this.dirent = createStructTypeBasedOnOffsets('dirent', OS.Constants.libc.OSFILE_SIZEOF_DIRENT + dirent_extra_size, [
-		['d_ino', ctypes.unsigned_long, OSFILE_OFFSETOF_DIRENT_D_INO],
-		['d_name', ctypes.char.array(OS.Constants.libc.OSFILE_SIZEOF_DIRENT_D_NAME + dirent_extra_size), OS.Constants.libc.OSFILE_OFFSETOF_DIRENT_D_NAME],
-		['d_type', ctypes.unsigned_char, OS.Constants.libc.OSFILE_OFFSETOF_DIRENT_D_TYPE]
+		['d_ino', this.ino_t, OSFILE_OFFSETOF_DIRENT_D_INO],
+		['d_name', this.char.array(OS.Constants.libc.OSFILE_SIZEOF_DIRENT_D_NAME + dirent_extra_size), OS.Constants.libc.OSFILE_OFFSETOF_DIRENT_D_NAME]
 	]);
 	// end - build dirent struct
 }
