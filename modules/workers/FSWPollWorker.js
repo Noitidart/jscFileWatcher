@@ -343,7 +343,7 @@ function poll(aArgs) {
 							console.info('ptrStr:', ptrStr.toString());
 							var cStr_cOSPath = ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr)); //jschar due to link321354 in FSWatcherWorker
 							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
-							console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
+							//console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
 							var jsStr_cOSPath = '';
 							for (var j=0; j<cStr_cOSPath.contents.length; j++) {
 								let jHoisted = j;
@@ -356,16 +356,17 @@ function poll(aArgs) {
 							cStr_cOSPath = null; // as i took out a lot OS.Constants.libc.PATH_MAX so lets just set it to null so it GC's, well im hoping this makes it GC
 							
 							var aOSPath_watchedDir = jsStr_cOSPath; // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
-							if (bsd_mac_kqStuff.watchedFd[fd] == 0 || bsd_mac_kqStuff.watchedFd[fd] != aOSPath_watchedDir) {
+							if (bsd_mac_kqStuff.watchedFd[fd] == 0 || bsd_mac_kqStuff.watchedFd[fd].OSPath != aOSPath_watchedDir) {
 								console.error('STARTING READDIR on:', jsStr_cOSPath);
-								if (bsd_mac_kqStuff.watchedFd[fd] != aOSPath_watchedDir) {
-									console.error('WARNING: just note to self, fd got reused (i suspected this was a possibility and this message confirms it), old path was "' + bsd_mac_kqStuff.watchedFd[fd] + '" and now it is updated to "' + aOSPath_watchedDir + '" the fd is: "' + fd + '"');
+								if (bsd_mac_kqStuff.watchedFd[fd] != 0 && bsd_mac_kqStuff.watchedFd[fd].OSPath != aOSPath_watchedDir) {
+									console.error('WARNING: just note to self, fd got reused (i suspected this was a possibility and this message confirms it), old path was "' + bsd_mac_kqStuff.watchedFd[fd].OSPath + '" and now it is updated to "' + aOSPath_watchedDir + '" the fd is: "' + fd + '"');
 								}
 								bsd_mac_kqStuff.watchedFd[fd] = {
 									OSPath: aOSPath_watchedDir, //jsStr
 									dirStat: {}
 								}
 								// start - reused block link68768431
+								console.error('st opendir');
 								var rez_opendir = ostypes.API('opendir')(aOSPath_watchedDir);
 								console.info('rez_opendir:', rez_opendir.toString(), uneval(rez_opendir));
 								if (ctypes.errno != 0 || rez_opendir.isNull()) {
