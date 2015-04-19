@@ -380,8 +380,8 @@ function poll(aArgs) {
 								var readBuf = ostypes.TYPE.char.array(readInChunksOf)();
 								var readSize = 0;
 								var readChunks = [];
-								while (readSize == readInChunksOf) { // if read less then readInChunksOf size then obviously there's no more
-									readSize = ostypes.API('fread')(readBuf, 1, readBuf.constructor.size, rez_popen);
+								do { 
+									readSize = ostypes.API('fread')(readBuf, ostypes.TYPE.char.size, readBuf.constructor.size, rez_popen);
 									if (ctypes.errno != 0) {
 										console.error('Failed fread, errno:', ctypes.errno, readSize.toString());
 										throw new Error({
@@ -391,7 +391,7 @@ function poll(aArgs) {
 										});
 									}
 									readChunks.push(readBuf.readString()/*.substring(0, size)*/);
-								}
+								} while (cutils.jscEqual(readSize, readInChunksOf)) { // if read less then readInChunksOf size then obviously there's no more
 								var rez_pclose = ostypes.API('pclose')(rez_popen);
 								if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
 									console.error('Failed rez_popen, errno:', ctypes.errno);
