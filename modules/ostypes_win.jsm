@@ -108,7 +108,7 @@ var winTypes = function() {
 		{ NextEntryOffset: this.DWORD },
 		{ Action: this.DWORD },
 		{ FileNameLength: this.DWORD },
-		{ FileName: ctypes.ArrayType(this.WCHAR, OS.Constants.Win.MAX_PATH) }, // not null terminated
+		{ FileName: ctypes.ArrayType(this.WCHAR, 1) }, // not null terminated
 	]);
 	this.GUID = ctypes.StructType('GUID', [
 	  { 'Data1': this.ULONG },

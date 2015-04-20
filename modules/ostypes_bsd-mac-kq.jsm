@@ -23,7 +23,9 @@ var kqTypes = function() {
 	this.int64_t = ctypes.int64_t;
 	this.intptr_t = ctypes.intptr_t;
 	this.long = ctypes.long;
+	this.off_t = ctypes.off_t;
 	this.short = ctypes.short;
+	this.size_t = ctypes.size_t;
 	this.uint16_t = ctypes.uint16_t;
 	this.uint32_t = ctypes.uint32_t;
 	this.uintptr_t = ctypes.uintptr_t
@@ -33,19 +35,37 @@ var kqTypes = function() {
 	// ADV C TYPES
 	this.time_t = this.long; // https://github.com/j4cbo/chiral/blob/3c66a8bb64e541c0f63b04b78ec2d0ffdf5b473c/chiral/os/kqueue.py#L34 AND also based on this github search https://github.com/search?utf8=%E2%9C%93&q=time_t+ctypes&type=Code&ref=searchresults AND based on this answer here: http://stackoverflow.com/a/471287/1828637
 
+	// SIMPLE TYPES
+	this.ino_t = ctypes.unsigned_long; // http://stackoverflow.com/questions/9073667/where-to-find-the-complete-definition-of-off-t-type and chatted with arai and we're very sure its ctypes.unsigned_long which is arch dependent
+	this.DIR = ctypes.StructType('DIR');
+	this.FILE = ctypes.StructType('FILE');
+	
 	// SIMPLE STRUCTS
 	this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 		{ ident: this.uintptr_t },
-		{ filter: this.int16_t },
-		{ flags: this.uint16_t },
+		{ filter: core.os.name == 'darwin' ? this.int16_t : this.uint32_t },
+		{ flags: core.os.name == 'darwin' ? this.uint16_t : this.uint32_t },
 		{ fflags: this.uint32_t },
-		{ data: this.intptr_t },
-		{ udata: this.void.ptr }
+		{ data: core.os.name == 'darwin' ? this.intptr_t : this.int64_t },
+		{ udata: core.os.name == 'darwin' ? this.void.ptr : this.intptr_t }
 	]);
 	this.timespec = ctypes.StructType('timespec', [ // http://www.opensource.apple.com/source/text_cmds/text_cmds-69/sort/timespec.h
 		{ tv_sec: this.time_t },
 		{ tv_nsec: this.long }
 	]);
+	
+	// start - build dirent struct
+	var OSFILE_OFFSETOF_DIRENT_D_INO = 0; // im guessing this is always at 0, by looking at a bunch of places and d_ino was always first
+	var dirent_extra_size = 0;
+	if (OS.Constants.libc.OSFILE_SIZEOF_DIRENT_D_NAME < 8) {
+		// d_name is defined like "char d_name[1];" on some platforms (e.g. Solaris), we need to give it more size for our structure.
+		dirent_extra_size = 255;
+	}
+	this.dirent = createStructTypeBasedOnOffsets('dirent', OS.Constants.libc.OSFILE_SIZEOF_DIRENT + dirent_extra_size, [
+		['d_ino', this.ino_t, OSFILE_OFFSETOF_DIRENT_D_INO],
+		['d_name', this.char.array(OS.Constants.libc.OSFILE_SIZEOF_DIRENT_D_NAME + dirent_extra_size), OS.Constants.libc.OSFILE_OFFSETOF_DIRENT_D_NAME]
+	]);
+	// end - build dirent struct
 }
 
 var kqInit = function() {
@@ -118,9 +138,11 @@ var kqInit = function() {
 						_lib[path] = ctypes.open('libc.so.7');
 					} else if (core.os.name == 'openbsd') {
 						_lib[path] = ctypes.open('libc.so.61.0');
+					} else if (core.os.name == 'sunos') {
+						_lib[path] = ctypes.open('libc.so');
 					} else {
 						throw new Error({
-							name: 'jscfilewatcher-api-error',
+							name: 'watcher-api-error',
 							message: 'Path to libc on operating system of , "' + OS.Constants.Sys.Name + '" is not supported for kqueue'
 						});
 					}
@@ -131,7 +153,7 @@ var kqInit = function() {
 						_lib[path] = ctypes.open(path);
 					} catch (e) {
 						throw new Error({
-							name: 'jscfilewatcher-api-error',
+							name: 'watcher-api-error',
 							message: 'Could not open ctypes library path of "' + path + '"',
 							ex_msg: ex.message
 						});
@@ -158,9 +180,21 @@ var kqInit = function() {
 			 *   int fildes
 			 * ); 
 			 */
-			return lib('libc.dylib').declare('close', self.TYPE.ABI,
+			return lib('libc').declare('close', self.TYPE.ABI,
 				self.TYPE.int,	// return
 				self.TYPE.int	// fildes
+			);
+		},
+		closedir: function() {
+			/* http://linux.die.net/man/3/closedir
+			 * https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man3/closedir.3.html
+			 * int closedir (
+			 *   DIR *dirp
+			 * );
+			 */
+			return lib('libc').declare('closedir', self.TYPE.ABI,
+				self.TYPE.int,		// return
+				self.TYPE.DIR.ptr	// *dirp
 			);
 		},
 		kevent: function() {
@@ -174,7 +208,7 @@ var kqInit = function() {
 			 *   const struct timespec *timeout
 			 * ); 
 			 */
-			return lib('libc.dylib').declare('kevent', self.TYPE.ABI,
+			return lib('libc').declare('kevent', self.TYPE.ABI,
 				self.TYPE.int,			// return
 				self.TYPE.int,			// kq
 				self.TYPE.kevent.ptr,	// *changelist
@@ -190,7 +224,7 @@ var kqInit = function() {
 			 *   void
 			 * ); 
 			 */
-			return lib('libc.dylib').declare('kqueue', self.TYPE.ABI,
+			return lib('libc').declare('kqueue', self.TYPE.ABI,
 				self.TYPE.int	// return
 			);
 		},
@@ -201,10 +235,92 @@ var kqInit = function() {
 			 *   int oflag
 			 * ); 
 			 */
-			return lib('libc.dylib').declare('open', self.TYPE.ABI,
+			return lib('libc').declare('open', self.TYPE.ABI,
 				self.TYPE.int,		// return
 				self.TYPE.char.ptr,	// *path
 				self.TYPE.int		// oflag
+			);
+		},
+		opendir: function() {
+			/* http://linux.die.net/man/3/opendir
+			 * https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man3/opendir.3.html
+			 * DIR *opendir (
+			 *   const char *name
+			 * );
+			 */
+			return lib('libc').declare('opendir', self.TYPE.ABI,
+				self.TYPE.DIR.ptr,	// return
+				self.TYPE.char.ptr	// *name
+			);
+		},
+		readdir: function() {
+			/* http://linux.die.net/man/3/readdir
+			 * https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man3/readdir.3.html
+			 * WARNING: Cannot call readdir from multiple threads on same directory path, it will break, thanks to discussion with @arai on #jsctypes
+			 * struct dirent *readdir (
+			 *   DIR *dirp
+			 * );
+			 */
+			return lib('libc').declare('readdir', self.TYPE.ABI,
+				self.TYPE.dirent.ptr,	// return
+				self.TYPE.DIR.ptr		// *dirp
+			);
+		},
+		readdir_r: function() {
+			/* http://linux.die.net/man/3/readdir
+			 * https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man3/readdir.3.html
+			 * int readdir_r (
+			 *   DIR *dirp
+			 *   struct dirent *entry
+			 *   struct dirent **result
+			 * );
+			 */
+			return lib('libc').declare('readdir_r', self.TYPE.ABI,
+				self.TYPE.int,				// return
+				self.TYPE.DIR.ptr,			// *dirp
+				self.TYPE.dirent.ptr,		// *entry
+				self.TYPE.dirent.ptr.ptr	// **result
+			);
+		},
+		popen: function() {
+			/* http://linux.die.net/man/3/popen
+			 * FILE *popen (
+			 *   const char *command,
+			 *   const char *type
+			 * );
+			 */
+			return lib('libc').declare('popen', self.TYPE.ABI,
+				self.TYPE.FILE.ptr,	// return
+				self.TYPE.char.ptr,	// *command
+				self.TYPE.char.ptr	// *type
+			);
+		},
+		fread: function() {
+			/* http://linux.die.net/man/3/fread
+			 * size_t fread (
+			 *   void *ptr,
+			 *   size_t size,
+			 *   size_t nmemb,
+			 *   FILE *stream
+			 * );
+			 */
+			return lib('libc').declare('fread', self.TYPE.ABI,
+				self.TYPE.size_t,	// return
+				self.TYPE.void.ptr,	// *ptr
+				self.TYPE.size_t,	// size
+				self.TYPE.size_t,	// nmemb
+				self.TYPE.FILE.ptr	// *stream
+			);
+		},
+		pclose: function() {
+			/* http://linux.die.net/man/3/pclose
+			 * int pclose (
+			 *   FILE *stream
+			 * );
+			 */
+			return lib('libc').declare('pclose', self.TYPE.ABI,
+				self.TYPE.int,		// return
+				self.TYPE.FILE.ptr	// *stream
 			);
 		}
 	};
@@ -212,7 +328,7 @@ var kqInit = function() {
 	// end - function declares
 	
 	this.HELPER = {
-		EV_SET: function EV_SET(kev_address, ident, filter, flags, fflags, data, udata_jsStr) {
+		EV_SET: function EV_SET(kev_address, ident, filter, flags, fflags, data, udata) {
 			// macro
 			// docs say args are: &kev, ident, filter, flags, fflags, data, udata // docs are here: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
 			console.info('kev_address:', kev_address.toString(), uneval(kev_address));
@@ -221,10 +337,63 @@ var kqInit = function() {
 			kev_address.contents.addressOfField('filter').contents = filter;
 			kev_address.contents.addressOfField('flags').contents = flags;
 			kev_address.contents.addressOfField('fflags').contents = fflags;
-			kev_address.contents.addressOfField('data').contents = data;
-			kev_address.contents.addressOfField('udata').contents = ostypes.TYPE.char.array()(udata_jsStr).address();
+			kev_address.contents.addressOfField('data').contents = data;			
+			kev_address.contents.addressOfField('udata').contents = udata;
 		}
 	};
+}
+
+function createStructTypeBasedOnOffsets(structName, totalSize, arrFields) {
+	// remove fields for which offset is undefined, this means that this OS does not have this field
+	for (var i = 0; i < arrFields.length; i++) {
+		if (arrFields[i][2] === undefined) {
+			console.warn('removing field named ' + arrFields[i][0])
+			arrFields.splice(i, 1);
+			i--;
+		}
+	}
+
+	// sort fields in asc order of offset
+	arrFields.sort(function(a, b) {
+		return a[2] > b[2]; // sorts ascending
+	});
+
+	// add padding of ctypes.uint8_t in between fields
+	var paddingFieldCnt = 0;
+	var cOffset = 0;
+	for (var i = 0; i < arrFields.length; i++) {
+		var nextOffset = arrFields[i][2];
+		console.log('cOffset:', cOffset, 'nextOffset:', nextOffset);
+		if (nextOffset == cOffset) {
+			console.log('this field should be here, so go on to next');
+		} else if (nextOffset > cOffset) {
+			console.log('nextOffset is greater then cOffset');
+			var paddingFieldName = 'padding_' + paddingFieldCnt;
+			arrFields.splice(i, 0, [paddingFieldName, ctypes.ArrayType(ctypes.uint8_t, nextOffset - cOffset), cOffset]);
+			cOffset += nextOffset - cOffset;
+			i++;
+			paddingFieldCnt++;
+		}
+		cOffset += arrFields[i][1].size;
+	}
+	if (cOffset < totalSize) {
+		var paddingFieldName = 'padding_' + paddingFieldCnt;
+		arrFields.push([paddingFieldName, ctypes.ArrayType(ctypes.uint8_t, totalSize - cOffset), cOffset]);
+		cOffset += totalSize - cOffset;
+	}
+	console.log('total size:', cOffset);
+
+	console.log('arrFields:', arrFields.join('|||').toString());
+
+	var feedArr = [];
+	for (var i = 0; i < arrFields.length; i++) {
+		var cField = {};
+		cField[arrFields[i][0]] = arrFields[i][1];
+		feedArr.push(cField);
+	}
+
+	console.log(uneval(ctypes.StructType(structName, feedArr)));
+	return ctypes.StructType(structName, feedArr);
 }
 
 var ostypes = new kqInit();

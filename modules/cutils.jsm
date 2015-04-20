@@ -135,7 +135,7 @@ function utilsInit() {
 	this.readAsChar8ThenAsChar16 = function(stringPtr, known_len, jschar) {
 		// when reading as jschar it assumes max length of 500
 
-		// stringPtr is either char or jschar, if you know its jschar for sure, pass 2nd arg as true
+		// stringPtr is either char or jschar, if you know its jschar for sure, pass 3rd arg as true
 		// if known_len is passed, then assumption is not made, at the known_len position in array we will see a null char
 		// i tried getting known_len from stringPtr but its not possible, it has be known, i tried this:
 			//"stringPtr.contents.toString()" "95"
@@ -205,6 +205,14 @@ function utilsInit() {
 		 *   var ptrStr = cutils.stringOfPtr(i.address()); // "0x14460454"
 		 *   var readIntPtr = ctypes.int.ptr(ctypes.UInt64(ptrStr));
 		 *   readIntPtr // CData { contents: 5 }
+		 */
+		 
+		/* EXAMPLE 3 - with string
+		 * var a = ctypes.char.array(100).ptr(ctypes.UInt64('0x1cf1e710')); // you must know the length, like i knew it was 100
+		 * a.contents.readString(); //gives you value
+		 * // modify it by doing:
+		 * a.contents.addressOfElement(0).contents = 97
+		 * // or use cutils.modifyCStr
 		 */
 		 
 		var ptrStr = ptr.toString().match(/.*"(.*?)"/); // can alternatively do `'0x' + ctypes.cast(num_files.address(), ctypes.uintptr_t).value.toString(16)`
