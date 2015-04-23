@@ -903,6 +903,9 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + evId);
 		
 		if (aEvent) {
+			var fullpath = paths[i].readString();
+			var filename = OS.Path.basename(fullpath);
+			var dirpath = OS.Path.dirname(fullpath);
 			if (aEvent == 'renamed') {
 				// check macStuff._cache_aRenamed if find evId - 1 then this is renamed-to and that is renamed-from IF find evId + 1 this is renamed-from and that is renamed-to
 				var aRenamedFromId = parseInt(evId) - 1;
@@ -951,17 +954,15 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 						}
 					});
 				}
+			} else {
+				macStuff.FSChanges.push({
+					aFileName: filename,
+					aEvent: aEvent,
+					aExtra: {
+						aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+					}
+				});
 			}
-			var fullpath = paths[i].readString();
-			var filename = OS.Path.basename(fullpath);
-			var dirpath = OS.Path.dirname(fullpath);
-			macStuff.FSChanges.push({
-				aFileName: filename,
-				aEvent: aEvent,
-				aExtra: {
-					aOSPath_parentDir_identifier: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
-				}
-			});
 		} // aEvent is false meaning it had some flags we dont care to trigger the callback for so dont push it to FSChanges
 	}
 	
