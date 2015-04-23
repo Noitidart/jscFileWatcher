@@ -528,8 +528,8 @@ function poll(aArgs) {
 						// create new
 						last_jsStr_ptrOf_cfArrRef = now_jsStr_ptrOf_cfArrRef;
 						var cfArrRef = ostypes.TYPE.CFArrayRef.ptr(ctypes.UInt64(now_jsStr_ptrOf_cfArrRef)).contents;
-						console.error('cfArrRef:', cfArrRef.toString());
-						return;
+						console.info('from poll worker cfArrRef:', cfArrRef.toString());
+						
 						fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 						console.info('fsstream:', fsstream.toString(), uneval(fsstream));
 						
