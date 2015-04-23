@@ -1154,7 +1154,7 @@ function convertFlagsToAEventStr(flags) {
 					};
 					// get moved-from when moving from unwatched-dir/sub-dir to watched-dir but the path is the path on watched-dir. so it should be `added`. so if do os.file.exists on the path then i can test whether it was moved-to or really moved-from
 					if (flags == '0') {
-						return 'contents-modified ok'; // 'moved-to OR contents-modified' // i used to have this as 'moved-to or watched-dir deleted' but its not true in my test cases
+						return 'contents-modified'; // 'moved-to OR contents-modified' // i used to have this as 'moved-to or watched-dir deleted' but its not true in my test cases
 					}
 					for (var f in default_flags) {
 						if (flags & ostypes.CONST[f]) {
