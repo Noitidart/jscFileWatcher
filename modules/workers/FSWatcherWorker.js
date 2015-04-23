@@ -198,7 +198,9 @@ function createWatcher(aWatcherID, aOptions={}) {
 					console.log('got numEv:', numEv.toString());
 					//var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
 					var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr).contents;
+					console.log('flags casted');
 					var ids = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr).contents;
+					console.log('ids casted');
 					
 					console.info('flags:', flags.toString(), 'ids:', ids.toString());
 					
