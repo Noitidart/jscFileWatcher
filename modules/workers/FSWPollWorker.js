@@ -973,9 +973,10 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 						});
 					}
 				} else {
+					// either moved from watched-dir to subdir-of-watched and dirpath indicates "removed" from watched-dir OR moved from unwatched-dir to watched-dir and dirpath indicates "added" to watched-dir
 					macStuff.FSChanges.push({
 						aFileName: filename,
-						aEvent: 'removed',
+						aEvent: OS.File.exists(fullpath) ? 'added' : 'removed',
 						aExtra: {
 							aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
 						}
