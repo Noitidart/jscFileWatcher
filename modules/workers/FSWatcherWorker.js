@@ -193,12 +193,19 @@ function createWatcher(aWatcherID, aOptions={}) {
 
 				var _js_fsevents_callback = function(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
 					console.error('in _js_fsevents_callback aH!!!', 'clientCallBackInfo:', clientCallBackInfo.toString(), 'numEvents:', numEvents.toString(), 'eventPaths:', eventPaths.toString(), 'eventFlags:', eventFlags.toString(), 'eventIds:', eventIds.toString());
+					
+					var numEv = cutils.jscGetDeepest(nevEvents);
+					//var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
+					var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr).contents;
+					var ids = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr).contents;
+					
+					console.info('flags:', flags.toString(), 'ids:', ids.toString());
+					
 					// stop runLoopRun
 					console.log('attempting to stop the runLoopRun so console message after it happens');
 					ostypes.API('FSEventStreamStop')(streamRef);
 					ostypes.API('FSEventStreamInvalidate')(streamRef);
-					
-					console.log('call to stop completed');
+					console.log('call to stop completed'); // after FSEventStreamStop and FSEventStreamInvalidate run then the RunLoopRun unblocks and firefox can be closed without hanging/force quit
 					return null;
 				};
 				
