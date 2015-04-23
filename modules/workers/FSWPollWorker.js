@@ -899,8 +899,9 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 	macStuff.FSChanges = [];
 	for (var i=0; i<numEv; i++) {
 		var aEvent = convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i]));
-		var evId = cutils.jscGetDeepest(ids[i]);
-		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + evId);
+		var evIdStr = cutils.jscGetDeepest(ids[i]));
+		var evId = ctypes.UInt64(evIdStr);
+		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + evIdStr);
 		
 		if (aEvent) {
 			var fullpath = paths[i].readString();
@@ -908,13 +909,13 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 			var dirpath = OS.Path.dirname(fullpath);
 			if (aEvent == 'renamed') {
 				// check macStuff._cache_aRenamed if find evId - 1 then this is renamed-to and that is renamed-from IF find evId + 1 this is renamed-from and that is renamed-to
-				var aRenamedFromId = parseInt(evId) - 1;
-				var aRenamedToId = parseInt(evId) + 1;
+				var aRenamedFromId = ctypes_math.UInt64.sub(evId,1).toString();
+				var aRenamedToId = ctypes_math.UInt64.add(evId,1).toString();
 				var foundLinkedRename = false;
 				for (var aRenamedId in macStuff._cache_aRenamed) {
 					if (aRenamedId == aRenamedFromId || aRenamedId == aRenamedToId) {
-						var cachedObj = macStuff._cache_aRenamed[aRenamedFromId];
-						delete macStuff._cache_aRenamed[aRenamedFromId];
+						var cachedObj = macStuff._cache_aRenamed[aRenamedId];
+						delete macStuff._cache_aRenamed[aRenamedId];
 						foundLinkedRename = true;
 						
 						if (aRenamedId == aRenamedFromId) {
@@ -946,7 +947,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 					}
 				}
 				if (!foundLinkedRename) {
-					macStuff._cache_aRenamed[evId] = {
+					macStuff._cache_aRenamed[evIdStr] = {
 						aFileName: filename,
 						aEvent: aEvent, // will obviously be 'renamed'
 						aExtra: {
