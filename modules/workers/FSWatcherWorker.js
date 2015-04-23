@@ -239,11 +239,11 @@ function createWatcher(aWatcherID, aOptions={}) {
 					
 					console.log('succsefuly started stream:', rez_FSEventStreamStart.toString());
 					
-					console.log('going to start runLoopRun');
+					console.error('going to start runLoopRun');
 					
 					ostypes.API('CFRunLoopRun')(); // returns void
 					
-					console.log('run loop run started!!!');
+					console.error('run loop run started!!! so this is post call line!!');
 				} catch(ex) {
 					ostypes.API('CFRelease')(path_cfStr); // returns void
 					
