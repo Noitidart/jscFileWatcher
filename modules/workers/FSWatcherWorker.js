@@ -204,7 +204,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				Watcher.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.maxLenCfArrRefPtrStr)(); // putting into Watcher obj as i think i need to keep it alive like htat (i didnt test but i think if i do var cfArrRefPtrStr = might get GC'ed)
 				//Watcher.cInt_numPaths = ctypes.int(0);
 				
-				Watcher.dummyCfstrForRLRIM = ostypes.HELPER.makeCFStr('1'); // CFRelease on .close()
+				Watcher.dummyCfstrForRLRIM = ostypes.HELPER.makeCFStr('mode'); // CFRelease on .close()
 				console.info('Watcher.dummyCfstrForRLRIM.address():', Watcher.dummyCfstrForRLRIM.address().toString());
 				
 				var argsForPoll = {
