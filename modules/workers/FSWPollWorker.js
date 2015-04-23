@@ -144,6 +144,23 @@ function init(objCore) {
 				nixStuff = {};
 				nixStuff._cache_aRenamed = {}; // key is cookie and val is aExtra of rename-from, and on reanmed-to, it finds the cookie and deletes it and triggers callback with renamed-to with aExtra holding oldFileName
 		
+				nixStuff.sizeUnaligned_inotify_event = 
+					ostypes.TYPE.inotify_event.fields[0].wd.size + 
+					ostypes.TYPE.inotify_event.fields[1].mask.size + 
+					ostypes.TYPE.inotify_event.fields[2].cookie.size + 
+					ostypes.TYPE.inotify_event.fields[3].len.size + 
+					ostypes.TYPE.inotify_event.fields[4].name.size; // has built in length of MAX_NAME + 1 (the + 1 is for null terminator)
+				nixStuff.size_inotify_event = ostypes.TYPE.inotify_event.size;
+				nixStuff.sizeField0 = ostypes.TYPE.inotify_event.fields[0].wd.size;
+				nixStuff.sizeField1 = ostypes.TYPE.inotify_event.fields[1].mask.size;
+				nixStuff.sizeField2 = ostypes.TYPE.inotify_event.fields[2].cookie.size;
+				nixStuff.sizeField3 = ostypes.TYPE.inotify_event.fields[3].len.size;
+				nixStuff.sizeField4 = ostypes.TYPE.inotify_event.fields[4].name.size;
+				
+				console.info('sizeUnaligned_inotify_event:', nixStuff.sizeUnaligned_inotify_event.toString());
+				console.info('size_inotify_event:', nixStuff.sizeUnaligned_inotify_event.toString());
+				console.info('sizeField4:', nixStuff.sizeField4.toString());
+		
 			break;
 		case 'darwin':
 		case 'freebsd':
@@ -604,30 +621,23 @@ function poll(aArgs) {
 				console.log('ok in pollThis of nixPoll');
 				let fd = parseInt(aArgs.fd);
 				
-				var sizeUnaligned_inotify_event = 
-					ostypes.TYPE.inotify_event.fields[0].wd.size + 
-					ostypes.TYPE.inotify_event.fields[1].mask.size + 
-					ostypes.TYPE.inotify_event.fields[2].cookie.size + 
-					ostypes.TYPE.inotify_event.fields[3].len.size + 
-					ostypes.TYPE.inotify_event.fields[4].name.size; // has built in length of MAX_NAME + 1 (the + 1 is for null terminator)
-				var size_inotify_event = ostypes.TYPE.inotify_event.size;
-				var sizeField0 = ostypes.TYPE.inotify_event.fields[0].wd.size;
-				var sizeField1 = ostypes.TYPE.inotify_event.fields[1].mask.size;
-				var sizeField2 = ostypes.TYPE.inotify_event.fields[2].cookie.size;
-				var sizeField3 = ostypes.TYPE.inotify_event.fields[3].len.size;
-				var sizeField4 = ostypes.TYPE.inotify_event.fields[4].name.size;
+				if (!('cInt_numPaths' in nixStuff)) {
+					nixStuff.cInt_numPaths = ctypes.int.ptr(ctypes.UInt64(aArgs.ptrStrOf__cInt_numPaths));
+				}
 				
-				console.info('sizeUnaligned_inotify_event:', sizeUnaligned_inotify_event.toString());
-				console.info('size_inotify_event:', sizeUnaligned_inotify_event.toString());
-				console.info('sizeField4:', sizeField4.toString());
+
 				
-				let count = size_inotify_event * 10; // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
+				let count = nixStuff.size_inotify_event * 10; // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
 				let buf = ctypes.ArrayType(ostypes.TYPE.char, count)(); // docs page here http://linux.die.net/man/7/inotify says sizeof(struct inotify_event) + NAME_MAX + 1 will be sufficient to read at least one event.
 				// let readbuf = new Uint8Array(size);
 				// let _buf = new ostypes.TYPE.fd_set.ptr(readbuf.buffer);
 				// let buf = ctypes.cast(_buf, ostypes.TYPE.char.array(size).ptr);
-				
-
+				let fdset = new Uint8Array(128); // needs to be big enough to handle the largest fd, im guessing largest is 3 integers long so 3*8 at max is 24 but i give it 128 as i was having issues getting 1, 8, and 16 to work
+				/* no need as it initializes at 0
+				for (let i = 0; i < fdset.length; i++) {
+					fdset[i] = 0;
+				}
+				*/
 				let timeoutStruct = ostypes.TYPE.timeval();
 				// Note: not the full range of timeouts works due to limited range of double.
 				timeoutStruct.tv_sec = Math.floor(loopIntervalS);
@@ -638,13 +648,17 @@ function poll(aArgs) {
 				count = ostypes.TYPE.size_t(count); // for use with read
 				while (true) {
 					console.warn('at top of INFINITE loop');
-				let fdset = new Uint8Array(128);
-				/* no need as it initializes at 0
-				for (let i = 0; i < fdset.length; i++) {
-					fdset[i] = 0;
-				}
-				*/
-				ostypes.HELPER.fd_set_set(fdset, fd);
+					if (nixStuff.cInt_numPaths.contents == 0) {
+						throw new Error({
+							name: 'poll-aborted-nopaths',
+							message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+						});
+					}
+				
+					// no need to loop through and set everything to 0 as we will be just putting back the same fd
+					// must set fd every time otherwise it detects no changes
+					ostypes.HELPER.fd_set_set(fdset, fd);
+					
 					let ret = ostypes.API('select')(fd + 1, fdset, null, null, timeoutStruct.address());
 					timeoutStruct.tv_sec = Math.floor(loopIntervalS);
 					timeoutStruct.tv_usec = Math.floor((loopIntervalS % 1) * 1000000);
@@ -766,7 +780,7 @@ function poll(aArgs) {
 								if (len == 0) {
 									break;
 								};
-								i += sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len);
+								i += nixStuff.sizeField0 + nixStuff.sizeField1 + nixStuff.sizeField2 + nixStuff.sizeField3 + parseInt(len);
 								console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len)));
 							} while (i < length);
 							
