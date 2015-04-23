@@ -197,9 +197,13 @@ function createWatcher(aWatcherID, aOptions={}) {
 					var numEv = cutils.jscGetDeepest(numEvents);
 					console.log('got numEv:', numEv.toString());
 					//var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
-					var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr);
+					try {
+						var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr);
+					} catch(ex) {
+						console.warn('ex on cast flags:', ex.toString();
+					}
 					// console.log('flags casted');
-					var ids = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr);
+					var ids = eventIds; //ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr);
 					// console.log('ids casted');
 					
 					console.info('.ptr casted', 'flags:', flags.toString(), 'ids:', ids.toString());
