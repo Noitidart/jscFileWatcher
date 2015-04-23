@@ -532,7 +532,7 @@ function poll(aArgs) {
 						
 						fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 						console.info('fsstream:', fsstream.toString(), uneval(fsstream));
-						if (fsstream.isNull()) {
+						if (fsstream.isNull()) { // i have seen this null when cfArr had no paths added to it, so was an empty cfarr
 							console.error('Failed FSEventStreamCreate');
 							throw new Error({
 								name: 'os-api-error',
