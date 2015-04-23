@@ -447,9 +447,13 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				};
 				
 				var jsStrArr = [];
+				// add in old watched paths
 				for (var cOSPath in Watcher.paths_watched_props) {
 					jsStrArr.push(Watcher.paths_watched_props[cOSPath].cfStr);
 				}
+				// add in the new path to be watched
+				jsStrArr.push(thisPObj.cfStr);
+				
 				var cfStrArr = ostypes.TYPE.void.ptr.array()(jsStrArr);
 
 				Watcher.cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.CONST.kCFTypeArrayCallBacks.address()); // putting into Watcher. because otherwise it might GC im not sure i didnt test

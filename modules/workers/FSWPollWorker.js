@@ -532,6 +532,13 @@ function poll(aArgs) {
 						
 						fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 						console.info('fsstream:', fsstream.toString(), uneval(fsstream));
+						if (fsstream.isNull()) {
+							console.error('Failed FSEventStreamCreate');
+							throw new Error({
+								name: 'os-api-error',
+								message: 'Failed FSEventStreamCreate'
+							});
+						}
 						
 						if (!('rez_CFRunLoopGetCurrent' in macStuff)) {
 							macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
