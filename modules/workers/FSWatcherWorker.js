@@ -25,7 +25,7 @@ var winStuff = {
 }
 
 var macStuff = {
-	macStuff_maxLenCfArrRefPtrStr: 20 // if update this update in FSWPollWorker
+	maxLenCfArrRefPtrStr: 20 // if update this update in FSWPollWorker
 };
 
 // Imports that use stuff defined in chrome
@@ -201,7 +201,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				Watcher.paths_watched_props = {}; // key is aOSPath, val is obj {path_id: jsInt, cfStr: cfStr}
 				Watcher.nextPathId = 0;
 				
-				Watcher.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff_maxLenCfArrRefPtrStr)(); // putting into Watcher obj as i think i need to keep it alive like htat (i didnt test but i think if i do var cfArrRefPtrStr = might get GC'ed)
+				Watcher.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.maxLenCfArrRefPtrStr)(); // putting into Watcher obj as i think i need to keep it alive like htat (i didnt test but i think if i do var cfArrRefPtrStr = might get GC'ed)
 				//Watcher.cInt_numPaths = ctypes.int(0);
 				
 				var argsForPoll = {

@@ -168,7 +168,7 @@ function init(objCore) {
 				} else {
 					// osx > 10.7
 					macStuff = {};
-					macStuff.macStuff_maxLenCfArrRefPtrStr = 20;
+					macStuff.maxLenCfArrRefPtrStr = 20;
 					macStuff._c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(js_FSEvStrCB);
 					macStuff.FSChanges = null;
 				}
@@ -507,7 +507,7 @@ function poll(aArgs) {
 				var fsstream;
 				
 				if (!('cfArrRef' in macStuff)) {
-					macStuff.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.macStuff_maxLenCfArrRefPtrStr).ptr(aArgs.ptrStrOf__cStr_ptrOf_cfArrRef);
+					macStuff.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.maxLenCfArrRefPtrStr).ptr(aArgs.ptrStrOf__cStr_ptrOf_cfArrRef);
 				}
 				if (!('cId' in macStuff)) {
 					macStuff.cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
