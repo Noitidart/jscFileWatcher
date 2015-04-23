@@ -18,13 +18,17 @@ nixTypes.prototype = {
   CALLBACK_ABI: ctypes.default_abi,
   ABI: ctypes.default_abi,
   
-	// SIMPLE TYPES
+	// C TYPES
 	char: ctypes.char,
 	int: ctypes.int,
+	long: ctypes.long,
 	size_t: ctypes.size_t,
 	ssize_t: ctypes.ssize_t,
 	uint32_t: ctypes.uint32_t,
-	'void*': ctypes.voidptr_t
+	void: ctypes.void
+	
+	// SIMPLE TYPES
+	fd_set: ctypes.uint8_t // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
 };
 
 var struct_const = { //these consts need to be defined here too, they will also be found in ostypes.CONST but i need here as structs use them
@@ -40,6 +44,10 @@ nixTypes.prototype.inotify_event = ctypes.StructType('inotify_event', [ // http:
 	{ name: ctypes.ArrayType(nixTypes.prototype.char, struct_const.NAME_MAX + 1) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
 ]);
 
+nixTypes.prototype.timeval = ctypes.StructType('timeval', [
+	{ 'tv_sec': self.TYPE.long },
+	{ 'tv_usec': self.TYPE.long }
+]);
 
 var nixInit = function() {
   var self = this;
@@ -90,7 +98,7 @@ var nixInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
-		close() {
+		close: {
 		       /* http://linux.die.net/man/2/close	
 			*  int close(
 			*    int fd
@@ -101,7 +109,7 @@ var nixInit = function() {
 				ctypes.int		// fd
 			);
 		},
-		inotify_add_watch() {
+		inotify_add_watch: {
 			/* http://linux.die.net/man/2/inotify_add_watch
 			 * int inotify_add_watch(
 			 *   int fd,
@@ -116,7 +124,7 @@ var nixInit = function() {
 				self.TYPE.uint32_t		// mask
 			);
 		},
-		inotify_init() {
+		inotify_init: {
 			/* http://linux.die.net/man/2/inotify_init
 			 * Notes: Pass 0 as flags if you want inotify_init1 to behave as `int inotify_init(void);`
 			 * int inotify_init1(
@@ -128,7 +136,7 @@ var nixInit = function() {
 				self.TYPE.int		// flags
 			);
 		},
-		inotify_rm_watch() {
+		inotify_rm_watch: {
 			/* http://linux.die.net/man/2/inotify_rm_watch
 			 * int inotify_rm_watch(
 			 *   int fd,
@@ -141,7 +149,7 @@ var nixInit = function() {
 				self.TYPE.int		// wd
 			);
 		},
-		read() {
+		read: {
 		       /* http://linux.die.net/man/2/read
 			*  ssize_t read(
 			*    int fd, 
@@ -152,8 +160,27 @@ var nixInit = function() {
 			return lib('libc').declare('read', self.TYPE.ABI, 
 				self.TYPE.ssize_t,		// return
 				self.TYPE.int,			// fd
-				self.TYPE['void*'], 	// *buf
+				self.TYPE.void.ptr, 	// *buf
 				self.TYPE.size_t		// count
+			);
+		},
+		select: {
+			/* http://linux.die.net/man/2/select
+			 * int select (
+			 *   int nfds,
+			 *   fd_set *readfds,
+			 *   fd_set *writefds,
+			 *   fd_set *exceptfds,
+			 *   struct timeval *timeout
+			 * );
+			 */
+			return lib('libc').declare('select', self.TYPE.ABI,
+				self.TYPE.int,		// return
+				self.TYPE.int,		// nfds
+				self.TYPE.fd_set.ptr,	// *readfds  // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
+				self.TYPE.fd_set.ptr,	// *writefds // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
+				self.TYPE.fd_set.ptr,	// *exceptfds // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
+				self.TYPE.timeval.ptr	// *timeout
 			);
 		}
 	};
@@ -206,7 +233,80 @@ nixInit.prototype = {
 	NAME_MAX: 255 // also in TYPEs as i needed it in a struct
   },
   HELPER: {
-    // here
+	function fd_set_get_idx(fd) {
+		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
+		if (core.os.name == 'linux' /*is_linux*/) {
+			// Unfortunately, we actually have an array of long ints, which is
+			// a) platform dependent and b) not handled by typed arrays. We manually
+			// figure out which byte we should be in. We assume a 64-bit platform
+			// that is little endian (aka x86_64 linux).
+			let elem64 = Math.floor(fd / 64);
+			let bitpos64 = fd % 64;
+			let elem8 = elem64 * 8;
+			let bitpos8 = bitpos64;
+			if (bitpos8 >= 8) {     // 8
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 16
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 24
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 32
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 40
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 48
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 56
+				bitpos8 -= 8;
+				elem8++;
+			}
+
+			return {'elem8': elem8, 'bitpos8': bitpos8};
+		} else if (core.os.name == 'darwin' /*is_mac*/) {
+			// We have an array of int32. This should hopefully work on Darwin
+			// 32 and 64 bit.
+			let elem32 = Math.floor(fd / 32);
+			let bitpos32 = fd % 32;
+			let elem8 = elem32 * 8;
+			let bitpos8 = bitpos32;
+			if (bitpos8 >= 8) {     // 8
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 16
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 24
+				bitpos8 -= 8;
+				elem8++;
+			}
+        
+			return {'elem8': elem8, 'bitpos8': bitpos8};
+		}
+	},
+	fd_set_set: function(fdset, fd) {
+		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
+		let { elem8, bitpos8 } = self.HELPER.fd_set_get_idx(fd);
+		fdset[elem8] = 1 << bitpos8;
+	},
+	fd_set_isset: function(fdset, fd) {
+		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
+		let { elem8, bitpos8 } = self.HELPER.fd_set_get_idx(fd);
+		return !!(fdset[elem8] & (1 << bitpos8));
+	}
   }
 };
 // ADV CONSTANTS
