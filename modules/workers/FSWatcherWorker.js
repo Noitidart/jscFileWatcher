@@ -433,7 +433,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					});
 				}
 				
-				if (aOSPath in paths_watched_props) {
+				if (aOSPath in Watcher.paths_watched_props) {
 					throw new Error({
 						name: 'watcher-api-error',
 						message: 'aOSPath of "' + aOSPath + '" already found in watched paths list so will not add this'					
