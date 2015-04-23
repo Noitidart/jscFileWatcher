@@ -515,7 +515,7 @@ function poll(aArgs) {
 				}
 				
 				while (true) {
-					var now_jsStr_ptrOf_cfArrRef = macStuff.cStr_ptrOf_cfArrRef.readString();
+					var now_jsStr_ptrOf_cfArrRef = macStuff.cStr_ptrOf_cfArrRef.contents.readString();
 					if (last_jsStr_ptrOf_cfArrRef != now_jsStr_ptrOf_cfArrRef) {
 						// invalidate old stream, create new stream
 						if (fsstream !== undefined) {
