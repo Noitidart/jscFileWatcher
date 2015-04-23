@@ -198,7 +198,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					console.log('got numEv:', numEv.toString());
 					//var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
 					try {
-						console.info('will try to cast:', eventFlags.toString());
+						console.info('will try to cast:', eventFlags.toString(), 'to:', ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr.toString());
 						var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr);
 					} catch(ex) {
 						console.warn('ex on cast flags:', ex.toString());
