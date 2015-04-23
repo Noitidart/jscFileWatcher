@@ -320,7 +320,12 @@ var macInit = function() {
 				self.TYPE.FSEventStreamRef
 			);
 		},
-		FSEventStreamStop: function() {},
+		FSEventStreamStop: function() {
+			return lib('FSEvents').declare("FSEventStreamStop", self.TYPE.ABI,
+				self.TYPE.void,
+				self.TYPE.FSEventStreamRef
+			);
+		},
 		FSEventStreamInvalidate: function() {
 			return lib('FSEvents').declare("FSEventStreamInvalidate", self.TYPE.ABI,
 				self.TYPE.void,

@@ -192,7 +192,11 @@ function createWatcher(aWatcherID, aOptions={}) {
 				// use FSEventFramework
 
 				var _js_fsevents_callback = function(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
-					console.error('in _js_fsevents_callback aH!!!');
+					console.error('in _js_fsevents_callback aH!!!', 'clientCallBackInfo:', clientCallBackInfo.toString(), 'numEvents:', numEvents.toString(), 'eventPaths:', eventPaths.toString(), 'eventFlags:', eventFlags.toString(), 'eventIds:', eventIds.toString());
+					// stop runLoopRun
+					console.log('attempting to stop the runLoopRun so console message after it happens');
+					ostypes.API('FSEventStreamStop')(streamRef);
+					console.log('call to stop completed');
 					return null;
 				};
 				
