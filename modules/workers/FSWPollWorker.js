@@ -627,7 +627,7 @@ function poll(aArgs) {
 				// let _buf = new ostypes.TYPE.fd_set.ptr(readbuf.buffer);
 				// let buf = ctypes.cast(_buf, ostypes.TYPE.char.array(size).ptr);
 				
-				let fdset = new Uint8Array(8);
+				let fdset = new Uint8Array(16);
 				/* no need as it initializes at 0
 				for (let i = 0; i < fdset.length; i++) {
 					fdset[i] = 0;
