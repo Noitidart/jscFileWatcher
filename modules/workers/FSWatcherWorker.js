@@ -200,7 +200,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					try {
 						var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr);
 					} catch(ex) {
-						console.warn('ex on cast flags:', ex.toString();
+						console.warn('ex on cast flags:', ex.toString());
 					}
 					// console.log('flags casted');
 					var ids = eventIds; //ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr);
