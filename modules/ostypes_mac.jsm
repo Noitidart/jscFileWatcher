@@ -210,6 +210,7 @@ var macInit = function() {
 		kCFRunLoopRunStopped: 2,
 		kCFRunLoopRunTimedOut: 3,
 		kFSEventStreamCreateFlagFileEvents: 16, // https://github.com/bizonix/DropBoxLibrarySRC/blob/2e4a151caa88b48653f31a22cb207fff851b75f8/pyc_decrypted/latest/pymac/constants.py#L165
+		kFSEventStreamCreateFlagNoDefer: 2,
 		kFSEventStreamCreateFlagWatchRoot: 4,
 		kFSEventStreamEventIdSinceNow: -1
 	};
