@@ -515,10 +515,13 @@ function poll(aArgs) {
 				if (!('cfArrRef' in macStuff)) {
 					macStuff.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.maxLenCfArrRefPtrStr).ptr(ctypes.UInt64(aArgs.ptrStrOf__cStr_ptrOf_cfArrRef));
 				}
+				var now_jsStr_ptrOf_cfArrRef;
+				
+				console.error('PRE THE LOOP SO ENTRY FUNC');
 				
 				while (true) {
-					var now_jsStr_ptrOf_cfArrRef = macStuff.cStr_ptrOf_cfArrRef.contents.readString();
-					console.info('last:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'now:', now_jsStr_ptrOf_cfArrRef.toString());
+					now_jsStr_ptrOf_cfArrRef = macStuff.cStr_ptrOf_cfArrRef.contents.readString();
+					console.info('LOOP TOP last:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'now:', now_jsStr_ptrOf_cfArrRef.toString());
 					if (macStuff.last_jsStr_ptrOf_cfArrRef != now_jsStr_ptrOf_cfArrRef) {
 						console.info('cfArr changed, so make new stream');
 						// invalidate old stream, create new stream
