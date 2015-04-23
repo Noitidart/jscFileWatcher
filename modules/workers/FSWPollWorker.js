@@ -19,8 +19,9 @@ const core = { // have to set up the main keys
 	},
 	firefox: {}
 };
-const loopIntervalMS = 30000;
-const loopIntervalS = 30;
+const loopIntervalMS = 500;
+const loopIntervalS = 0.5;
+const loopIntervalNS = 500000000;
 
 // START - OS Specific
 var winStuff;
@@ -264,7 +265,7 @@ function poll(aArgs) {
 					}
 					
 					winStuff.FSChanges = [];
-					var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(winStuff.handles_watched_cArr.length, winStuff.handles_watched_cArr, false, 10000 /*in ship product set this to half a second, so 500ms*/, true);
+					var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(winStuff.handles_watched_cArr.length, winStuff.handles_watched_cArr, false, loopIntervalMS, true);
 					console.error('hang completed for WaitForMultipleObjectsEx');
 					//console.error('value of did callback happen first:', winStuff.didCBHap); // learned that WaitForMultipleObjectsEx un-blocks/hangs after the callback ran, this is perfect aH! so now i can return the promise with the callbacks work, just store it to global then return it here (clear global so future functions wont double return)
 					if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_FAILED)) {
@@ -315,7 +316,7 @@ function poll(aArgs) {
 				// Set the timeout to wake us every half second.
 				var timeout = ostypes.TYPE.timespec();
 				var useSec = 0;
-				var useNsec = 500000000;
+				var useNsec = loopIntervalNS;
 				timeout.tv_sec = useSec; // 0 seconds
 				timeout.tv_nsec = useNsec; // 500 milliseconds
 				
