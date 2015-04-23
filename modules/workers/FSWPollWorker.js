@@ -180,6 +180,7 @@ function init(objCore) {
 					console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
 					
 					macStuff.last_jsStr_ptrOf_cfArrRef = 0;
+					macStuff._cache_aRenamed = {}; //key is eventId
 				}
 				
 			break;
@@ -898,16 +899,69 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 	macStuff.FSChanges = [];
 	for (var i=0; i<numEv; i++) {
 		var aEvent = convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i]));
-		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + cutils.jscGetDeepest(ids[i]));
+		var evId = cutils.jscGetDeepest(ids[i]);
+		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + evId);
 		
 		if (aEvent) {
-		macStuff.FSChanges.push({
-			aFileName: paths[i].readString(),
-			aEvent: aEvent,
-			aExtra: {
-				//aOSPath_parentDir_identifier: hDir_ptrStr
+			if (aEvent == 'renamed') {
+				// check macStuff._cache_aRenamed if find evId - 1 then this is renamed-to and that is renamed-from IF find evId + 1 this is renamed-from and that is renamed-to
+				var aRenamedFromId = parseInt(evId) - 1;
+				var aRenamedToId = parseInt(evId) + 1;
+				var foundLinkedRename = false;
+				for (var aRenamedId in macStuff._cache_aRenamed) {
+					if (aRenamedId == aRenamedFromId || aRenamedId == aRenamedToId) {
+						var cachedObj = macStuff._cache_aRenamed[aRenamedFromId];
+						delete macStuff._cache_aRenamed[aRenamedFromId];
+						foundLinkedRename = true;
+						
+						if (aRenamedId == aRenamedFromId) {
+							macStuff.FSChanges.push({
+								aFileName: filename,
+								aEvent: aEvent, // will obviously be 'renamed'
+								aExtra: {
+									aOSPath_parentDir_identifier: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									aOld: {
+										aFileName: cachedObj.aFileName
+									}
+								}
+							});
+						} else {
+							// then obviously  aRenamedId == aRenamedToId
+							macStuff.FSChanges.push({
+								aFileName: cachedObj.aFileName,
+								aEvent: aEvent, // will obviously be 'renamed'
+								aExtra: {
+									aOSPath_parentDir_identifier: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									aOld: {
+										aFileName: filename
+									}
+								}
+							});
+						}
+						
+						break;
+					}
+				}
+				if (!foundLinkedRename) {
+					macStuff.FSChanges.push({
+						aFileName: filename,
+						aEvent: aEvent, // will obviously be 'renamed'
+						aExtra: {
+							aOSPath_parentDir_identifier: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+						}
+					});
+				}
 			}
-		});
+			var fullpath = paths[i].readString();
+			var filename = OS.Path.basename(fullpath);
+			var dirpath = OS.Path.dirname(fullpath);
+			macStuff.FSChanges.push({
+				aFileName: filename,
+				aEvent: aEvent,
+				aExtra: {
+					aOSPath_parentDir_identifier: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+				}
+			});
 		} // aEvent is false meaning it had some flags we dont care to trigger the callback for so dont push it to FSChanges
 	}
 	
@@ -1071,7 +1125,7 @@ function convertFlagsToAEventStr(flags) {
 					for (var f in default_flags) {
 						if (flags & ostypes.CONST[f]) {
 							if (flags & ostypes.CONST.kFSEventStreamEventFlagMustScanSubDirs) {
-								return default_flags[f] + ' | SUBDIR?';
+								console.error(default_flags[f] + ' | SUBDIR?');
 							}
 							return default_flags[f];
 						}
