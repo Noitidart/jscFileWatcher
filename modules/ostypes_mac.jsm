@@ -212,6 +212,26 @@ var macInit = function() {
 		kFSEventStreamCreateFlagFileEvents: 16, // https://github.com/bizonix/DropBoxLibrarySRC/blob/2e4a151caa88b48653f31a22cb207fff851b75f8/pyc_decrypted/latest/pymac/constants.py#L165
 		kFSEventStreamCreateFlagNoDefer: 2,
 		kFSEventStreamCreateFlagWatchRoot: 4,
+		kFSEventStreamEventFlagNone: 0x00000000,
+		kFSEventStreamEventFlagMustScanSubDirs: 0x00000001,
+		kFSEventStreamEventFlagUserDropped: 0x00000002,
+		kFSEventStreamEventFlagKernelDropped: 0x00000004,
+		kFSEventStreamEventFlagEventIdsWrapped: 0x00000008,
+		kFSEventStreamEventFlagHistoryDone: 0x00000010,
+		kFSEventStreamEventFlagRootChanged: 0x00000020,
+		kFSEventStreamEventFlagMount: 0x00000040,
+		kFSEventStreamEventFlagUnmount: 0x00000080,
+		kFSEventStreamEventFlagItemCreated: 0x00000100,
+		kFSEventStreamEventFlagItemRemoved: 0x00000200,
+		kFSEventStreamEventFlagItemInodeMetaMod: 0x00000400,
+		kFSEventStreamEventFlagItemRenamed: 0x00000800,
+		kFSEventStreamEventFlagItemModified: 0x00001000,
+		kFSEventStreamEventFlagItemFinderInfoMod: 0x00002000,
+		kFSEventStreamEventFlagItemChangeOwner: 0x00004000,
+		kFSEventStreamEventFlagItemXattrMod: 0x00008000,
+		kFSEventStreamEventFlagItemIsFile: 0x00010000,
+		kFSEventStreamEventFlagItemIsDir: 0x00020000,
+		kFSEventStreamEventFlagItemIsSymlink: 0x00040000,
 		kFSEventStreamEventIdSinceNow: -1
 	};
 	

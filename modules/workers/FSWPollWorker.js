@@ -902,7 +902,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + cutils.jscGetDeepest(flags[i]), 'id: ' + cutils.jscGetDeepest(ids[i]));
 		macStuff.FSChanges.push({
 			aFileName: paths[i].readString(),
-			aEvent: cutils.jscGetDeepest(flags[i]),
+			aEvent: convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i])),
 			aExtra: {
 				//aOSPath_parentDir_identifier: hDir_ptrStr
 			}
@@ -1059,6 +1059,19 @@ function convertFlagsToAEventStr(flags) {
 				} else {
 					// its mac and os.version is >= 10.7
 					// use FSEventFramework
+					
+					var default_flags = {
+						kFSEventStreamEventFlagItemCreated: 'added',
+						kFSEventStreamEventFlagItemRemoved: 'removed',
+						kFSEventStreamEventFlagItemRenamed: 'renamed',
+						kFSEventStreamEventFlagItemModified: 'contents-modified'
+					};
+					for (var f in default_flags) {
+						if (flags & ostypes.CONST[f]) {
+							return default_flags[f];
+						}
+					}
+					return false;
 				}
 				
 			break;
