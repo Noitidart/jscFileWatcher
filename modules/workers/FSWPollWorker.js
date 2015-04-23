@@ -926,22 +926,38 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 							});
 						} else {
 							if (filename != nextFilename) {
-								console.error('filename != nextFilename and i thought if next flag 0 and dirpath != nextDirpath, then this has to be user is moving file from dirpath to nextDirpath weirrrrd');
+								console.error('filename != nextFilename and i thought if next flag 0 and dirpath != nextDirpath, then this has to be user is moving file from dirpath to nextDirpath weirrrrd SO ASSUMING FIRST ENTRY WAS contents-modified AND 0 FLAGGED IS removed AS THIS IS WHAT I SAW IN MY TEST'); // test was make new folder in subdir of watched-dir, then rename it, then move it to watched-dir then delete it from watched-dir then i would get 3 in one callback, contents-modified .DS on watched-dir, moved-from on .DS in subdir and then 0 on deleted file
+								macStuff.FSChanges.push({
+									aFileName: filename,
+									aEvent: 'contents-modified', // moved from dirpath to nextDirpath (so we mark it as added in nextDirpath) link68743400
+									aExtra: {
+										aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									}
+								});
+								macStuff.FSChanges.push({
+									aFileName: nextFilename, //  (so we mark it as added in nextDirpath) link68743400
+									aEvent: 'removed',
+									aExtra: {
+										aOSPath_parentDir: nextDirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									}
+								});
+							} else {
+								// file moved from sub-dir-of-watched-dir to watched-dir (or maybe target sub-sub and to sub blah)
+								macStuff.FSChanges.push({
+									aFileName: filename,
+									aEvent: 'removed', // moved from dirpath to nextDirpath (so we mark it as added in nextDirpath) link68743400
+									aExtra: {
+										aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									}
+								});
+								macStuff.FSChanges.push({
+									aFileName: nextFilename, //  (so we mark it as added in nextDirpath) link68743400
+									aEvent: 'added',
+									aExtra: {
+										aOSPath_parentDir: nextDirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									}
+								});
 							}
-							macStuff.FSChanges.push({
-								aFileName: filename,
-								aEvent: 'removed', // moved from dirpath to nextDirpath (so we mark it as added in nextDirpath) link68743400
-								aExtra: {
-									aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
-								}
-							});
-							macStuff.FSChanges.push({
-								aFileName: nextFilename, //  (so we mark it as added in nextDirpath) link68743400
-								aEvent: 'added',
-								aExtra: {
-									aOSPath_parentDir: nextDirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
-								}
-							});
 						}
 						console.warn('i ++\'ed to skip nextFilename:', nextFilename, 'nextDirpath:', nextDirpath, 'nextFlags:', cutils.jscGetDeepest(flags[i+1]));
 						i++; // so it skips checking the next 1
