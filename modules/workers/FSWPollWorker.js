@@ -911,7 +911,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 					var nextFullpath = paths[i+1].readString();
 					var nextFilename = OS.Path.basename(nextFullpath);
 					var nextDirpath = OS.Path.dirname(nextFullpath);
-					var nextid = cutils.jscGetDeepest(ids[i+1]);
+					var nextId = cutils.jscGetDeepest(ids[i+1]);
 					if (cutils.jscGetDeepest(flags[i+1]) == '0') {
 						// this one is renamed-from
 						if (nextDirpath == dirpath) {
@@ -960,7 +960,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 								});
 							}
 						}
-						console.warn('i ++\'ed to skip nextFilename:', nextFilename, 'nextDirpath:', nextDirpath, 'nextFlags:', cutils.jscGetDeepest(flags[i+1]));
+						console.warn('i ++\'ed to skip nextFilename:', nextFilename, 'nextDirpath:', nextDirpath, 'nextFlags:', cutils.jscGetDeepest(flags[i+1]), 'nextId:', nextId);
 						i++; // so it skips checking the next 1
 					} else {
 						console.error('will handle in next FOR i ITER ????? aEvent ????? as next entry is not flag of 0 it is:', cutils.jscGetDeepest(flags[i+1]), {
@@ -1152,7 +1152,7 @@ function convertFlagsToAEventStr(flags) {
 					};
 					// get moved-from when moving from unwatched-dir/sub-dir to watched-dir but the path is the path on watched-dir. so it should be `added`. so if do os.file.exists on the path then i can test whether it was moved-to or really moved-from
 					if (flags == '0') {
-						return 'moved-to OR contents-modified'; // i used to have this as 'moved-to or watched-dir deleted' but its not true in my test cases
+						return 'contents-modified ok'; // 'moved-to OR contents-modified' // i used to have this as 'moved-to or watched-dir deleted' but its not true in my test cases
 					}
 					for (var f in default_flags) {
 						if (flags & ostypes.CONST[f]) {
