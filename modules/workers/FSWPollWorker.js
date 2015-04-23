@@ -932,14 +932,14 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 								aFileName: filename,
 								aEvent: 'removed', // moved from dirpath to nextDirpath (so we mark it as added in nextDirpath) link68743400
 								aExtra: {
-									aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
 								}
 							});
 							macStuff.FSChanges.push({
 								aFileName: nextFilename, //  (so we mark it as added in nextDirpath) link68743400
 								aEvent: 'added',
 								aExtra: {
-									aOSPath_parentDir: nextDirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									aOSPath_parentDir: nextDirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
 								}
 							});
 						}
@@ -949,9 +949,9 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 						console.error('will handle in next FOR i ITER ????? aEvent ????? as next entry is not flag of 0 it is:', cutils.jscGetDeepest(flags[i+1]), {
 							aFileName: filename,
 							aEvent: '????? aEvent ?????',
-							readOnFlags: convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i]))
+							readOnFlags: convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i])),
 							aExtra: {
-								aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+								aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
 							}
 						});
 					}
