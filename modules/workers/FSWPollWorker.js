@@ -1128,9 +1128,9 @@ function convertFlagsToAEventStr(flags) {
 					// use FSEventFramework
 					
 					var default_flags = {
+						kFSEventStreamEventFlagItemRenamed: 'moved-from',
 						kFSEventStreamEventFlagItemCreated: 'added',
 						kFSEventStreamEventFlagItemRemoved: 'removed',
-						kFSEventStreamEventFlagItemRenamed: 'moved-from',
 						kFSEventStreamEventFlagItemModified: 'contents-modified'
 					};
 					if (flags == '0') {
