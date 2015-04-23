@@ -19,11 +19,14 @@ const core = { // have to set up the main keys
 	},
 	firefox: {}
 };
+const loopIntervalMS = 30000;
+const loopIntervalS = 30;
 
 // START - OS Specific
 var winStuff;
 var nixStuff;
 var bsd_mac_kqStuff;
+var macStuff;
 // END - OS Specific
 
 // Imports that use stuff defined in chrome
@@ -145,24 +148,39 @@ function init(objCore) {
 		case 'freebsd':
 		case 'openbsd':
 		
-				bsd_mac_kqStuff = {};
-				bsd_mac_kqStuff.evtMtrPtrStr_len = 50; // change in FSWatcherWorker too
-				bsd_mac_kqStuff.watchedFd = {};
-				/* about bsd_mac_kqStuff.watchedFd
-				keys is fd,
-				val is obj:
-					{
-						jsStr: jsStr of OSPath of watched directory,
-						dirStat: {
-							jsStr_filename_1: {
-								lastModificationDate: js_lastModDate
-							},
-							jsStr_filename_2: {
-								lastModificationDate: js_lastModDate
-							},
+				if (core.os.name !== 'darwin' /* bsd */ || core.os.version < 7) {
+					bsd_mac_kqStuff = {};
+					bsd_mac_kqStuff.evtMtrPtrStr_len = 50; // change in FSWatcherWorker too
+					bsd_mac_kqStuff.watchedFd = {};
+					/* about bsd_mac_kqStuff.watchedFd
+					keys is fd,
+					val is obj:
+						{
+							jsStr: jsStr of OSPath of watched directory,
+							dirStat: {
+								jsStr_filename_1: {
+									lastModificationDate: js_lastModDate
+								},
+								jsStr_filename_2: {
+									lastModificationDate: js_lastModDate
+								},
+							}
 						}
-					}
-				*/
+					*/
+				} else {
+					// osx > 10.7
+					macStuff = {};
+					macStuff.maxLenCfArrRefPtrStr = 20;
+					macStuff._c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(js_FSEvStrCB);
+					macStuff.FSChanges = null;
+					
+					macStuff.cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
+					console.info('macStuff.cId:', macStuff.cId.toString());
+					macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
+					console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
+					
+					macStuff.last_jsStr_ptrOf_cfArrRef = 0;
+				}
 				
 			break;
 		default:
@@ -493,6 +511,87 @@ function poll(aArgs) {
 			} else {
 				// os.version is >= 10.7
 				// use FSEventFramework
+				
+				if (!('cfArrRef' in macStuff)) {
+					macStuff.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.maxLenCfArrRefPtrStr).ptr(ctypes.UInt64(aArgs.ptrStrOf__cStr_ptrOf_cfArrRef));
+				}
+				var now_jsStr_ptrOf_cfArrRef;
+				
+				console.error('PRE THE LOOP SO ENTRY FUNC');
+				
+				while (true) {
+					now_jsStr_ptrOf_cfArrRef = macStuff.cStr_ptrOf_cfArrRef.contents.readString();
+					console.info('LOOP TOP last:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'now:', now_jsStr_ptrOf_cfArrRef.toString());
+					if (macStuff.last_jsStr_ptrOf_cfArrRef != now_jsStr_ptrOf_cfArrRef) {
+						console.info('cfArr changed, so make new stream');
+						// invalidate old stream, create new stream
+						if ('fsstream' in macStuff) {
+							ostypes.API('FSEventStreamStop')(macStuff.fsstream); // i dont think i need this but lets leave it just in case
+							ostypes.API('FSEventStreamInvalidate')(macStuff.fsstream);
+							// just doing the above two will make runLoopRun break but we want to totally clean up the stream as we dont want it anymore as we are making a new one
+							ostypes.API('FSEventStreamRelease')(macStuff.fsstream);
+						}
+						
+						// create new
+						macStuff.last_jsStr_ptrOf_cfArrRef = now_jsStr_ptrOf_cfArrRef;
+						console.log('set last to now so last is now:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'and again now is:', now_jsStr_ptrOf_cfArrRef.toString());
+						var cfArrRef = ostypes.TYPE.CFArrayRef.ptr(ctypes.UInt64(now_jsStr_ptrOf_cfArrRef)).contents;
+						console.info('from poll worker cfArrRef:', cfArrRef.toString());
+						
+						macStuff.fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
+						console.info('macStuff.fsstream:', macStuff.fsstream.toString(), uneval(macStuff.fsstream));
+						if (macStuff.fsstream.isNull()) { // i have seen this null when cfArr had no paths added to it, so was an empty cfarr
+							console.error('Failed FSEventStreamCreate');
+							throw new Error({
+								name: 'os-api-error',
+								message: 'Failed FSEventStreamCreate'
+							});
+						}
+						
+						ostypes.API('FSEventStreamScheduleWithRunLoop')(macStuff.fsstream, macStuff.rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
+						
+						var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart')(macStuff.fsstream);
+						if (!rez_FSEventStreamStart) {
+							console.error('Failed FSEventStreamStart');
+							throw new Error({
+								name: 'os-api-error',
+								message: 'Failed FSEventStreamStart'
+							});
+						}
+						console.log('succsefuly started stream:', rez_FSEventStreamStart.toString());
+					} // else { console.log('cfArr unchanged so just go straight to run loop again'); }
+				
+					//console.log('going to start runLoopRun');
+					macStuff.FSChanges = null;
+					var rez_cfRLRIM = ostypes.API('CFRunLoopRunInMode')(ostypes.CONST.kCFRunLoopDefaultMode, loopIntervalS, true); // returns void
+					console.log('post runLoopRun line, rez_cfRLRIM:', rez_cfRLRIM.toString(), uneval(rez_cfRLRIM));
+					
+					if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunFinished)) {
+						console.log('poll-aborted-nopaths');
+						throw new Error({
+							name: 'poll-aborted-nopaths',
+							message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+						});
+					} else if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunStopped)) {
+						console.log('The run loop was stopped with CFRunLoopStop');
+						throw new Error({
+							name: 'poll-aborted-manually-stopped',
+							message: 'This is not an error, just throwing to cause rejection due to loop stopped by CFRunLoopStop'
+						});
+					} else if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunTimedOut)) {
+						console.log('The time interval seconds passed'); // probably no events triggered so continue loop
+					} else if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunHandledSource)) {
+						console.log('A source was processed. This exit condition only applies when returnAfterSourceHandled is true.');
+					} else {
+						console.error('huh??!?! should never get here');
+					}
+					
+					
+					if (macStuff.FSChanges && macStuff.FSChanges.length > 0) {
+						return macStuff.FSChanges;
+					} // else continue loop
+				}
+				
 			}
 
 		break;
@@ -777,6 +876,134 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 }
 // END - OS Specific - helpers for kqueue
 // START - OS Specific - helpers for windows
+// START - OS Specific - helpers for osx 10.7+
+function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
+	console.error('in _js_fsevents_callback aH!!!', 'clientCallBackInfo:', clientCallBackInfo.toString(), 'numEvents:', numEvents.toString(), 'eventPaths:', eventPaths.toString(), 'eventFlags:', eventFlags.toString(), 'eventIds:', eventIds.toString());
+	
+	var numEv = parseInt(cutils.jscGetDeepest(numEvents));
+	console.log('got numEv:', numEv.toString());
+	var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
+	//console.info('will try to cast:', eventFlags.toString(), 'to:', ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr.toString());
+	// try {
+		var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr).contents;
+	// } catch(ex) {
+		// console.warn('ex on cast flags:', ex.toString());
+	// }
+	// console.log('flags casted');
+	var ids = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr).contents;
+	// console.log('ids casted');
+	
+	console.info('.ptr casted', 'paths:', paths.toString(), 'flags:', flags.toString(), 'ids:', ids.toString());
+	
+	macStuff.FSChanges = [];
+	for (var i=0; i<numEv; i++) {
+		var aEvent = convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i]));
+		var evIdStr = cutils.jscGetDeepest(ids[i]);
+		var evId = ctypes.UInt64(evIdStr);
+		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + evIdStr);
+		
+		if (aEvent) {
+			var fullpath = paths[i].readString();
+			var filename = OS.Path.basename(fullpath);
+			var dirpath = OS.Path.dirname(fullpath);
+			if (aEvent == 'moved-from') {
+				if (i+1 < numEv) {
+					var nextFullpath = paths[i+1].readString();
+					var nextFilename = OS.Path.basename(nextFullpath);
+					var nextDirpath = OS.Path.dirname(nextFullpath);
+					var nextId = cutils.jscGetDeepest(ids[i+1]);
+					if (cutils.jscGetDeepest(flags[i+1]) == '0') {
+						// this one is renamed-from
+						if (nextDirpath == dirpath) {
+							macStuff.FSChanges.push({
+								aFileName: nextFilename,
+								aEvent: 'renamed',
+								aExtra: {
+									aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									aOld: {
+										aFileName: filename
+									}
+								}
+							});
+						} else {
+							if (filename != nextFilename) {
+								console.error('filename != nextFilename and i thought if next flag 0 and dirpath != nextDirpath, then this has to be user is moving file from dirpath to nextDirpath weirrrrd SO ASSUMING FIRST ENTRY WAS contents-modified AND 0 FLAGGED IS removed AS THIS IS WHAT I SAW IN MY TEST'); // test was make new folder in subdir of watched-dir, then rename it, then move it to watched-dir then delete it from watched-dir then i would get 3 in one callback, contents-modified .DS on watched-dir, moved-from on .DS in subdir and then 0 on deleted file
+								macStuff.FSChanges.push({
+									aFileName: filename,
+									aEvent: 'contents-modified', // moved from dirpath to nextDirpath (so we mark it as added in nextDirpath) link68743400
+									aExtra: {
+										aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									}
+								});
+								macStuff.FSChanges.push({
+									aFileName: nextFilename, //  (so we mark it as added in nextDirpath) link68743400
+									aEvent: 'removed',
+									aExtra: {
+										aOSPath_parentDir: nextDirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									}
+								});
+							} else {
+								// file moved from sub-dir-of-watched-dir to watched-dir (or maybe target sub-sub and to sub blah)
+								macStuff.FSChanges.push({
+									aFileName: filename,
+									aEvent: 'removed', // moved from dirpath to nextDirpath (so we mark it as added in nextDirpath) link68743400
+									aExtra: {
+										aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									}
+								});
+								macStuff.FSChanges.push({
+									aFileName: nextFilename, //  (so we mark it as added in nextDirpath) link68743400
+									aEvent: 'added',
+									aExtra: {
+										aOSPath_parentDir: nextDirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									}
+								});
+							}
+						}
+						console.warn('i ++\'ed to skip nextFilename:', nextFilename, 'nextDirpath:', nextDirpath, 'nextFlags:', cutils.jscGetDeepest(flags[i+1]), 'nextId:', nextId);
+						i++; // so it skips checking the next 1
+					} else {
+						console.error('will handle in next FOR i ITER ????? aEvent ????? as next entry is not flag of 0 it is:', cutils.jscGetDeepest(flags[i+1]), {
+							aFileName: filename,
+							aEvent: '????? aEvent ?????',
+							readOnFlags: convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i])),
+							aExtra: {
+								aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+							}
+						});
+					}
+				} else {
+					// either moved from watched-dir to anywhere-other-dir (meaning subdir-of-watched or unwatched-dir) and dirpath indicates "removed" from watched-dir OR moved from unwatched-dir to watched-dir and dirpath indicates "added" to watched-dir
+					macStuff.FSChanges.push({
+						aFileName: filename,
+						aEvent: OS.File.exists(fullpath) ? 'added' : 'removed',
+						aExtra: {
+							aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+						}
+					});
+				}
+			} else {
+				macStuff.FSChanges.push({
+					aFileName: filename,
+					aEvent: aEvent,
+					aExtra: {
+						aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+					}
+				});
+			}
+		} // aEvent is false meaning it had some flags we dont care to trigger the callback for so dont push it to FSChanges
+	}
+	
+	/*
+	// stop runLoopRun
+	console.log('attempting to stop the runLoopRun so console message after it happens');
+	ostypes.API('FSEventStreamStop')(streamRef);
+	ostypes.API('FSEventStreamInvalidate')(streamRef);
+	console.log('call to stop completed'); // after FSEventStreamStop and FSEventStreamInvalidate run then the RunLoopRun unblocks and firefox can be closed without hanging/force quit
+	*/
+	return null;
+};
+// END - OS Specific - helpers for osx 10.7+
 function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 	// for Windows only
 	
@@ -917,6 +1144,26 @@ function convertFlagsToAEventStr(flags) {
 				} else {
 					// its mac and os.version is >= 10.7
 					// use FSEventFramework
+					
+					var default_flags = {
+						kFSEventStreamEventFlagItemRenamed: 'moved-from',
+						kFSEventStreamEventFlagItemCreated: 'added',
+						kFSEventStreamEventFlagItemRemoved: 'removed',
+						kFSEventStreamEventFlagItemModified: 'contents-modified'
+					};
+					// get moved-from when moving from unwatched-dir/sub-dir to watched-dir but the path is the path on watched-dir. so it should be `added`. so if do os.file.exists on the path then i can test whether it was moved-to or really moved-from
+					if (flags == '0') {
+						return 'contents-modified ok'; // 'moved-to OR contents-modified' // i used to have this as 'moved-to or watched-dir deleted' but its not true in my test cases
+					}
+					for (var f in default_flags) {
+						if (flags & ostypes.CONST[f]) {
+							if (flags & ostypes.CONST.kFSEventStreamEventFlagMustScanSubDirs) {
+								console.error(default_flags[f] + ' | SUBDIR?');
+							}
+							return default_flags[f];
+						}
+					}
+					return false;
 				}
 				
 			break;

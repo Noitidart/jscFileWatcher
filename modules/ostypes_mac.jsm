@@ -107,7 +107,7 @@ var macTypes = function() {
 	this.CFArrayEqualCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.Boolean, [this.void.ptr, this.void.ptr]).ptr;
 	this.CFArrayReleaseCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.void, [this.CFAllocatorRef, this.void.ptr]).ptr;
 	this.CFArrayRetainCallBack = ctypes.FunctionType(this.CALLBACK_ABI, this.void.ptr, [this.CFAllocatorRef, this.void.ptr]).ptr;
-	this.FSEventStreamCallback = ctypes.FunctionType(this.CALLBACK_ABI, this.void, [this.ConstFSEventStreamRef, this.void.ptr, this.size_t, this.void.ptr, this.FSEventStreamEventFlags, this.FSEventStreamEventId]).ptr;
+	this.FSEventStreamCallback = ctypes.FunctionType(this.CALLBACK_ABI, this.void, [this.ConstFSEventStreamRef, this.void.ptr, this.size_t, this.void.ptr, this.FSEventStreamEventFlags.ptr, this.FSEventStreamEventId.ptr]).ptr;
 	this.ModalFilterProcPtr = ctypes.FunctionType(this.CALLBACK_ABI, this.Boolean, [this.DialogRef, this.EventRecord.ptr, this.DialogItemIndex.ptr]).ptr;
 	
 	// ADVANCED FUNCTION TYPES
@@ -205,8 +205,33 @@ var macInit = function() {
 		kCFAllocatorDefault: null, // 0
 		get kCFTypeArrayCallBacks () { console.error('in getter'); if (!('kCFTypeArrayCallBacks' in _const)) { _const['kCFTypeArrayCallBacks'] = lib('CoreFoundation').declare('kCFTypeArrayCallBacks', self.TYPE.CFArrayCallBacks); console.error('DEFINED IN CACHE'); } return _const['kCFTypeArrayCallBacks']; },
 		get kCFRunLoopDefaultMode () { if (!('kCFRunLoopDefaultMode' in _const)) { _const['kCFRunLoopDefaultMode'] = lib('CoreFoundation').declare('kCFRunLoopDefaultMode', self.TYPE.CFStringRef); } return _const['kCFRunLoopDefaultMode']; },
+		kCFRunLoopRunFinished: 1,
+		kCFRunLoopRunHandledSource: 4,
+		kCFRunLoopRunStopped: 2,
+		kCFRunLoopRunTimedOut: 3,
 		kFSEventStreamCreateFlagFileEvents: 16, // https://github.com/bizonix/DropBoxLibrarySRC/blob/2e4a151caa88b48653f31a22cb207fff851b75f8/pyc_decrypted/latest/pymac/constants.py#L165
+		kFSEventStreamCreateFlagNoDefer: 2,
 		kFSEventStreamCreateFlagWatchRoot: 4,
+		kFSEventStreamEventFlagNone: 0x00000000,
+		kFSEventStreamEventFlagMustScanSubDirs: 0x00000001,
+		kFSEventStreamEventFlagUserDropped: 0x00000002,
+		kFSEventStreamEventFlagKernelDropped: 0x00000004,
+		kFSEventStreamEventFlagEventIdsWrapped: 0x00000008,
+		kFSEventStreamEventFlagHistoryDone: 0x00000010,
+		kFSEventStreamEventFlagRootChanged: 0x00000020,
+		kFSEventStreamEventFlagMount: 0x00000040,
+		kFSEventStreamEventFlagUnmount: 0x00000080,
+		kFSEventStreamEventFlagItemCreated: 0x00000100,
+		kFSEventStreamEventFlagItemRemoved: 0x00000200,
+		kFSEventStreamEventFlagItemInodeMetaMod: 0x00000400,
+		kFSEventStreamEventFlagItemRenamed: 0x00000800,
+		kFSEventStreamEventFlagItemModified: 0x00001000,
+		kFSEventStreamEventFlagItemFinderInfoMod: 0x00002000,
+		kFSEventStreamEventFlagItemChangeOwner: 0x00004000,
+		kFSEventStreamEventFlagItemXattrMod: 0x00008000,
+		kFSEventStreamEventFlagItemIsFile: 0x00010000,
+		kFSEventStreamEventFlagItemIsDir: 0x00020000,
+		kFSEventStreamEventFlagItemIsSymlink: 0x00040000,
 		kFSEventStreamEventIdSinceNow: -1
 	};
 	
@@ -233,6 +258,14 @@ var macInit = function() {
 		CFRunLoopRun: function() {
 			return lib('CoreFoundation').declare("CFRunLoopRun", self.TYPE.ABI,
 				self.TYPE.void
+			);
+		},
+		CFRunLoopRunInMode: function() {
+			return lib('CoreFoundation').declare("CFRunLoopRunInMode", self.TYPE.ABI,
+				self.TYPE.SInt32,
+				self.TYPE.CFStringRef,
+				self.TYPE.CFTimeInterval,
+				self.TYPE.Boolean
 			);
 		},
 		CFRelease: function() {
@@ -320,7 +353,12 @@ var macInit = function() {
 				self.TYPE.FSEventStreamRef
 			);
 		},
-		FSEventStreamStop: function() {},
+		FSEventStreamStop: function() {
+			return lib('FSEvents').declare("FSEventStreamStop", self.TYPE.ABI,
+				self.TYPE.void,
+				self.TYPE.FSEventStreamRef
+			);
+		},
 		FSEventStreamInvalidate: function() {
 			return lib('FSEvents').declare("FSEventStreamInvalidate", self.TYPE.ABI,
 				self.TYPE.void,

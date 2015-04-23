@@ -718,6 +718,13 @@ function managePoll(instanceWatcher) {
 						}
 						delete cVal.aExtra.aOSPath_parentDir_identifier;
 					}
+					if (core.os.name == 'darwin' && core.os.version >= 7 && 'aOSPath_parentDir' in cVal.aExtra) {
+						// this is for osx 10.7+ as we want to discard subdir of watched dirs
+						if (!(cVal.aExtra.aOSPath_parentDir in thisW.paths_watched)) {
+							console.error('will not trigger cb for this obj as its path was not found in thisW.paths_watched, this is likely a subdir:', cVal);
+							continue; // to prevent cb from triggering with this obj
+						}
+					}
 					thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
 				}
 				do_waitForNextChange(); // restart poll
@@ -797,7 +804,7 @@ function extendCore() {
 					// 10.10.1 => 10.101
 					// so can compare numerically, as 10.100 is less then 10.101
 					
-					core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
+					//core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 				}
 				break;
 			default:

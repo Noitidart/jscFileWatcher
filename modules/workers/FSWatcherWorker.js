@@ -24,6 +24,10 @@ var winStuff = {
 	maxLen_cStrOfHandlePtrStrsWaitingAdd: 100 // if update this here, update it in FSWPollWorker too
 }
 
+var macStuff = {
+	maxLenCfArrRefPtrStr: 20 // if update this update in FSWPollWorker
+};
+
 // Imports that use stuff defined in chrome
 // I don't import ostypes_*.jsm yet as I want to init core first, as they use core stuff like core.os.isWinXP etc
 importScripts(core.addon.path.content + 'modules/cutils.jsm');
@@ -191,67 +195,21 @@ function createWatcher(aWatcherID, aOptions={}) {
 				// its mac and os.version is >= 10.7
 				// use FSEventFramework
 
-				var _js_fsevents_callback = function(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
-					console.error('in _js_fsevents_callback aH!!!');
-					return null;
+				var Watcher = {};
+				_Watcher_cache[aWatcherID] = Watcher;
+				
+				Watcher.paths_watched_props = {}; // key is aOSPath, val is obj {path_id: jsInt, cfStr: cfStr}
+				Watcher.nextPathId = 0;
+				
+				Watcher.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.maxLenCfArrRefPtrStr)(); // putting into Watcher obj as i think i need to keep it alive like htat (i didnt test but i think if i do var cfArrRefPtrStr = might get GC'ed)
+				//Watcher.cInt_numPaths = ctypes.int(0);
+				
+				var argsForPoll = {
+					ptrStrOf__cStr_ptrOf_cfArrRef: cutils.strOfPtr(Watcher.cStr_ptrOf_cfArrRef.address()),
+					//ptrStrOf__cInt_numPaths: cutils.strOfPtr(Watcher.cInt_numPaths.address())
 				};
 				
-				var path_jsStr = OS.Constants.Path.desktopDir;
-				var path_cfStr = ostypes.HELPER.makeCFStr(path_jsStr);
-				
-				try {
-					var _c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(_js_fsevents_callback);
-					var cfStrArr = ostypes.TYPE.void.ptr.array(1)([
-						path_cfStr
-					]);
-					var cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.CONST.kCFTypeArrayCallBacks.address());
-					console.info('cfArrRef:', cfArrRef.toString());
-					if (cfArrRef.isNull()) {
-						console.error('Failed cfArrRef');
-						throw new Error({
-							name: 'os-api-error',
-							message: 'Failed CFArrayCreate'
-						});
-					}
-					
-					var cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
-					console.info('cId:', cId.toString());
-					var fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, _c_fsevents_callback, null, cfArrRef, cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
-					console.info('fsstream:', fsstream.toString(), uneval(fsstream));
-
-					var rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
-					console.info('rez_CFRunLoopGetCurrent:', rez_CFRunLoopGetCurrent.toString());
-					
-					ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
-					
-					var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart')(fsstream);
-					if (!rez_FSEventStreamStart) {
-						console.error('Failed FSEventStreamStart');
-						throw new Error({
-							name: 'os-api-error',
-							message: 'Failed FSEventStreamStart'
-						});
-					}
-					
-					console.log('succsefuly started stream:', rez_FSEventStreamStart.toString());
-					
-					console.log('going to start runLoopRun');
-					
-					ostypes.API('CFRunLoopRun')(); // returns void
-					
-					console.log('run loop run started!!!');
-				} catch(ex) {
-					ostypes.API('CFRelease')(path_cfStr); // returns void
-					
-					if (fsstream && !fsstream.isNull()) {
-						console.log('need to clean up fsstream');
-						ostypes.API('FSEventStreamInvalidate')(fsstream);
-						ostypes.API('FSEventStreamRelease')(fsstream);
-						console.log('done cleaning up fsstream');
-					}
-					
-					throw ex;
-				}
+				return argsForPoll;
 				
 				
 			}
@@ -466,6 +424,55 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 			} else {
 				// its mac and os.version is >= 10.7
 				// use FSEventFramework
+				
+				var Watcher = _Watcher_cache[aWatcherID];
+				if (!Watcher) {
+					throw new Error({
+						name: 'watcher-api-error',
+						message: 'Watcher not found in cache'
+					});
+				}
+				
+				if (aOSPath in Watcher.paths_watched_props) {
+					throw new Error({
+						name: 'watcher-api-error',
+						message: 'aOSPath of "' + aOSPath + '" already found in watched paths list so will not add this'					
+					});
+				}
+				
+				Watcher.nextPathId++;
+				var thisPObj = {
+					path_id: Watcher.nextPathId-1,
+					cfStr: ostypes.HELPER.makeCFStr(aOSPath) // make sure to release these on watcher1.close()
+				};
+				
+				var jsStrArr = [];
+				// add in old watched paths
+				for (var cOSPath in Watcher.paths_watched_props) {
+					jsStrArr.push(Watcher.paths_watched_props[cOSPath].cfStr);
+				}
+				// add in the new path to be watched
+				jsStrArr.push(thisPObj.cfStr);
+				
+				var cfStrArr = ostypes.TYPE.void.ptr.array()(jsStrArr);
+
+				Watcher.cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.CONST.kCFTypeArrayCallBacks.address()); // putting into Watcher. because otherwise it might GC im not sure i didnt test
+				console.info('cfArrRef:', Watcher.cfArrRef.toString());
+				if (Watcher.cfArrRef.isNull()) {
+					console.error('Failed cfArrRef');
+					throw new Error({
+						name: 'os-api-error',
+						message: 'Failed CFArrayCreate'
+					});
+				}
+				
+				Watcher.paths_watched_props[aOSPath] = thisPObj;
+				
+				cutils.modifyCStr(Watcher.cStr_ptrOf_cfArrRef, cutils.strOfPtr(Watcher.cfArrRef.address()));
+				
+				return thisPObj.path_id;
+
+				
 			}
 
 		break;
