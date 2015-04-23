@@ -117,19 +117,31 @@ function createWatcher(aWatcherID, aOptions={}) {
 		// 	
 		// 	break;		
         	case 'sunos':
-         		var port = ostypes.API('port_create')();
-            		if (port === -1) {
-              			throw new Error('Creating a port failed!');
-		   	}
-		 	var jsCb = function(yep) {
-       				console.log('got here');
-		  	}
- 
-			var cCb = ostypes.TYPE.start_routine.ptr(jsCb);
-			var firstArg = ctypes.unsigned_int(1); // defaults to 0 otherwise put a number like ctypes.unsigned_int(4);
-			var casted = ctypes.cast(ctypes.int(port).address(), ctypes.void_t.ptr);
-			var pthread = ostypes.API('pthread_create')(firstArg.address(), ostypes.TYPE.pthread_attr_t.ptr, cCb, casted); 
-		    break;
+			var port = ostypes.API('port_create')();
+	      		if (port === -1) {
+	        		throw new Error('Creating a port failed!');
+	      		}
+			var jsCb = function(yep) {
+		        	console.log('got here');
+				return null;
+		      	};
+	
+		        var cCb = ostypes.TYPE.start_routine.ptr(jsCb);
+		        var attrObj = ostypes.TYPE.pthread_attr_t();
+		        var firstArg = ostypes.TYPE.unsigned_int(); // defaults to 0 otherwise put a number like ctypes.unsigned_int(4);
+		        var casted = ctypes.cast(ostypes.TYPE.int(port).address(), ostypes.TYPE.void.ptr);
+		        var pthread = ostypes.API('pthread_create')(firstArg.address(), attrObj.address(), cCb, casted); 
+		        var fi = ostypes.TYPE.fileinfo();
+		        fi.fobj.fo_name = ostypes.TYPE.char.array()(OS.Constants.Path.desktopDir);
+		        fi.events = ostypes.CONST.FILE_ACCESS;
+		        fi.port = port;
+		
+		
+			var rez_pf = ostypes.HELPER.process_file(fi.address(), 0);
+		        if (rez_pf)  {
+		
+			}
+	      		break;
 		case 'darwin':
 		case 'freebsd':
 		case 'openbsd':
