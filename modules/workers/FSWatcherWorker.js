@@ -194,11 +194,11 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var _js_fsevents_callback = function(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
 					console.error('in _js_fsevents_callback aH!!!', 'clientCallBackInfo:', clientCallBackInfo.toString(), 'numEvents:', numEvents.toString(), 'eventPaths:', eventPaths.toString(), 'eventFlags:', eventFlags.toString(), 'eventIds:', eventIds.toString());
 					
-					var numEv = cutils.jscGetDeepest(numEvents);
+					var numEv = parseInt(cutils.jscGetDeepest(numEvents));
 					console.log('got numEv:', numEv.toString());
 					//var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
+					console.info('will try to cast:', eventFlags.toString(), 'to:', ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr.toString());
 					try {
-						console.info('will try to cast:', eventFlags.toString(), 'to:', ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr.toString());
 						var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr);
 					} catch(ex) {
 						console.warn('ex on cast flags:', ex.toString());
