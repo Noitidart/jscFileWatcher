@@ -1071,7 +1071,7 @@ function convertFlagsToAEventStr(flags) {
 					for (var f in default_flags) {
 						if (flags & ostypes.CONST[f]) {
 							if (flags & ostypes.CONST.kFSEventStreamEventFlagMustScanSubDirs) {
-								return default_flags[f] & ' | SUBDIR?';
+								return default_flags[f] + ' | SUBDIR?';
 							}
 							return default_flags[f];
 						}
