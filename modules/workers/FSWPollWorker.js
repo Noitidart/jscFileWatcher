@@ -180,7 +180,6 @@ function init(objCore) {
 					console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
 					
 					macStuff.last_jsStr_ptrOf_cfArrRef = 0;
-					macStuff._cache_aRenamed = {}; //key is eventId
 				}
 				
 			break;
@@ -907,37 +906,17 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 			var fullpath = paths[i].readString();
 			var filename = OS.Path.basename(fullpath);
 			var dirpath = OS.Path.dirname(fullpath);
-			if (aEvent == 'renamed') {
-				// check macStuff._cache_aRenamed if find evId - 1 then this is renamed-to and that is renamed-from IF find evId + 1 this is renamed-from and that is renamed-to
-				var uint1 = ctypes.UInt64('1');
-				var aRenamedFromId = ctypes_math.UInt64.sub(evId, uint1).toString();
-				var aRenamedToId = ctypes_math.UInt64.add(evId, uint1).toString();
-				console.info('aRenamedFromId:', aRenamedFromId, 'aRenamedToId:', aRenamedToId);
-				
-				var foundLinkedRename = false;
-				for (var aRenamedId in macStuff._cache_aRenamed) {
-					if (aRenamedId == aRenamedFromId || aRenamedId == aRenamedToId) {
-						console.log('found match!!!');
-						var cachedObj = macStuff._cache_aRenamed[aRenamedId];
-						delete macStuff._cache_aRenamed[aRenamedId];
-						foundLinkedRename = true;
-						
-						if (aRenamedId == aRenamedFromId) {
+			if (aEvent == 'moved-from') {
+				if (i+1 < numEv && cutils.jscGetDeepest(flags[i+1]) == '0') {
+					var nextFullpath = paths[i+1].readString();
+					var nextFilename = OS.Path.basename(nextFullpath);
+					var nextDirpath = OS.Path.dirname(nextFullpath);
+					if (cutils.jscGetDeepest(flags[i+1]) == '0') {
+						// this one is renamed-from
+						if (nextDirpath == dirpath) {
 							macStuff.FSChanges.push({
-								aFileName: filename,
-								aEvent: aEvent, // will obviously be 'renamed'
-								aExtra: {
-									aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
-									aOld: {
-										aFileName: cachedObj.aFileName
-									}
-								}
-							});
-						} else {
-							// then obviously  aRenamedId == aRenamedToId
-							macStuff.FSChanges.push({
-								aFileName: cachedObj.aFileName,
-								aEvent: aEvent, // will obviously be 'renamed'
+								aFileName: nextFilename,
+								aEvent: 'renamed',
 								aExtra: {
 									aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
 									aOld: {
@@ -945,20 +924,44 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 									}
 								}
 							});
+						} else {
+							macStuff.FSChanges.push({
+								aFileName: filename,
+								aEvent: 'removed', // moved from dirpath to nextDirpath (so we mark it as added in nextDirpath) link68743400
+								aExtra: {
+									aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+								}
+							});
+							macStuff.FSChanges.push({
+								aFileName: nextFilename, //  (so we mark it as added in nextDirpath) link68743400
+								aEvent: 'added',
+								aExtra: {
+									aOSPath_parentDir: nextDirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+								}
+							});
 						}
-						
-						break;
+						i++; // so it skips checking the next 1
+					} else {
+						console.error('????? aEvent ????? as next entry is not flag of 0 it is:', cutils.jscGetDeepest(flags[i+1]));
+							macStuff.FSChanges.push({
+								aFileName: filename,
+								aEvent: '????? aEvent ?????',
+								aExtra: {
+									aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+								}
+							});
 					}
-				}
-				if (!foundLinkedRename) {
-					console.log('no match for ', evIdStr, macStuff._cache_aRenamed.toString());
-					macStuff._cache_aRenamed[evIdStr] = {
+				} else {
+					macStuff.FSChanges.push({
 						aFileName: filename,
-						aEvent: aEvent, // will obviously be 'renamed'
+						aEvent: 'removed',
 						aExtra: {
-							aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+							aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+							aOld: {
+								aFileName: cachedObj.aFileName
+							}
 						}
-					};
+					});
 				}
 			} else {
 				macStuff.FSChanges.push({
@@ -1126,9 +1129,12 @@ function convertFlagsToAEventStr(flags) {
 					var default_flags = {
 						kFSEventStreamEventFlagItemCreated: 'added',
 						kFSEventStreamEventFlagItemRemoved: 'removed',
-						kFSEventStreamEventFlagItemRenamed: 'renamed',
+						kFSEventStreamEventFlagItemRenamed: 'moved-from',
 						kFSEventStreamEventFlagItemModified: 'contents-modified'
 					};
+					if (flags == '0') {
+						return 'moved-to or watched-dir deleted';
+					}
 					for (var f in default_flags) {
 						if (flags & ostypes.CONST[f]) {
 							if (flags & ostypes.CONST.kFSEventStreamEventFlagMustScanSubDirs) {
