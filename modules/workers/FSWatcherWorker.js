@@ -210,7 +210,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					console.info('.ptr casted', 'paths:', paths.toString(), 'flags:', flags.toString(), 'ids:', ids.toString());
 					
 					for (var i=0; i<numEv; i++) {
-						console.info('path ' + i, paths[i].readString());
+						console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + cutils.jscGetDeepest(flags[i]), 'id: ' + cutils.jscGetDeepest(ids[i]));
 					}
 					
 					/*
