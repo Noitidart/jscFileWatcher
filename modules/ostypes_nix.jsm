@@ -14,20 +14,20 @@ var ifdef_UNICODE = true;
 
 var nixTypes = function() {
   // ABIs
-  CALLBACK_ABI: ctypes.default_abi,
-  ABI: ctypes.default_abi,
+  this.CALLBACK_ABI = ctypes.default_abi
+  this.ABI = ctypes.default_abi;
   
 	// C TYPES
-	this.char = ctypes.char,
-	this.int = ctypes.int,
-	this.long = ctypes.long,
-	this.size_t = ctypes.size_t,
-	this.ssize_t = ctypes.ssize_t,
-	this.uint32_t = ctypes.uint32_t,
-	this.void = ctypes.void,
+	this.char = ctypes.char;
+	this.int = ctypes.int;
+	this.long = ctypes.long;
+	this.size_t = ctypes.size_t;
+	this.ssize_t = ctypes.ssize_t;
+	this.uint32_t = ctypes.uint32_t;
+	this.void = ctypes.void;
 	
 	// SIMPLE TYPES
-	this.fd_set = ctypes.uint8_t // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
+	this.fd_set = ctypes.uint8_t; // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
 	
 	//these consts need to be defined here too, they will also be found in ostypes.CONST but i need here as structs use them
 	var struct_const = {

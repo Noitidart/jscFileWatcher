@@ -19,9 +19,9 @@ const core = { // have to set up the main keys
 	},
 	firefox: {}
 };
-const loopIntervalMS = 500;
-const loopIntervalS = 0.5;
-const loopIntervalNS = 500000000;
+const loopIntervalMS = 5000; // only modify here
+const loopIntervalS = loopIntervalMS  / 1000; // do not modify
+const loopIntervalNS = loopIntervalMS * 1000000; // do not modify
 
 // START - OS Specific
 var winStuff;
