@@ -98,7 +98,7 @@ var nixInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
-		close: {
+		close: function(){
 		       /* http://linux.die.net/man/2/close	
 			*  int close(
 			*    int fd
@@ -109,7 +109,7 @@ var nixInit = function() {
 				ctypes.int		// fd
 			);
 		},
-		inotify_add_watch: {
+		inotify_add_watch: function(){
 			/* http://linux.die.net/man/2/inotify_add_watch
 			 * int inotify_add_watch(
 			 *   int fd,
@@ -124,7 +124,7 @@ var nixInit = function() {
 				self.TYPE.uint32_t		// mask
 			);
 		},
-		inotify_init: {
+		inotify_init: function(){
 			/* http://linux.die.net/man/2/inotify_init
 			 * Notes: Pass 0 as flags if you want inotify_init1 to behave as `int inotify_init(void);`
 			 * int inotify_init1(
@@ -136,7 +136,7 @@ var nixInit = function() {
 				self.TYPE.int		// flags
 			);
 		},
-		inotify_rm_watch: {
+		inotify_rm_watch: function(){
 			/* http://linux.die.net/man/2/inotify_rm_watch
 			 * int inotify_rm_watch(
 			 *   int fd,
@@ -149,7 +149,7 @@ var nixInit = function() {
 				self.TYPE.int		// wd
 			);
 		},
-		read: {
+		read: function(){
 		       /* http://linux.die.net/man/2/read
 			*  ssize_t read(
 			*    int fd, 
@@ -164,7 +164,7 @@ var nixInit = function() {
 				self.TYPE.size_t		// count
 			);
 		},
-		select: {
+		select: function(){
 			/* http://linux.die.net/man/2/select
 			 * int select (
 			 *   int nfds,
