@@ -205,7 +205,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				//Watcher.cInt_numPaths = ctypes.int(0);
 				
 				Watcher.dummyCfstrForRLRIM = ostypes.HELPER.makeCFStr('1'); // CFRelease on .close()
-				console.info('Watcher.dummyCfstrForRLRIM.address():', Watcher.dummyCfstrForRLRIM.address());
+				console.info('Watcher.dummyCfstrForRLRIM.address():', Watcher.dummyCfstrForRLRIM.address().toString());
 				
 				var argsForPoll = {
 					ptrStrOf__cStr_ptrOf_cfArrRef: cutils.strOfPtr(Watcher.cStr_ptrOf_cfArrRef.address()),

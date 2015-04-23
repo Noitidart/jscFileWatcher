@@ -566,21 +566,21 @@ function poll(aArgs) {
 					var rez_cfRLRIM = ostypes.API('CFRunLoopRunInMode')(macStuff.dummyCfstrForRLRIM, loopIntervalS, true); // returns void
 					console.error('post runLoopRun line, rez_cfRLRIM:', rez_cfRLRIM.toString(), uneval(rez_cfRLRIM));
 					
-					if (cutils.jscEqual(rez_cfRLRIM, ostype.CONST.kCFRunLoopRunFinished)) {
+					if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunFinished)) {
 						console.log('poll-aborted-nopaths');
 						throw new Error({
 							name: 'poll-aborted-nopaths',
 							message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
 						});
-					} else if (cutils.jscEqual(rez_cfRLRIM, ostype.CONST.kCFRunLoopRunStopped)) {
+					} else if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunStopped)) {
 						console.log('The run loop was stopped with CFRunLoopStop');
 						throw new Error({
 							name: 'poll-aborted-manually-stopped',
 							message: 'This is not an error, just throwing to cause rejection due to loop stopped by CFRunLoopStop'
 						});
-					} else if (cutils.jscEqual(rez_cfRLRIM, ostype.CONST.kCFRunLoopRunTimedOut)) {
+					} else if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunTimedOut)) {
 						console.log('The time interval seconds passed'); // probably no events triggered so continue loop
-					} else if (cutils.jscEqual(rez_cfRLRIM, ostype.CONST.kCFRunLoopRunHandledSource)) {
+					} else if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunHandledSource)) {
 						console.log('A source was processed. This exit condition only applies when returnAfterSourceHandled is true.');
 					} else {
 						console.error('huh??!?! should never get here');
