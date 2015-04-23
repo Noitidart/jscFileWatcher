@@ -627,13 +627,7 @@ function poll(aArgs) {
 				// let _buf = new ostypes.TYPE.fd_set.ptr(readbuf.buffer);
 				// let buf = ctypes.cast(_buf, ostypes.TYPE.char.array(size).ptr);
 				
-				let fdset = new Uint8Array(128);
-				/* no need as it initializes at 0
-				for (let i = 0; i < fdset.length; i++) {
-					fdset[i] = 0;
-				}
-				*/
-				ostypes.HELPER.fd_set_set(fdset, fd);
+
 				let timeoutStruct = ostypes.TYPE.timeval();
 				// Note: not the full range of timeouts works due to limited range of double.
 				timeoutStruct.tv_sec = Math.floor(loopIntervalS);
@@ -644,6 +638,13 @@ function poll(aArgs) {
 				count = ostypes.TYPE.size_t(count); // for use with read
 				while (true) {
 					console.warn('at top of INFINITE loop');
+				let fdset = new Uint8Array(128);
+				/* no need as it initializes at 0
+				for (let i = 0; i < fdset.length; i++) {
+					fdset[i] = 0;
+				}
+				*/
+				ostypes.HELPER.fd_set_set(fdset, fd);
 					let ret = ostypes.API('select')(fd + 1, fdset, null, null, timeoutStruct.address());
 					timeoutStruct.tv_sec = Math.floor(loopIntervalS);
 					timeoutStruct.tv_usec = Math.floor((loopIntervalS % 1) * 1000000);
