@@ -511,7 +511,6 @@ function poll(aArgs) {
 			} else {
 				// os.version is >= 10.7
 				// use FSEventFramework
-				var macStuff.fsstream;
 				
 				if (!('cfArrRef' in macStuff)) {
 					macStuff.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.maxLenCfArrRefPtrStr).ptr(ctypes.UInt64(aArgs.ptrStrOf__cStr_ptrOf_cfArrRef));
