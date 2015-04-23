@@ -655,7 +655,7 @@ function poll(aArgs) {
 						});
 					}
 					//let ready = ostypes.HELPER.fd_set_isset(fdset, fd);
-					if (!ready) {
+					//if (!ready) {
 					if (cutils.jscEqual(ret, 0)) {
 						console.error('timeout');
 						continue;  // timeout
