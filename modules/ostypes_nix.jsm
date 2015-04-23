@@ -45,8 +45,8 @@ nixTypes.prototype.inotify_event = ctypes.StructType('inotify_event', [ // http:
 ]);
 
 nixTypes.prototype.timeval = ctypes.StructType('timeval', [
-	{ 'tv_sec': self.TYPE.long },
-	{ 'tv_usec': self.TYPE.long }
+	{ 'tv_sec': nixTypes.prototype.long },
+	{ 'tv_usec': nixTypes.prototype.long }
 ]);
 
 var nixInit = function() {
