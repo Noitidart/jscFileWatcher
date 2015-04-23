@@ -178,6 +178,8 @@ function init(objCore) {
 					console.info('macStuff.cId:', macStuff.cId.toString());
 					macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
 					console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
+					
+					macStuff.last_jsStr_ptrOf_cfArrRef = 0;
 				}
 				
 			break;
@@ -509,9 +511,7 @@ function poll(aArgs) {
 			} else {
 				// os.version is >= 10.7
 				// use FSEventFramework
-
-				var last_jsStr_ptrOf_cfArrRef = 0;
-				var fsstream;
+				var macStuff.fsstream;
 				
 				if (!('cfArrRef' in macStuff)) {
 					macStuff.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.maxLenCfArrRefPtrStr).ptr(ctypes.UInt64(aArgs.ptrStrOf__cStr_ptrOf_cfArrRef));
@@ -519,26 +519,26 @@ function poll(aArgs) {
 				
 				while (true) {
 					var now_jsStr_ptrOf_cfArrRef = macStuff.cStr_ptrOf_cfArrRef.contents.readString();
-					console.info('last:', last_jsStr_ptrOf_cfArrRef.toString(), 'now:', now_jsStr_ptrOf_cfArrRef.toString());
-					if (last_jsStr_ptrOf_cfArrRef != now_jsStr_ptrOf_cfArrRef) {
+					console.info('last:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'now:', now_jsStr_ptrOf_cfArrRef.toString());
+					if (macStuff.last_jsStr_ptrOf_cfArrRef != now_jsStr_ptrOf_cfArrRef) {
 						console.info('cfArr changed, so make new stream');
 						// invalidate old stream, create new stream
-						if (fsstream !== undefined) {
-							ostypes.API('FSEventStreamStop')(fsstream); // i dont think i need this but lets leave it just in case
-							ostypes.API('FSEventStreamInvalidate')(fsstream);
+						if ('fsstream' in macStuff) {
+							ostypes.API('FSEventStreamStop')(macStuff.fsstream); // i dont think i need this but lets leave it just in case
+							ostypes.API('FSEventStreamInvalidate')(macStuff.fsstream);
 							// just doing the above two will make runLoopRun break but we want to totally clean up the stream as we dont want it anymore as we are making a new one
-							ostypes.API('FSEventStreamRelease')(fsstream);
+							ostypes.API('FSEventStreamRelease')(macStuff.fsstream);
 						}
 						
 						// create new
-						last_jsStr_ptrOf_cfArrRef = now_jsStr_ptrOf_cfArrRef;
-						console.log('set last to now so last is now:', last_jsStr_ptrOf_cfArrRef.toString(), 'and again now is:', now_jsStr_ptrOf_cfArrRef.toString());
+						macStuff.last_jsStr_ptrOf_cfArrRef = now_jsStr_ptrOf_cfArrRef;
+						console.log('set last to now so last is now:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'and again now is:', now_jsStr_ptrOf_cfArrRef.toString());
 						var cfArrRef = ostypes.TYPE.CFArrayRef.ptr(ctypes.UInt64(now_jsStr_ptrOf_cfArrRef)).contents;
 						console.info('from poll worker cfArrRef:', cfArrRef.toString());
 						
-						fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
-						console.info('fsstream:', fsstream.toString(), uneval(fsstream));
-						if (fsstream.isNull()) { // i have seen this null when cfArr had no paths added to it, so was an empty cfarr
+						macStuff.fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
+						console.info('macStuff.fsstream:', macStuff.fsstream.toString(), uneval(macStuff.fsstream));
+						if (macStuff.fsstream.isNull()) { // i have seen this null when cfArr had no paths added to it, so was an empty cfarr
 							console.error('Failed FSEventStreamCreate');
 							throw new Error({
 								name: 'os-api-error',
@@ -546,9 +546,9 @@ function poll(aArgs) {
 							});
 						}
 						
-						ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, macStuff.rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
+						ostypes.API('FSEventStreamScheduleWithRunLoop')(macStuff.fsstream, macStuff.rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
 						
-						var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart')(fsstream);
+						var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart')(macStuff.fsstream);
 						if (!rez_FSEventStreamStart) {
 							console.error('Failed FSEventStreamStart');
 							throw new Error({
