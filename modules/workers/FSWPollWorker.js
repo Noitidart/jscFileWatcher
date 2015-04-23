@@ -19,8 +19,8 @@ const core = { // have to set up the main keys
 	},
 	firefox: {}
 };
-const loopIntervalMS = 5000;
-const loopIntervalS = 5;
+const loopIntervalMS = 30000;
+const loopIntervalS = 30;
 
 // START - OS Specific
 var winStuff;
@@ -538,7 +538,7 @@ function poll(aArgs) {
 						var cfArrRef = ostypes.TYPE.CFArrayRef.ptr(ctypes.UInt64(now_jsStr_ptrOf_cfArrRef)).contents;
 						console.info('from poll worker cfArrRef:', cfArrRef.toString());
 						
-						macStuff.fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
+						macStuff.fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
 						console.info('macStuff.fsstream:', macStuff.fsstream.toString(), uneval(macStuff.fsstream));
 						if (macStuff.fsstream.isNull()) { // i have seen this null when cfArr had no paths added to it, so was an empty cfarr
 							console.error('Failed FSEventStreamCreate');
