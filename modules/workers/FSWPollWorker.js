@@ -907,7 +907,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 			var filename = OS.Path.basename(fullpath);
 			var dirpath = OS.Path.dirname(fullpath);
 			if (aEvent == 'moved-from') {
-				if (i+1 < numEv && cutils.jscGetDeepest(flags[i+1]) == '0') {
+				if (i+1 < numEv) {
 					var nextFullpath = paths[i+1].readString();
 					var nextFilename = OS.Path.basename(nextFullpath);
 					var nextDirpath = OS.Path.dirname(nextFullpath);
@@ -925,6 +925,9 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 								}
 							});
 						} else {
+							if (filename != nextFilename) {
+								console.error('filename != nextFilename and i thought if next flag 0 and dirpath != nextDirpath, then this has to be user is moving file from dirpath to nextDirpath weirrrrd');
+							}
 							macStuff.FSChanges.push({
 								aFileName: filename,
 								aEvent: 'removed', // moved from dirpath to nextDirpath (so we mark it as added in nextDirpath) link68743400
@@ -940,16 +943,17 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 								}
 							});
 						}
+						console.warn('i ++\'ed to skip');
 						i++; // so it skips checking the next 1
 					} else {
-						console.error('????? aEvent ????? as next entry is not flag of 0 it is:', cutils.jscGetDeepest(flags[i+1]));
-							macStuff.FSChanges.push({
-								aFileName: filename,
-								aEvent: '????? aEvent ?????',
-								aExtra: {
-									aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
-								}
-							});
+						console.error('will handle in next FOR i ITER ????? aEvent ????? as next entry is not flag of 0 it is:', cutils.jscGetDeepest(flags[i+1]), {
+							aFileName: filename,
+							aEvent: '????? aEvent ?????',
+							readOnFlags: convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i]))
+							aExtra: {
+								aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+							}
+						});
 					}
 				} else {
 					macStuff.FSChanges.push({
