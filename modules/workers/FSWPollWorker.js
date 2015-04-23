@@ -173,6 +173,11 @@ function init(objCore) {
 					macStuff.maxLenCfArrRefPtrStr = 20;
 					macStuff._c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(js_FSEvStrCB);
 					macStuff.FSChanges = null;
+					
+					macStuff.cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
+					console.info('macStuff.cId:', macStuff.cId.toString());
+					macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
+					console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
 				}
 				
 			break;
@@ -510,10 +515,8 @@ function poll(aArgs) {
 				
 				if (!('cfArrRef' in macStuff)) {
 					macStuff.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.maxLenCfArrRefPtrStr).ptr(ctypes.UInt64(aArgs.ptrStrOf__cStr_ptrOf_cfArrRef));
-				}
-				if (!('cId' in macStuff)) {
-					macStuff.cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
-					console.info('macStuff.cId:', macStuff.cId.toString());
+					macStuff.dummyCfstrForRLRIM = ostypes.TYPE.CFStringRef.ptr(ctypes.UInt64(aArgs.ptrStrOf_dummyCfstrForRLRIM)).contents;
+					console.info('macStuff.dummyCfstrForRLRIM:', macStuff.dummyCfstrForRLRIM.toString());
 				}
 				
 				while (true) {
@@ -543,11 +546,6 @@ function poll(aArgs) {
 							});
 						}
 						
-						if (!('rez_CFRunLoopGetCurrent' in macStuff)) {
-							macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
-						}
-						console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
-						
 						ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, macStuff.rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
 						
 						var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart')(fsstream);
@@ -565,7 +563,7 @@ function poll(aArgs) {
 				
 					console.error('going to start runLoopRun');
 					macStuff.FSChanges = null;
-					var rez_cfRLRIM = ostypes.API('CFRunLoopRunInMode')(macStuff.cStr_ptrOf_cfArrRef, loopIntervalS, true); // returns void // passing macStuff.cStr_ptrOf_cfArrRef as need any random cfstr to work
+					var rez_cfRLRIM = ostypes.API('CFRunLoopRunInMode')(macStuff.dummyCfstrForRLRIM, loopIntervalS, true); // returns void
 					console.error('post runLoopRun line, rez_cfRLRIM:', rez_cfRLRIM.toString(), uneval(rez_cfRLRIM));
 					
 					if (cutils.jscEqual(rez_cfRLRIM, ostype.CONST.kCFRunLoopRunFinished)) {
