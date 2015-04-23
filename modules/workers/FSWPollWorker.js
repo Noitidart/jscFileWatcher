@@ -661,6 +661,12 @@ function poll(aArgs) {
 						continue;  // timeout
 					} else {
 						console.error('no time out data exists!! ret:', ret.toString());
+						/*
+						for (let i = 0; i < fdset.length; i++) {
+							fdset[i] = 0;
+						}
+						ostypes.HELPER.fd_set_set(fdset, fd);
+						*/
 					}
 
 						let length = ostypes.API('read')(fd, buf, count);

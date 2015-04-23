@@ -24,7 +24,7 @@ var nixTypes = function() {
 	this.size_t = ctypes.size_t;
 	this.ssize_t = ctypes.ssize_t;
 	this.uint32_t = ctypes.uint32_t;
-	this.void = ctypes.void;
+	this.void = ctypes.void_t;
 	
 	// SIMPLE TYPES
 	this.fd_set = ctypes.uint8_t; // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
