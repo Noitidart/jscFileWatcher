@@ -199,15 +199,19 @@ function createWatcher(aWatcherID, aOptions={}) {
 					var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
 					//console.info('will try to cast:', eventFlags.toString(), 'to:', ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr.toString());
 					// try {
-						var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr);
+						var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr).contents;
 					// } catch(ex) {
 						// console.warn('ex on cast flags:', ex.toString());
 					// }
 					// console.log('flags casted');
-					var ids = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr);
+					var ids = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr).contents;
 					// console.log('ids casted');
 					
 					console.info('.ptr casted', 'paths:', paths.toString(), 'flags:', flags.toString(), 'ids:', ids.toString());
+					
+					for (var i=0; i<numEv; i++) {
+						console.info('path ' + i, paths[i].readString());
+					}
 					
 					/*
 					// stop runLoopRun
