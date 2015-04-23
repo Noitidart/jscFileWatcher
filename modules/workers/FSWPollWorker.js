@@ -654,8 +654,9 @@ function poll(aArgs) {
 							uniEerrno: ctypes.errno
 						});
 					}
-					let ready = ostypes.HELPER.fd_set_isset(fdset, fd);
+					//let ready = ostypes.HELPER.fd_set_isset(fdset, fd);
 					if (!ready) {
+					if (cutils.jscEqual(ret, 0)) {
 						console.error('timeout');
 						continue;  // timeout
 					}
