@@ -943,7 +943,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 								}
 							});
 						}
-						console.warn('i ++\'ed to skip');
+						console.warn('i ++\'ed to skip nextFilename:', nextFilename, 'nextDirpath:', nextDirpath, 'nextFlags:', cutils.jscGetDeepest(flags[i+1]));
 						i++; // so it skips checking the next 1
 					} else {
 						console.error('will handle in next FOR i ITER ????? aEvent ????? as next entry is not flag of 0 it is:', cutils.jscGetDeepest(flags[i+1]), {
