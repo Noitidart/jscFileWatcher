@@ -196,24 +196,26 @@ function createWatcher(aWatcherID, aOptions={}) {
 					
 					var numEv = parseInt(cutils.jscGetDeepest(numEvents));
 					console.log('got numEv:', numEv.toString());
-					//var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
-					console.info('will try to cast:', eventFlags.toString(), 'to:', ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr.toString());
-					try {
+					var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
+					//console.info('will try to cast:', eventFlags.toString(), 'to:', ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr.toString());
+					// try {
 						var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr);
-					} catch(ex) {
-						console.warn('ex on cast flags:', ex.toString());
-					}
+					// } catch(ex) {
+						// console.warn('ex on cast flags:', ex.toString());
+					// }
 					// console.log('flags casted');
-					var ids = eventIds; //ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr);
+					var ids = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr);
 					// console.log('ids casted');
 					
-					console.info('.ptr casted', 'flags:', flags.toString(), 'ids:', ids.toString());
+					console.info('.ptr casted', 'paths:', paths.toString(), 'flags:', flags.toString(), 'ids:', ids.toString());
 					
+					/*
 					// stop runLoopRun
 					console.log('attempting to stop the runLoopRun so console message after it happens');
 					ostypes.API('FSEventStreamStop')(streamRef);
 					ostypes.API('FSEventStreamInvalidate')(streamRef);
 					console.log('call to stop completed'); // after FSEventStreamStop and FSEventStreamInvalidate run then the RunLoopRun unblocks and firefox can be closed without hanging/force quit
+					*/
 					return null;
 				};
 				
