@@ -633,7 +633,7 @@ function poll(aArgs) {
 					fdset[i] = 0;
 				}
 				*/
-				fd_set_set(fdset, fd);
+				ostypes.HELPER.fd_set_set(fdset, fd);
 				let timeoutStruct = ostypes.TYPE.timeval();
 				// Note: not the full range of timeouts works due to limited range of double.
 				timeoutStruct.tv_sec = Math.floor(loopIntervalS);
@@ -652,7 +652,7 @@ function poll(aArgs) {
 							uniEerrno: ctypes.errno
 						});
 					}
-					let ready = fd_set_isset(fdset, fd);
+					let ready = ostypes.HELPER.fd_set_isset(fdset, fd);
 					if (!ready) {
 						console.error('timeout');
 						continue;  // timeout
