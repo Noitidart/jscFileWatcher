@@ -54,7 +54,7 @@ var nixInit = function() {
 
 	this.IS64BIT = is64bit;
 
-	this.TYPE = new macTypes();
+	this.TYPE = new nixTypes();
 	
   var _lib = {}; // cache for lib
   var lib = function(path) {
