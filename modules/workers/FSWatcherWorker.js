@@ -202,7 +202,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					 var ids = eventIds; //ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr).contents;
 					// console.log('ids casted');
 					
-					console.info('flags:', flags.toString(), 'ids:', ids.toString());
+					console.info('back to .ptr', 'flags:', flags.toString(), 'ids:', ids.toString());
 					
 					// stop runLoopRun
 					console.log('attempting to stop the runLoopRun so console message after it happens');
