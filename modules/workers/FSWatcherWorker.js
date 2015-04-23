@@ -196,6 +196,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 					// stop runLoopRun
 					console.log('attempting to stop the runLoopRun so console message after it happens');
 					ostypes.API('FSEventStreamStop')(streamRef);
+					ostypes.API('FSEventStreamInvalidate')(streamRef);
+					
 					console.log('call to stop completed');
 					return null;
 				};
