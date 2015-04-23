@@ -205,6 +205,10 @@ var macInit = function() {
 		kCFAllocatorDefault: null, // 0
 		get kCFTypeArrayCallBacks () { console.error('in getter'); if (!('kCFTypeArrayCallBacks' in _const)) { _const['kCFTypeArrayCallBacks'] = lib('CoreFoundation').declare('kCFTypeArrayCallBacks', self.TYPE.CFArrayCallBacks); console.error('DEFINED IN CACHE'); } return _const['kCFTypeArrayCallBacks']; },
 		get kCFRunLoopDefaultMode () { if (!('kCFRunLoopDefaultMode' in _const)) { _const['kCFRunLoopDefaultMode'] = lib('CoreFoundation').declare('kCFRunLoopDefaultMode', self.TYPE.CFStringRef); } return _const['kCFRunLoopDefaultMode']; },
+		kCFRunLoopRunFinished: 1,
+		kCFRunLoopRunHandledSource: 4,
+		kCFRunLoopRunStopped: 2,
+		kCFRunLoopRunTimedOut: 3,
 		kFSEventStreamCreateFlagFileEvents: 16, // https://github.com/bizonix/DropBoxLibrarySRC/blob/2e4a151caa88b48653f31a22cb207fff851b75f8/pyc_decrypted/latest/pymac/constants.py#L165
 		kFSEventStreamCreateFlagWatchRoot: 4,
 		kFSEventStreamEventIdSinceNow: -1
@@ -233,6 +237,14 @@ var macInit = function() {
 		CFRunLoopRun: function() {
 			return lib('CoreFoundation').declare("CFRunLoopRun", self.TYPE.ABI,
 				self.TYPE.void
+			);
+		},
+		CFRunLoopRunInMode: function() {
+			return lib('CoreFoundation').declare("CFRunLoopRunInMode", self.TYPE.ABI,
+				self.TYPE.SInt32,
+				self.TYPE.CFStringRef,
+				self.TYPE.CFTimeInterval,
+				self.TYPE.Boolean
 			);
 		},
 		CFRelease: function() {

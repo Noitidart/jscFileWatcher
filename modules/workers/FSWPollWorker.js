@@ -19,6 +19,8 @@ const core = { // have to set up the main keys
 	},
 	firefox: {}
 };
+const loopIntervalMS = 5000;
+const loopIntervalS = 5;
 
 // START - OS Specific
 var winStuff;
@@ -517,6 +519,7 @@ function poll(aArgs) {
 				while (true) {
 					var now_jsStr_ptrOf_cfArrRef = macStuff.cStr_ptrOf_cfArrRef.contents.readString();
 					if (last_jsStr_ptrOf_cfArrRef != now_jsStr_ptrOf_cfArrRef) {
+						console.info('cfArr changed, so make new stream');
 						// invalidate old stream, create new stream
 						if (fsstream !== undefined) {
 							ostypes.API('FSEventStreamStop')(fsstream); // i dont think i need this but lets leave it just in case
@@ -556,16 +559,39 @@ function poll(aArgs) {
 							});
 						}
 						console.log('succsefuly started stream:', rez_FSEventStreamStart.toString());
+					} else {
+						console.log('cfArr unchanged so just go straight to run loop again');
 					}
 				
 					console.error('going to start runLoopRun');
 					macStuff.FSChanges = null;
-					ostypes.API('CFRunLoopRun')(); // returns void
-					console.error('post runLoopRun line');
+					var rez_cfRLRIM = ostypes.API('CFRunLoopRunInMode')(macStuff.cStr_ptrOf_cfArrRef, loopIntervalS, true); // returns void // passing macStuff.cStr_ptrOf_cfArrRef as need any random cfstr to work
+					console.error('post runLoopRun line, rez_cfRLRIM:', rez_cfRLRIM.toString(), uneval(rez_cfRLRIM));
+					
+					if (cutils.jscEqual(rez_cfRLRIM, ostype.CONST.kCFRunLoopRunFinished)) {
+						console.log('poll-aborted-nopaths');
+						throw new Error({
+							name: 'poll-aborted-nopaths',
+							message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+						});
+					} else if (cutils.jscEqual(rez_cfRLRIM, ostype.CONST.kCFRunLoopRunStopped)) {
+						console.log('The run loop was stopped with CFRunLoopStop');
+						throw new Error({
+							name: 'poll-aborted-manually-stopped',
+							message: 'This is not an error, just throwing to cause rejection due to loop stopped by CFRunLoopStop'
+						});
+					} else if (cutils.jscEqual(rez_cfRLRIM, ostype.CONST.kCFRunLoopRunTimedOut)) {
+						console.log('The time interval seconds passed'); // probably no events triggered so continue loop
+					} else if (cutils.jscEqual(rez_cfRLRIM, ostype.CONST.kCFRunLoopRunHandledSource)) {
+						console.log('A source was processed. This exit condition only applies when returnAfterSourceHandled is true.');
+					} else {
+						console.error('huh??!?! should never get here');
+					}
+					
 					
 					if (macStuff.FSChanges) {
 						return macStuff.FSChanges;
-					}
+					} // else continue loop
 				}
 				
 			}
