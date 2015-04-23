@@ -901,7 +901,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 		var aEvent = convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i]));
 		var evIdStr = cutils.jscGetDeepest(ids[i]);
 		var evId = ctypes.UInt64(evIdStr);
-		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + evIdStr);
+		console.info('contents at ' + i, 'path: ' + paths[i].readString()/*, 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + evIdStr*/);
 		
 		if (aEvent) {
 			var fullpath = paths[i].readString();
@@ -911,6 +911,8 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 				// check macStuff._cache_aRenamed if find evId - 1 then this is renamed-to and that is renamed-from IF find evId + 1 this is renamed-from and that is renamed-to
 				var aRenamedFromId = ctypes_math.UInt64.sub(evId,1).toString();
 				var aRenamedToId = ctypes_math.UInt64.add(evId,1).toString();
+				console.info('aRenamedFromId:', aRenamedFromId, 'aRenamedToId:', aRenamedToId);
+				
 				var foundLinkedRename = false;
 				for (var aRenamedId in macStuff._cache_aRenamed) {
 					if (aRenamedId == aRenamedFromId || aRenamedId == aRenamedToId) {
