@@ -898,7 +898,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 	macStuff.FSChanges = [];
 	for (var i=0; i<numEv; i++) {
 		var aEvent = convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i]));
-		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' cutils.jscGetDeepest(flags[i]), 'id: ' + cutils.jscGetDeepest(ids[i]));
+		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + cutils.jscGetDeepest(ids[i]));
 		
 		if (aEvent) {
 		macStuff.FSChanges.push({
