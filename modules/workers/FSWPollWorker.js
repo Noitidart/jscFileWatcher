@@ -911,6 +911,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 					var nextFullpath = paths[i+1].readString();
 					var nextFilename = OS.Path.basename(nextFullpath);
 					var nextDirpath = OS.Path.dirname(nextFullpath);
+					var nextid = cutils.jscGetDeepest(ids[i+1]);
 					if (cutils.jscGetDeepest(flags[i+1]) == '0') {
 						// this one is renamed-from
 						if (nextDirpath == dirpath) {
@@ -1149,8 +1150,9 @@ function convertFlagsToAEventStr(flags) {
 						kFSEventStreamEventFlagItemRemoved: 'removed',
 						kFSEventStreamEventFlagItemModified: 'contents-modified'
 					};
+					// get moved-from when moving from unwatched-dir/sub-dir to watched-dir but the path is the path on watched-dir. so it should be `added`. so if do os.file.exists on the path then i can test whether it was moved-to or really moved-from
 					if (flags == '0') {
-						return 'moved-to or watched-dir deleted';
+						return 'moved-to OR contents-modified'; // i used to have this as 'moved-to or watched-dir deleted' but its not true in my test cases
 					}
 					for (var f in default_flags) {
 						if (flags & ostypes.CONST[f]) {
