@@ -536,9 +536,9 @@ function poll(aArgs) {
 						if (!('rez_CFRunLoopGetCurrent' in macStuff)) {
 							macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
 						}
-						console.info('rez_CFRunLoopGetCurrent:', rez_CFRunLoopGetCurrent.toString());
+						console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
 						
-						ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
+						ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, macStuff.rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
 						
 						var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart')(fsstream);
 						if (!rez_FSEventStreamStart) {
