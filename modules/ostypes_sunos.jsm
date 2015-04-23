@@ -68,9 +68,9 @@ var sunosTypes = function() {
     { fo_pad: this.uintptr_t }, /* For future expansion */
     { fo_name: this.char.ptr }, /* Null terminated file name */
   ]);
-  
+
   this.fileinfo = ctypes.StructType('fileinfo', [
-    { fobj: this.file_obj },
+    { fobj: this.file_obj }, // is this defined correct?
     { events: this.int },
     { port: this.int }
   ]);
@@ -82,7 +82,8 @@ var sunosTypes = function() {
     { portev_object: this.uintptr_t },  /* source specific object */
     { portev_user: this.void.ptr }  /* user cookie */
   ]);
-  
+
+
   this.stat = ctypes.StructType('stat', [ // http://opensolarisforum.org/man/man2/stat.html
     { st_mode: this.mode_t }, /* File mode (see mknod(2)) */
     { st_ino: this.ino_t  }, /* Inode number */
@@ -95,9 +96,9 @@ var sunosTypes = function() {
     { st_uid: this.uid_t },           /* User ID of the file’s owner */
     { st_gid: this.gid_t },           /* Group ID of the file’s group */
     { st_size: this.off_t },       /* File size in bytes */
-    { st_atime: this.time_t },        /* Time of last access */
-    { st_mtime: this.time_t },        /* Time of last data modification */
-    { st_ctime: this.time_t },       /* Time of last file status change */
+    { st_atim: this.timespec_t },        /* Time of last access */
+    { st_mtim: this.timespec_t },        /* Time of last data modification */
+    { st_ctim: this.timespec_t },       /* Time of last file status change */
     /* Times measured in seconds since */
     /* 00:00:00 UTC, Jan. 1, 1970 */
     { st_blksize: this.long },     /* Preferred I/O block size */
@@ -123,13 +124,6 @@ var sunosInit = function() {
       return cache || (cache = ctypes.open('libc.so'));
     };
   }();
-  var _api = {};
-  this.API = function(declaration) { // it means ensureDeclared and return declare. if its not declared it declares it. else it returns the previously declared.
-    if (!(declaration in _api)) {
-      _api[declaration] = preDec[declaration](); //if declaration is not in preDec then dev messed up
-    }
-    return _api[declaration];
-  };
   var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
     close: function() {
      /* https://en.wikipedia.org/wiki/Close_%28system_call%29
@@ -157,6 +151,16 @@ var sunosInit = function() {
         self.TYPE.FILE.ptr
       );
     }, 
+    free: function() {
+      /*http://linux.die.net/man/3/free
+      * void free(
+      *   void *ptr
+      * );
+      */
+      return lib().declare('free', self.TYPE.ABI,
+        self.TYPE.void_t.ptr  
+      );
+    },
     port_associate: function() {
      /* https://docs.oracle.com/cd/E19253-01/816-5168/6mbb3hri4/index.html
       * int port_associate(
@@ -221,7 +225,7 @@ var sunosInit = function() {
       * int pthread_create(
       *   pthread_t *restrict thread,
       *   const pthread_attr_t *restrict attr,
-      *   void *(*start_routine)(void*), 
+      *   void *(*start_routine)(void*),  // cna u check this out plz,  ill brb ah ok np
       *   void *restrict arg
       *);
       */
@@ -245,9 +249,27 @@ var sunosInit = function() {
         self.TYPE.char.ptr,      // filename
         self.TYPE.stat.ptr  // buf
       );
+    },
+    strdup: function() {
+     /* http://linux.die.net/man/3/strdup
+      * char *strdup(
+      *   char *s
+      * );
+      */
+      return lib().declare('strdup', self.TYPE.ABI,
+        self.TYPE.char.ptr,              // return
+        self.TYPE.char.ptr              // *s 
+      );
     }
   };
-  
+    var _api = {};
+  this.API = function(declaration) { // it means ensureDeclared and return declare. if its not declared it declares it. else it returns the previously declared.
+    if (!(declaration in _api)) {
+      _api[declaration] = preDec[declaration](); //if declaration is not in preDec then dev messed up
+    }
+    return _api[declaration];
+  };
+
   this.CONST = {
     PORT_SOURCE_AIO: 1,
     PORT_SOURCE_TIMER: 2,
@@ -277,5 +299,62 @@ var sunosInit = function() {
       return this.UNMOUNTED | this.FILE_DELETE | this.FILE_RENAME_TO | this. FILE_RENAME_FROM | this.MOUNTEDOVER;
     }
   };
-};
+
+	this.HELPER = {
+		process_file: function(finf_ptr /*fileinfo.address*/ , revents /*js_int*/ ) {
+
+			var fobjp = finf_ptr.contents.fobj; // struct file_obj *fobjp = &finf->fobj;
+			var port = finf_ptr.contents.port; //  int port = finf->port;
+
+			var sb = self.TYPE.stat();
+			if (finf_ptr.contents.fobj.fo_name.contents === 47) {
+				throw new Error('Throwing to prevent the hang...');
+			}
+			var rez_stat = self.API('stat')(finf_ptr.contents.fobj.fo_name, sb.address());
+			OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.desktopDir, 'dump1.txt'), [rez_stat.toString(), fobjp.toString()].join('\n'));
+
+			if (!(revents & self.CONST.FILE_EXCEPTION) && cutils.jscEqual(rez_stat, -1)) { // this caused an error, it contained 47 instad of home/desktop
+				console.error('failed to stat file');
+				self.API('free')(finf_ptr.contents.fobj.fo_name); // returns void
+				throw new Error('failed to stat file see the logged errno: ' + ctypes.errno);
+			}
+
+			if (revents) {
+				if (revents & self.CONST.FILE_EXCEPTION) {
+					console.log('revents:', revents, 'fobjp.fo_name:', fobjp.fo_name);
+					self.API('free')(finf_ptr.contents.fobj.fo_name); // returns void, shouldnt be it like this? yessss ohhh my gosh hahahah holy shit!
+					self.API('free')(finf_ptr); // returns void
+					return;
+
+				}
+			}
+
+			// re-register
+			OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.desktopDir, 'dump2.txt'), [sb.toString()].join('\n'));
+			fobjp.fo_atime = sb.st_atim;
+			fobjp.ffo_mtime_atime = sb.st_mtim;
+			fobjp.fo_ctime = sb.st_ctim;
+			
+			var fobjp_cast_uintptr_t = ctypes.cast(fobjp.address(), self.TYPE.uintptr_t); //' had to go, sorry D: no prob
+			//var finf_cast_voidptr = ctypes.cast(finf_ptr, self.TYPE.void.ptr); // no need to cast this void.ptr as void.ptr accepts anything
+			var rez_port_assoc = self.API('port_associate')(port, self.CONST.PORT_SOURCE_FILE, fobjp_cast_uintptr_t, finf_ptr.contents.events, finf_ptr);
+
+			console.info('rez_port_assoc:', rez_port_assoc.toString(), 'errno:', ctypes.errno);
+
+			if (cutils.jscEqual(rez_port_assoc, -1)) {
+				// add error processing as required, file may have been deleted moved
+				console.error('failed to register file', fobjp.fo_name.readString(), 'errno:', ctypes.errno);
+				self.API('free')(finf_ptr.contents.fobj.fo_name);
+
+				self.API('free')(finf_ptr);
+
+				throw new Error('failed to register file');
+			}
+
+			return true;
+		}
+	};
+  
+}
+
 var ostypes = new sunosInit();
