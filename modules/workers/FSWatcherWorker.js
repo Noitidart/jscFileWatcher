@@ -205,7 +205,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				//Watcher.cInt_numPaths = ctypes.int(0);
 				
 				var argsForPoll = {
-					ptrStrOf__cStr_ptrOf_cfArrRef: cutils.strOfPtr(cStr_ptrOf_cfArrRef.address())
+					ptrStrOf__cStr_ptrOf_cfArrRef: cutils.strOfPtr(Watcher.cStr_ptrOf_cfArrRef.address())
 					//ptrStrOf__cInt_numPaths: cutils.strOfPtr(Watcher.cInt_numPaths.address())
 				};
 				
