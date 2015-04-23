@@ -12,46 +12,50 @@ if (ctypes.voidptr_t.size === 4 /* 32-bit */) {
 
 var ifdef_UNICODE = true;
 
-var nixTypes = function() {};
-nixTypes.prototype = {
+var nixTypes = function() {
   // ABIs
   CALLBACK_ABI: ctypes.default_abi,
   ABI: ctypes.default_abi,
   
 	// C TYPES
-	char: ctypes.char,
-	int: ctypes.int,
-	long: ctypes.long,
-	size_t: ctypes.size_t,
-	ssize_t: ctypes.ssize_t,
-	uint32_t: ctypes.uint32_t,
-	void: ctypes.void,
+	this.char = ctypes.char,
+	this.int = ctypes.int,
+	this.long = ctypes.long,
+	this.size_t = ctypes.size_t,
+	this.ssize_t = ctypes.ssize_t,
+	this.uint32_t = ctypes.uint32_t,
+	this.void = ctypes.void,
 	
 	// SIMPLE TYPES
-	fd_set: ctypes.uint8_t // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
-};
+	this.fd_set = ctypes.uint8_t // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
+	
+	//these consts need to be defined here too, they will also be found in ostypes.CONST but i need here as structs use them
+	var struct_const = {
+		NAME_MAX: 255
+	};
+		
+	// SIMPLE STRUCTS
+	this.inotify_event = ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
+		{ wd: this.int },													// Watch descriptor
+		{ mask: this.uint32_t },											// Mask describing event
+		{ cookie: this.uint32_t },											// Unique cookie associating related events (for rename(2))
+		{ len: this.uint32_t },												// Size of name field
+		{ name: ctypes.ArrayType(this.char, struct_const.NAME_MAX + 1) }	// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
+	]);
 
-var struct_const = { //these consts need to be defined here too, they will also be found in ostypes.CONST but i need here as structs use them
-	NAME_MAX: 255
+	this.timeval = ctypes.StructType('timeval', [
+		{ 'tv_sec': this.long },
+		{ 'tv_usec': this.long }
+	]);
 };
-  
-// SIMPLE STRUCTS
-nixTypes.prototype.inotify_event = ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
-	{ wd: nixTypes.prototype.int },				       // Watch descriptor
-	{ mask: nixTypes.prototype.uint32_t },		 // Mask describing event
-	{ cookie: nixTypes.prototype.uint32_t },	 // Unique cookie associating related events (for rename(2))
-	{ len: nixTypes.prototype.uint32_t },		   // Size of name field
-	{ name: ctypes.ArrayType(nixTypes.prototype.char, struct_const.NAME_MAX + 1) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
-]);
-
-nixTypes.prototype.timeval = ctypes.StructType('timeval', [
-	{ 'tv_sec': nixTypes.prototype.long },
-	{ 'tv_usec': nixTypes.prototype.long }
-]);
 
 var nixInit = function() {
-  var self = this;
-  
+	var self = this;
+
+	this.IS64BIT = is64bit;
+
+	this.TYPE = new macTypes();
+	
   var _lib = {}; // cache for lib
   var lib = function(path) {
     //ensures path is in lib, if its in lib then its open, if its not then it adds it to lib and opens it. returns lib
@@ -86,6 +90,55 @@ var nixInit = function() {
     }
     return _lib[path];
   };
+  
+  // CONSTANTS
+  this.CONST = {
+    // start - INOTIFY - from https://github.com/dsoprea/PyInotify/blob/980610f91d4c3819dce54988cfec8f138599cedf/inotify/constants.py
+	// had to use https://github.com/D-Programming-Language/druntime/blob/61ba4b8d3c0052065c17ffc8eef4f11496f3db3e/src/core/sys/linux/sys/inotify.d#L53
+		// cuz otherwise it would throw SyntaxError: octal literals and octal escape sequences are deprecated
+    // inotify_init1 flags.
+    IN_CLOEXEC      : 0x80000, // octal!2000000 
+    IN_NONBLOCK     : 0x800, // octal!4000
+    
+    // Supported events suitable for MASK parameter of INOTIFY_ADD_WATCH.
+    IN_ACCESS                : 0x00000001,
+    IN_MODIFY                : 0x00000002,
+    IN_ATTRIB                : 0x00000004,
+    IN_CLOSE_WRITE     	     : 0x00000008,
+    IN_CLOSE_NOWRITE	     : 0x00000010,
+    IN_OPEN                  : 0x00000020,
+    IN_MOVED_FROM            : 0x00000040,
+    IN_MOVED_TO              : 0x00000080,
+    IN_CREATE                : 0x00000100,
+    IN_DELETE                : 0x00000200,
+    IN_DELETE_SELF           : 0x00000400,
+    IN_MOVE_SELF             : 0x00000800,
+    
+    // Events sent by kernel.
+    IN_UNMOUNT      : 0x00002000, // Backing fs was unmounted.
+    IN_Q_OVERFLOW   : 0x00004000, // Event queued overflowed.
+    IN_IGNORED      : 0x00008000, // File was ignored.
+
+    // Special flags.
+    IN_ONLYDIR             : 0x01000000, // Only watch the path if it is a directory.
+    IN_DONT_FOLLOW         : 0x02000000, // Do not follow a sym link.
+    IN_MASK_ADD            : 0x20000000, // Add to the mask of an already existing watch.
+    IN_ISDIR               : 0x40000000, // Event occurred against dir.
+    IN_ONESHOT             : 0x80000000, // Only send event once.
+
+    // end - INOTIFY
+	
+	NAME_MAX: 255 // also in TYPEs as i needed it in a struct
+  };
+  
+	// ADV CONSTANTS
+	// Helper events.
+	this.CONST.IN_CLOSE = this.CONST.IN_CLOSE_WRITE | this.CONST.IN_CLOSE_NOWRITE,
+	this.CONST.IN_MOVE = this.CONST.IN_MOVED_FROM | this.CONST.IN_MOVED_TO,
+		
+	// All events which a program can wait on.
+	this.CONST.IN_ALL_EVENTS = (this.CONST.IN_ACCESS | this.CONST.IN_MODIFY | this.CONST.IN_ATTRIB | this.CONST.IN_CLOSE_WRITE | this.CONST.IN_CLOSE_NOWRITE | this.CONST.IN_OPEN | this.CONST.IN_MOVED_FROM | this.CONST.IN_MOVED_TO | this.CONST.IN_CREATE | this.CONST.IN_DELETE | this.CONST.IN_DELETE_SELF | this.CONST.IN_MOVE_SELF);
+
   
 	// start - function declares
 	var _api = {};
@@ -186,53 +239,8 @@ var nixInit = function() {
 	};
 	// end - predefine your declares here
 	// end - function declares
-};
-nixInit.prototype = {
   
-  IS64BIT: is64bit,
-  
-  TYPE: new nixTypes(),
-  
-  // CONSTANTS
-  CONST: {
-    // start - INOTIFY - from https://github.com/dsoprea/PyInotify/blob/980610f91d4c3819dce54988cfec8f138599cedf/inotify/constants.py
-	// had to use https://github.com/D-Programming-Language/druntime/blob/61ba4b8d3c0052065c17ffc8eef4f11496f3db3e/src/core/sys/linux/sys/inotify.d#L53
-		// cuz otherwise it would throw SyntaxError: octal literals and octal escape sequences are deprecated
-    // inotify_init1 flags.
-    IN_CLOEXEC      : 0x80000, // octal!2000000 
-    IN_NONBLOCK     : 0x800, // octal!4000
-    
-    // Supported events suitable for MASK parameter of INOTIFY_ADD_WATCH.
-    IN_ACCESS                : 0x00000001,
-    IN_MODIFY                : 0x00000002,
-    IN_ATTRIB                : 0x00000004,
-    IN_CLOSE_WRITE     	     : 0x00000008,
-    IN_CLOSE_NOWRITE	     : 0x00000010,
-    IN_OPEN                  : 0x00000020,
-    IN_MOVED_FROM            : 0x00000040,
-    IN_MOVED_TO              : 0x00000080,
-    IN_CREATE                : 0x00000100,
-    IN_DELETE                : 0x00000200,
-    IN_DELETE_SELF           : 0x00000400,
-    IN_MOVE_SELF             : 0x00000800,
-    
-    // Events sent by kernel.
-    IN_UNMOUNT      : 0x00002000, // Backing fs was unmounted.
-    IN_Q_OVERFLOW   : 0x00004000, // Event queued overflowed.
-    IN_IGNORED      : 0x00008000, // File was ignored.
-
-    // Special flags.
-    IN_ONLYDIR             : 0x01000000, // Only watch the path if it is a directory.
-    IN_DONT_FOLLOW         : 0x02000000, // Do not follow a sym link.
-    IN_MASK_ADD            : 0x20000000, // Add to the mask of an already existing watch.
-    IN_ISDIR               : 0x40000000, // Event occurred against dir.
-    IN_ONESHOT             : 0x80000000, // Only send event once.
-
-    // end - INOTIFY
-	
-	NAME_MAX: 255 // also in TYPEs as i needed it in a struct
-  },
-  HELPER: {
+  this.HELPER = {
 	fd_set_get_idx: function(fd) {
 		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
 		if (core.os.name == 'linux' /*is_linux*/) {
@@ -299,22 +307,16 @@ nixInit.prototype = {
 	},
 	fd_set_set: function(fdset, fd) {
 		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
-		let { elem8, bitpos8 } = this.fd_set_get_idx(fd);
+		let { elem8, bitpos8 } = self.HELPER.fd_set_get_idx(fd);
 		fdset[elem8] = 1 << bitpos8;
 	},
 	fd_set_isset: function(fdset, fd) {
 		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
-		let { elem8, bitpos8 } = this.fd_set_get_idx(fd);
+		let { elem8, bitpos8 } = self.HELPER.fd_set_get_idx(fd);
 		return !!(fdset[elem8] & (1 << bitpos8));
 	}
-  }
+  };
+	
 };
-// ADV CONSTANTS
-// Helper events.
-nixInit.prototype.CONST.IN_CLOSE = nixInit.prototype.CONST.IN_CLOSE_WRITE | nixInit.prototype.CONST.IN_CLOSE_NOWRITE,
-nixInit.prototype.CONST.IN_MOVE = nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO,
-    
-// All events which a program can wait on.
-nixInit.prototype.CONST.IN_ALL_EVENTS = (nixInit.prototype.CONST.IN_ACCESS | nixInit.prototype.CONST.IN_MODIFY | nixInit.prototype.CONST.IN_ATTRIB | nixInit.prototype.CONST.IN_CLOSE_WRITE | nixInit.prototype.CONST.IN_CLOSE_NOWRITE | nixInit.prototype.CONST.IN_OPEN | nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO | nixInit.prototype.CONST.IN_CREATE | nixInit.prototype.CONST.IN_DELETE | nixInit.prototype.CONST.IN_DELETE_SELF | nixInit.prototype.CONST.IN_MOVE_SELF);
 
 var ostypes = new nixInit();
