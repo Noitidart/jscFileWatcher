@@ -657,7 +657,7 @@ function poll(aArgs) {
 						console.error('timeout');
 						continue;  // timeout
 					}
-					while (true) {
+
 						let length = ostypes.API('read')(fd, buf, count);
 
 						length = parseInt(cutils.jscGetDeepest(length));
@@ -675,7 +675,7 @@ function poll(aArgs) {
 							let FSChanges = [];
 							var i = 0;
 							var numElementsRead = 0;
-							console.error('starting loop');
+							console.error('starting read notif loop');
 							length = parseInt(cutils.jscGetDeepest(length));
 							do {
 								let iHoisted = i;
@@ -764,7 +764,7 @@ function poll(aArgs) {
 								return FSChanges;
 							}
 						}
-					}
+					
 				}
 				
 				// old way - didnt use select
