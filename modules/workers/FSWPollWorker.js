@@ -909,8 +909,9 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 			var dirpath = OS.Path.dirname(fullpath);
 			if (aEvent == 'renamed') {
 				// check macStuff._cache_aRenamed if find evId - 1 then this is renamed-to and that is renamed-from IF find evId + 1 this is renamed-from and that is renamed-to
-				var aRenamedFromId = ctypes_math.UInt64.sub(evId,1).toString();
-				var aRenamedToId = ctypes_math.UInt64.add(evId,1).toString();
+				var uint1 = ctypes.UInt64('1');
+				var aRenamedFromId = ctypes_math.UInt64.sub(evId, uint1).toString();
+				var aRenamedToId = ctypes_math.UInt64.add(evId, uint1).toString();
 				console.info('aRenamedFromId:', aRenamedFromId, 'aRenamedToId:', aRenamedToId);
 				
 				var foundLinkedRename = false;
