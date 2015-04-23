@@ -645,6 +645,8 @@ function poll(aArgs) {
 				while (true) {
 					console.warn('at top of INFINITE loop');
 					let ret = ostypes.API('select')(fd + 1, fdset, null, null, timeoutStruct.address());
+					timeoutStruct.tv_sec = Math.floor(loopIntervalS);
+					timeoutStruct.tv_usec = Math.floor((loopIntervalS % 1) * 1000000);
 					if (cutils.jscEqual(ret, -1)) {
 						throw new Error({
 							name: 'os-api-error',
