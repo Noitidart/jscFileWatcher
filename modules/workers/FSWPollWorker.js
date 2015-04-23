@@ -781,7 +781,7 @@ function poll(aArgs) {
 									break;
 								};
 								i += nixStuff.sizeField0 + nixStuff.sizeField1 + nixStuff.sizeField2 + nixStuff.sizeField3 + parseInt(len);
-								console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len)));
+								console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (nixStuff.sizeField0 + nixStuff.sizeField1 + nixStuff.sizeField2 + nixStuff.sizeField3 + parseInt(len)));
 							} while (i < length);
 							
 							console.error('loop ended:', 'numElementsRead:', numElementsRead);
