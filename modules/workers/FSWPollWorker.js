@@ -24,6 +24,7 @@ const core = { // have to set up the main keys
 var winStuff;
 var nixStuff;
 var bsd_mac_kqStuff;
+var macStuff;
 // END - OS Specific
 
 // Imports that use stuff defined in chrome
@@ -145,24 +146,32 @@ function init(objCore) {
 		case 'freebsd':
 		case 'openbsd':
 		
-				bsd_mac_kqStuff = {};
-				bsd_mac_kqStuff.evtMtrPtrStr_len = 50; // change in FSWatcherWorker too
-				bsd_mac_kqStuff.watchedFd = {};
-				/* about bsd_mac_kqStuff.watchedFd
-				keys is fd,
-				val is obj:
-					{
-						jsStr: jsStr of OSPath of watched directory,
-						dirStat: {
-							jsStr_filename_1: {
-								lastModificationDate: js_lastModDate
-							},
-							jsStr_filename_2: {
-								lastModificationDate: js_lastModDate
-							},
+				if (core.os.name !== 'darwin' /* bsd */ || core.os.version < 7) {
+					bsd_mac_kqStuff = {};
+					bsd_mac_kqStuff.evtMtrPtrStr_len = 50; // change in FSWatcherWorker too
+					bsd_mac_kqStuff.watchedFd = {};
+					/* about bsd_mac_kqStuff.watchedFd
+					keys is fd,
+					val is obj:
+						{
+							jsStr: jsStr of OSPath of watched directory,
+							dirStat: {
+								jsStr_filename_1: {
+									lastModificationDate: js_lastModDate
+								},
+								jsStr_filename_2: {
+									lastModificationDate: js_lastModDate
+								},
+							}
 						}
-					}
-				*/
+					*/
+				} else {
+					// osx > 10.7
+					macStuff = {};
+					macStuff.macStuff_maxLenCfArrRefPtrStr = 20;
+					macStuff._c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(js_FSEvStrCB);
+					macStuff.FSChanges = null;
+				}
 				
 			break;
 		default:
@@ -493,6 +502,64 @@ function poll(aArgs) {
 			} else {
 				// os.version is >= 10.7
 				// use FSEventFramework
+
+				var last_jsStr_ptrOf_cfArrRef = 0;
+				var fsstream;
+				
+				if (!('cfArrRef' in macStuff)) {
+					macStuff.cStr_ptrOf_cfArrRef = ctypes.char.array(macStuff.macStuff_maxLenCfArrRefPtrStr).ptr(aArgs.ptrStrOf__cStr_ptrOf_cfArrRef);
+				}
+				if (!('cId' in macStuff)) {
+					macStuff.cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
+					console.info('macStuff.cId:', macStuff.cId.toString());
+				}
+				
+				while (true) {
+					var now_jsStr_ptrOf_cfArrRef = macStuff.cStr_ptrOf_cfArrRef.readString();
+					if (last_jsStr_ptrOf_cfArrRef != now_jsStr_ptrOf_cfArrRef) {
+						// invalidate old stream, create new stream
+						if (fsstream !== undefined) {
+							ostypes.API('FSEventStreamStop')(fsstream); // i dont think i need this but lets leave it just in case
+							ostypes.API('FSEventStreamInvalidate')(fsstream);
+							// just doing the above two will make runLoopRun break but we want to totally clean up the stream as we dont want it anymore as we are making a new one
+							ostypes.API('FSEventStreamRelease')(fsstream);
+						}
+						
+						// create new
+						last_jsStr_ptrOf_cfArrRef = now_jsStr_ptrOf_cfArrRef;
+						var cfArrRef = ostypes.TYPE.CFArrayRef.ptr(now_jsStr_ptrOf_cfArrRef).contents;
+						
+						fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0.5, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents);
+						console.info('fsstream:', fsstream.toString(), uneval(fsstream));
+						
+						if (!('rez_CFRunLoopGetCurrent' in macStuff)) {
+							macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
+						}
+						console.info('rez_CFRunLoopGetCurrent:', rez_CFRunLoopGetCurrent.toString());
+						
+						ostypes.API('FSEventStreamScheduleWithRunLoop')(fsstream, rez_CFRunLoopGetCurrent, ostypes.CONST.kCFRunLoopDefaultMode) // returns void
+						
+						var rez_FSEventStreamStart = ostypes.API('FSEventStreamStart')(fsstream);
+						if (!rez_FSEventStreamStart) {
+							console.error('Failed FSEventStreamStart');
+							throw new Error({
+								name: 'os-api-error',
+								message: 'Failed FSEventStreamStart'
+							});
+						}
+						console.log('succsefuly started stream:', rez_FSEventStreamStart.toString());
+					}
+				
+					console.error('going to start runLoopRun');
+					macStuff.FSChanges = null;
+					ostypes.API('CFRunLoopRun')(); // returns void
+					console.error('post runLoopRun line');
+					
+					if (macStuff.FSChanges) {
+						return macStuff.FSChanges;
+					}
+				}
+				
 			}
 
 		break;
@@ -777,6 +844,47 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 }
 // END - OS Specific - helpers for kqueue
 // START - OS Specific - helpers for windows
+// START - OS Specific - helpers for osx 10.7+
+function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
+	console.error('in _js_fsevents_callback aH!!!', 'clientCallBackInfo:', clientCallBackInfo.toString(), 'numEvents:', numEvents.toString(), 'eventPaths:', eventPaths.toString(), 'eventFlags:', eventFlags.toString(), 'eventIds:', eventIds.toString());
+	
+	var numEv = parseInt(cutils.jscGetDeepest(numEvents));
+	console.log('got numEv:', numEv.toString());
+	var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
+	//console.info('will try to cast:', eventFlags.toString(), 'to:', ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr.toString());
+	// try {
+		var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr).contents;
+	// } catch(ex) {
+		// console.warn('ex on cast flags:', ex.toString());
+	// }
+	// console.log('flags casted');
+	var ids = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr).contents;
+	// console.log('ids casted');
+	
+	console.info('.ptr casted', 'paths:', paths.toString(), 'flags:', flags.toString(), 'ids:', ids.toString());
+	
+	macStuff.FSChanges = [];
+	for (var i=0; i<numEv; i++) {
+		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + cutils.jscGetDeepest(flags[i]), 'id: ' + cutils.jscGetDeepest(ids[i]));
+		macStuff.FSChanges.push({
+			aFileName: paths[i].readString(),
+			aEvent: cutils.jscGetDeepest(flags[i]),
+			aExtra: {
+				//aOSPath_parentDir_identifier: hDir_ptrStr
+			}
+		});
+	}
+	
+	/*
+	// stop runLoopRun
+	console.log('attempting to stop the runLoopRun so console message after it happens');
+	ostypes.API('FSEventStreamStop')(streamRef);
+	ostypes.API('FSEventStreamInvalidate')(streamRef);
+	console.log('call to stop completed'); // after FSEventStreamStop and FSEventStreamInvalidate run then the RunLoopRun unblocks and firefox can be closed without hanging/force quit
+	*/
+	return null;
+};
+// END - OS Specific - helpers for osx 10.7+
 function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 	// for Windows only
 	
