@@ -919,7 +919,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 								aFileName: filename,
 								aEvent: aEvent, // will obviously be 'renamed'
 								aExtra: {
-									aOSPath_parentDir_identifier: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
 									aOld: {
 										aFileName: cachedObj.aFileName
 									}
@@ -931,7 +931,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 								aFileName: cachedObj.aFileName,
 								aEvent: aEvent, // will obviously be 'renamed'
 								aExtra: {
-									aOSPath_parentDir_identifier: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+									aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
 									aOld: {
 										aFileName: filename
 									}
@@ -947,7 +947,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 						aFileName: filename,
 						aEvent: aEvent, // will obviously be 'renamed'
 						aExtra: {
-							aOSPath_parentDir_identifier: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
+							aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
 						}
 					});
 				}

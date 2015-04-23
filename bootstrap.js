@@ -718,6 +718,13 @@ function managePoll(instanceWatcher) {
 						}
 						delete cVal.aExtra.aOSPath_parentDir_identifier;
 					}
+					if (core.os.name == 'darwin' && core.os.version >= 7 && 'aOSPath_parentDir' in cVal.aExtra) {
+						// this is for osx 10.7+ as we want to discard subdir of watched dirs
+						if (!(cVal.aExtra.aOSPath_parentDir in thisW.paths_watched)) {
+							console.error('will not trigger cb for this obj as its path was not found in thisW.paths_watched, this is likely a subdir:', cVal);
+							break; // to prevent cb from triggering with this obj
+						}
+					}
 					thisW.cb(cVal.aFileName, cVal.aEvent, cVal.aExtra);
 				}
 				do_waitForNextChange(); // restart poll
