@@ -659,6 +659,8 @@ function poll(aArgs) {
 					if (cutils.jscEqual(ret, 0)) {
 						console.error('timeout');
 						continue;  // timeout
+					} else {
+						console.error('no time out data exists!! ret:', ret.toString());
 					}
 
 						let length = ostypes.API('read')(fd, buf, count);
