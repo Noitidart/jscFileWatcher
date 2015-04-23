@@ -532,6 +532,7 @@ function poll(aArgs) {
 						
 						// create new
 						last_jsStr_ptrOf_cfArrRef = now_jsStr_ptrOf_cfArrRef;
+						console.log('set last to now so last is now:', last_jsStr_ptrOf_cfArrRef.toString(), 'and again now is:', now_jsStr_ptrOf_cfArrRef.toString());
 						var cfArrRef = ostypes.TYPE.CFArrayRef.ptr(ctypes.UInt64(now_jsStr_ptrOf_cfArrRef)).contents;
 						console.info('from poll worker cfArrRef:', cfArrRef.toString());
 						
