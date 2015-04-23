@@ -299,12 +299,12 @@ nixInit.prototype = {
 	},
 	fd_set_set: function(fdset, fd) {
 		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
-		let { elem8, bitpos8 } = self.HELPER.fd_set_get_idx(fd);
+		let { elem8, bitpos8 } = this.fd_set_get_idx(fd);
 		fdset[elem8] = 1 << bitpos8;
 	},
 	fd_set_isset: function(fdset, fd) {
 		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
-		let { elem8, bitpos8 } = self.HELPER.fd_set_get_idx(fd);
+		let { elem8, bitpos8 } = this.fd_set_get_idx(fd);
 		return !!(fdset[elem8] & (1 << bitpos8));
 	}
   }
