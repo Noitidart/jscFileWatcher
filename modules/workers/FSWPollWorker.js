@@ -825,7 +825,11 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 	//console.info('readTotal:', readTotal.toString());
 	var inode_and_filename_patt = /^(\d+) (.*?)$/gm;
 	var inode_and_filename_match;
-	while (inode_and_filename_match = inode_and_filename_patt.exec(readTotal)) {
+	while (true) {
+		inode_and_filename_match = inode_and_filename_patt.exec(readTotal);
+		if (!inode_and_filename_match) {
+			break;
+		}
 		obj_inodeAndFns[inode_and_filename_match[1]] = {
 			filename: inode_and_filename_match[2],
 			lastmod: OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2])).lastModificationDate.toString()
