@@ -957,9 +957,6 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 						aEvent: 'removed',
 						aExtra: {
 							aOSPath_parentDir: dirpath, // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
-							aOld: {
-								aFileName: cachedObj.aFileName
-							}
 						}
 					});
 				}
