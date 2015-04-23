@@ -562,7 +562,7 @@ function poll(aArgs) {
 				
 					console.error('going to start runLoopRun');
 					macStuff.FSChanges = null;
-					var rez_cfRLRIM = ostypes.API('CFRunLoopRunInMode')(ostypes.CONST.kCFRunLoopDefaultMode, loopIntervalS, true); // returns void
+					var rez_cfRLRIM = ostypes.API('CFRunLoopRunInMode')(ostypes.CONST.kCFRunLoopDefaultMode, loopIntervalS, false); // returns void
 					console.error('post runLoopRun line, rez_cfRLRIM:', rez_cfRLRIM.toString(), uneval(rez_cfRLRIM));
 					
 					if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunFinished)) {
