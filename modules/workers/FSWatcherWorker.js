@@ -453,8 +453,8 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				var cfStrArr = ostypes.TYPE.void.ptr.array()(jsStrArr);
 
 				Watcher.cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.CONST.kCFTypeArrayCallBacks.address()); // putting into Watcher. because otherwise it might GC im not sure i didnt test
-				console.info('cfArrRef:', cfArrRef.toString());
-				if (cfArrRef.isNull()) {
+				console.info('cfArrRef:', Watcher.cfArrRef.toString());
+				if (Watcher.cfArrRef.isNull()) {
 					console.error('Failed cfArrRef');
 					throw new Error({
 						name: 'os-api-error',
@@ -464,7 +464,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				
 				Watcher.paths_watched_props[aOSPath] = thisPObj;
 				
-				cutils.modifyCStr(Watcher.cStr_ptrOf_cfArrRef, cutils.strOfPtr(cfArrRef));
+				cutils.modifyCStr(Watcher.cStr_ptrOf_cfArrRef, cutils.strOfPtr(Watcher.cfArrRef));
 				
 				return thisPObj.path_id;
 
