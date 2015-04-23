@@ -559,14 +559,12 @@ function poll(aArgs) {
 							});
 						}
 						console.log('succsefuly started stream:', rez_FSEventStreamStart.toString());
-					} else {
-						console.log('cfArr unchanged so just go straight to run loop again');
-					}
+					} // else { console.log('cfArr unchanged so just go straight to run loop again'); }
 				
-					console.error('going to start runLoopRun');
+					//console.log('going to start runLoopRun');
 					macStuff.FSChanges = null;
 					var rez_cfRLRIM = ostypes.API('CFRunLoopRunInMode')(ostypes.CONST.kCFRunLoopDefaultMode, loopIntervalS, true); // returns void
-					console.error('post runLoopRun line, rez_cfRLRIM:', rez_cfRLRIM.toString(), uneval(rez_cfRLRIM));
+					console.log('post runLoopRun line, rez_cfRLRIM:', rez_cfRLRIM.toString(), uneval(rez_cfRLRIM));
 					
 					if (cutils.jscEqual(rez_cfRLRIM, ostypes.CONST.kCFRunLoopRunFinished)) {
 						console.log('poll-aborted-nopaths');
@@ -589,7 +587,7 @@ function poll(aArgs) {
 					}
 					
 					
-					if (macStuff.FSChanges) {
+					if (macStuff.FSChanges && macStuff.FSChanges.length > 0) {
 						return macStuff.FSChanges;
 					} // else continue loop
 				}
@@ -899,14 +897,18 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 	
 	macStuff.FSChanges = [];
 	for (var i=0; i<numEv; i++) {
-		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + cutils.jscGetDeepest(flags[i]), 'id: ' + cutils.jscGetDeepest(ids[i]));
+		var aEvent = convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i]));
+		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' cutils.jscGetDeepest(flags[i]), 'id: ' + cutils.jscGetDeepest(ids[i]));
+		
+		if (aEvent) {
 		macStuff.FSChanges.push({
 			aFileName: paths[i].readString(),
-			aEvent: convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i])),
+			aEvent: aEvent,
 			aExtra: {
 				//aOSPath_parentDir_identifier: hDir_ptrStr
 			}
 		});
+		} // aEvent is false meaning it had some flags we dont care to trigger the callback for so dont push it to FSChanges
 	}
 	
 	/*
@@ -1068,6 +1070,9 @@ function convertFlagsToAEventStr(flags) {
 					};
 					for (var f in default_flags) {
 						if (flags & ostypes.CONST[f]) {
+							if (flags & ostypes.CONST.kFSEventStreamEventFlagMustScanSubDirs) {
+								return default_flags[f] & ' | SUBDIR?';
+							}
 							return default_flags[f];
 						}
 					}
