@@ -946,13 +946,13 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 					}
 				}
 				if (!foundLinkedRename) {
-					macStuff.FSChanges.push({
+					macStuff._cache_aRenamed[evId] = {
 						aFileName: filename,
 						aEvent: aEvent, // will obviously be 'renamed'
 						aExtra: {
 							aOSPath_parentDir: dirpath // on mainthread side, check if dirpath is in any of the watched paths, if not then dont trigger this callback as its for a subdir BUT im trying to think of a way to do this all in the worker side
 						}
-					});
+					};
 				}
 			} else {
 				macStuff.FSChanges.push({
