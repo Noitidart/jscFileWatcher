@@ -197,12 +197,12 @@ function createWatcher(aWatcherID, aOptions={}) {
 					var numEv = cutils.jscGetDeepest(numEvents);
 					console.log('got numEv:', numEv.toString());
 					//var paths = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(numEv).ptr).contents;
-					 var flags = eventFlags; //ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr).contents;
+					var flags = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(numEv).ptr);
 					// console.log('flags casted');
-					 var ids = eventIds; //ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr).contents;
+					var ids = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(numEv).ptr);
 					// console.log('ids casted');
 					
-					console.info('.arr', 'flags:', flags.toString(), 'ids:', ids.toString());
+					console.info('.ptr casted', 'flags:', flags.toString(), 'ids:', ids.toString());
 					
 					// stop runLoopRun
 					console.log('attempting to stop the runLoopRun so console message after it happens');
