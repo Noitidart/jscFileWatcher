@@ -973,7 +973,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 						});
 					}
 				} else {
-					// either moved from watched-dir to subdir-of-watched and dirpath indicates "removed" from watched-dir OR moved from unwatched-dir to watched-dir and dirpath indicates "added" to watched-dir
+					// either moved from watched-dir to anywhere-other-dir (meaning subdir-of-watched or unwatched-dir) and dirpath indicates "removed" from watched-dir OR moved from unwatched-dir to watched-dir and dirpath indicates "added" to watched-dir
 					macStuff.FSChanges.push({
 						aFileName: filename,
 						aEvent: OS.File.exists(fullpath) ? 'added' : 'removed',
