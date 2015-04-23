@@ -917,6 +917,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 				var foundLinkedRename = false;
 				for (var aRenamedId in macStuff._cache_aRenamed) {
 					if (aRenamedId == aRenamedFromId || aRenamedId == aRenamedToId) {
+						console.log('found match!!!');
 						var cachedObj = macStuff._cache_aRenamed[aRenamedId];
 						delete macStuff._cache_aRenamed[aRenamedId];
 						foundLinkedRename = true;
@@ -950,6 +951,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 					}
 				}
 				if (!foundLinkedRename) {
+					console.log('no match for ', evIdStr, macStuff._cache_aRenamed.toString());
 					macStuff._cache_aRenamed[evIdStr] = {
 						aFileName: filename,
 						aEvent: aEvent, // will obviously be 'renamed'
