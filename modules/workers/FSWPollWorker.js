@@ -901,7 +901,7 @@ function js_FSEvStrCB(streamRef, clientCallBackInfo, numEvents, eventPaths, even
 		var aEvent = convertFlagsToAEventStr(cutils.jscGetDeepest(flags[i]));
 		var evIdStr = cutils.jscGetDeepest(ids[i]);
 		var evId = ctypes.UInt64(evIdStr);
-		console.info('contents at ' + i, 'path: ' + paths[i].readString()/*, 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + evIdStr*/);
+		console.info('contents at ' + i, 'path: ' + paths[i].readString(), 'flags: ' + aEvent + ' | ' + cutils.jscGetDeepest(flags[i]), 'id: ' + evIdStr);
 		
 		if (aEvent) {
 			var fullpath = paths[i].readString();
