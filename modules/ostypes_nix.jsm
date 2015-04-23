@@ -25,7 +25,7 @@ nixTypes.prototype = {
 	size_t: ctypes.size_t,
 	ssize_t: ctypes.ssize_t,
 	uint32_t: ctypes.uint32_t,
-	void: ctypes.void
+	void: ctypes.void,
 	
 	// SIMPLE TYPES
 	fd_set: ctypes.uint8_t // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
@@ -175,8 +175,8 @@ var nixInit = function() {
 			 * );
 			 */
 			return lib('libc').declare('select', self.TYPE.ABI,
-				self.TYPE.int,		// return
-				self.TYPE.int,		// nfds
+				self.TYPE.int,			// return
+				self.TYPE.int,			// nfds
 				self.TYPE.fd_set.ptr,	// *readfds  // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
 				self.TYPE.fd_set.ptr,	// *writefds // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
 				self.TYPE.fd_set.ptr,	// *exceptfds // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
