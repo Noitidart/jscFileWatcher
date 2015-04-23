@@ -464,7 +464,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				
 				Watcher.paths_watched_props[aOSPath] = thisPObj;
 				
-				cutils.modifyCStr(Watcher.cStr_ptrOf_cfArrRef, cutils.strOfPtr(Watcher.cfArrRef));
+				cutils.modifyCStr(Watcher.cStr_ptrOf_cfArrRef, cutils.strOfPtr(Watcher.cfArrRef.address()));
 				
 				return thisPObj.path_id;
 
