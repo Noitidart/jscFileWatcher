@@ -234,9 +234,11 @@ function createWatcher(aWatcherID, aOptions={}) {
 				_Watcher_cache[aWatcherID] = Watcher;
 				Watcher.fd = fd;
 				Watcher.paths_watched = {}; // casing is whatever devuser passed in, key is aOSPath, and value is watch_fd
+				Watcher.cInt_numPaths = ctypes.int();
 				
 				var argsForPoll = {
-					fd: parseInt(cutils.jscGetDeepest(fd))
+					fd: parseInt(cutils.jscGetDeepest(fd)),
+					ptrStrOf__cInt_numPaths: cutils.strOfPtr(Watcher.cInt_numPaths.address())
 				};
 				
 				return argsForPoll;
@@ -515,6 +517,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					});
 				} else {
 					Watcher.paths_watched[aOSPath] = watch_fd; // is ostypes.TYPE.int which is ctypes.int so no need to jscGetDeepest
+					Watcher.cInt_numPaths.value = Watcher.cInt_numPaths.value + 1;
 				}
 				
 				return watch_fd;

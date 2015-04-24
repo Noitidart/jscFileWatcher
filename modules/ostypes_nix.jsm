@@ -12,38 +12,50 @@ if (ctypes.voidptr_t.size === 4 /* 32-bit */) {
 
 var ifdef_UNICODE = true;
 
-var nixTypes = function() {};
-nixTypes.prototype = {
+var nixTypes = function() {
   // ABIs
-  CALLBACK_ABI: ctypes.default_abi,
-  ABI: ctypes.default_abi,
+  this.CALLBACK_ABI = ctypes.default_abi
+  this.ABI = ctypes.default_abi;
   
+	// C TYPES
+	this.char = ctypes.char;
+	this.int = ctypes.int;
+	this.long = ctypes.long;
+	this.size_t = ctypes.size_t;
+	this.ssize_t = ctypes.ssize_t;
+	this.uint32_t = ctypes.uint32_t;
+	this.void = ctypes.void_t;
+	
 	// SIMPLE TYPES
-	char: ctypes.char,
-	int: ctypes.int,
-	size_t: ctypes.size_t,
-	ssize_t: ctypes.ssize_t,
-	uint32_t: ctypes.uint32_t,
-	'void*': ctypes.voidptr_t
-};
+	this.fd_set = ctypes.uint8_t; // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
+	
+	//these consts need to be defined here too, they will also be found in ostypes.CONST but i need here as structs use them
+	var struct_const = {
+		NAME_MAX: 255
+	};
+		
+	// SIMPLE STRUCTS
+	this.inotify_event = ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
+		{ wd: this.int },													// Watch descriptor
+		{ mask: this.uint32_t },											// Mask describing event
+		{ cookie: this.uint32_t },											// Unique cookie associating related events (for rename(2))
+		{ len: this.uint32_t },												// Size of name field
+		{ name: ctypes.ArrayType(this.char, struct_const.NAME_MAX + 1) }	// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
+	]);
 
-var struct_const = { //these consts need to be defined here too, they will also be found in ostypes.CONST but i need here as structs use them
-	NAME_MAX: 255
+	this.timeval = ctypes.StructType('timeval', [
+		{ 'tv_sec': this.long },
+		{ 'tv_usec': this.long }
+	]);
 };
-  
-// SIMPLE STRUCTS
-nixTypes.prototype.inotify_event = ctypes.StructType('inotify_event', [ // http://man7.org/linux/man-pages/man7/inotify.7.html
-	{ wd: nixTypes.prototype.int },				       // Watch descriptor
-	{ mask: nixTypes.prototype.uint32_t },		 // Mask describing event
-	{ cookie: nixTypes.prototype.uint32_t },	 // Unique cookie associating related events (for rename(2))
-	{ len: nixTypes.prototype.uint32_t },		   // Size of name field
-	{ name: ctypes.ArrayType(nixTypes.prototype.char, struct_const.NAME_MAX + 1) }		// Optional null-terminated name // Within a ufs filesystem the maximum length from http://www.unix.com/unix-for-dummies-questions-and-answers/4260-maximum-file-name-length.htmlof a filename is 255 and i do 256 becuause i wnant it null terminated
-]);
-
 
 var nixInit = function() {
-  var self = this;
-  
+	var self = this;
+
+	this.IS64BIT = is64bit;
+
+	this.TYPE = new nixTypes();
+	
   var _lib = {}; // cache for lib
   var lib = function(path) {
     //ensures path is in lib, if its in lib then its open, if its not then it adds it to lib and opens it. returns lib
@@ -79,95 +91,8 @@ var nixInit = function() {
     return _lib[path];
   };
   
-	// start - function declares
-	var _api = {};
-	this.API = function(declaration) { // it means ensureDeclared and return declare. if its not declared it declares it. else it returns the previously declared.
-		if (!(declaration in _api)) {
-			_api[declaration] = preDec[declaration](); //if declaration is not in preDec then dev messed up
-		}
-		return _api[declaration];
-	};
-
-	// start - predefine your declares here
-	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
-		close() {
-		       /* http://linux.die.net/man/2/close	
-			*  int close(
-			*    int fd
-			*  );
-			*/
-			return lib('libc').declare('close', self.TYPE_ABI,
-				ctypes.int,		// return
-				ctypes.int		// fd
-			);
-		},
-		inotify_add_watch() {
-			/* http://linux.die.net/man/2/inotify_add_watch
-			 * int inotify_add_watch(
-			 *   int fd,
-			 *   const char *pathname,
-			 *   uint32_t mask
-			 * );
-			 */
-			 return lib('libc').declare('inotify_add_watch', self.TYPE.ABI,
-				self.TYPE.int,			// return
-				self.TYPE.int,			// fd
-				self.TYPE.char.ptr,	// *pathname
-				self.TYPE.uint32_t		// mask
-			);
-		},
-		inotify_init() {
-			/* http://linux.die.net/man/2/inotify_init
-			 * Notes: Pass 0 as flags if you want inotify_init1 to behave as `int inotify_init(void);`
-			 * int inotify_init1(
-			 *   int flags
-			 * );
-			 */
-			return lib('libc').declare('inotify_init1', self.TYPE.ABI,
-				self.TYPE.int,		// return
-				self.TYPE.int		// flags
-			);
-		},
-		inotify_rm_watch() {
-			/* http://linux.die.net/man/2/inotify_rm_watch
-			 * int inotify_rm_watch(
-			 *   int fd,
-			 *   int wd
-			 * );
-			 */
-			return lib('libc').declare('inotify_rm_watch', self.TYPE.ABI,
-				self.TYPE.int,		// return
-				self.TYPE.int,		// fd
-				self.TYPE.int		// wd
-			);
-		},
-		read() {
-		       /* http://linux.die.net/man/2/read
-			*  ssize_t read(
-			*    int fd, 
-			*    void *buf, 
-			*    size_t count;
-			*  );
-			*/
-			return lib('libc').declare('read', self.TYPE.ABI, 
-				self.TYPE.ssize_t,		// return
-				self.TYPE.int,			// fd
-				self.TYPE['void*'], 	// *buf
-				self.TYPE.size_t		// count
-			);
-		}
-	};
-	// end - predefine your declares here
-	// end - function declares
-};
-nixInit.prototype = {
-  
-  IS64BIT: is64bit,
-  
-  TYPE: new nixTypes(),
-  
   // CONSTANTS
-  CONST: {
+  this.CONST = {
     // start - INOTIFY - from https://github.com/dsoprea/PyInotify/blob/980610f91d4c3819dce54988cfec8f138599cedf/inotify/constants.py
 	// had to use https://github.com/D-Programming-Language/druntime/blob/61ba4b8d3c0052065c17ffc8eef4f11496f3db3e/src/core/sys/linux/sys/inotify.d#L53
 		// cuz otherwise it would throw SyntaxError: octal literals and octal escape sequences are deprecated
@@ -204,17 +129,198 @@ nixInit.prototype = {
     // end - INOTIFY
 	
 	NAME_MAX: 255 // also in TYPEs as i needed it in a struct
-  },
-  HELPER: {
-    // here
-  }
+  };
+  
+	// ADV CONSTANTS
+	// Helper events.
+	this.CONST.IN_CLOSE = this.CONST.IN_CLOSE_WRITE | this.CONST.IN_CLOSE_NOWRITE,
+	this.CONST.IN_MOVE = this.CONST.IN_MOVED_FROM | this.CONST.IN_MOVED_TO,
+		
+	// All events which a program can wait on.
+	this.CONST.IN_ALL_EVENTS = (this.CONST.IN_ACCESS | this.CONST.IN_MODIFY | this.CONST.IN_ATTRIB | this.CONST.IN_CLOSE_WRITE | this.CONST.IN_CLOSE_NOWRITE | this.CONST.IN_OPEN | this.CONST.IN_MOVED_FROM | this.CONST.IN_MOVED_TO | this.CONST.IN_CREATE | this.CONST.IN_DELETE | this.CONST.IN_DELETE_SELF | this.CONST.IN_MOVE_SELF);
+
+  
+	// start - function declares
+	var _api = {};
+	this.API = function(declaration) { // it means ensureDeclared and return declare. if its not declared it declares it. else it returns the previously declared.
+		if (!(declaration in _api)) {
+			_api[declaration] = preDec[declaration](); //if declaration is not in preDec then dev messed up
+		}
+		return _api[declaration];
+	};
+
+	// start - predefine your declares here
+	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
+		close: function() {
+		       /* http://linux.die.net/man/2/close	
+			*  int close(
+			*    int fd
+			*  );
+			*/
+			return lib('libc').declare('close', self.TYPE_ABI,
+				ctypes.int,		// return
+				ctypes.int		// fd
+			);
+		},
+		inotify_add_watch: function() {
+			/* http://linux.die.net/man/2/inotify_add_watch
+			 * int inotify_add_watch(
+			 *   int fd,
+			 *   const char *pathname,
+			 *   uint32_t mask
+			 * );
+			 */
+			 return lib('libc').declare('inotify_add_watch', self.TYPE.ABI,
+				self.TYPE.int,			// return
+				self.TYPE.int,			// fd
+				self.TYPE.char.ptr,	// *pathname
+				self.TYPE.uint32_t		// mask
+			);
+		},
+		inotify_init: function() {
+			/* http://linux.die.net/man/2/inotify_init
+			 * Notes: Pass 0 as flags if you want inotify_init1 to behave as `int inotify_init(void);`
+			 * int inotify_init1(
+			 *   int flags
+			 * );
+			 */
+			return lib('libc').declare('inotify_init1', self.TYPE.ABI,
+				self.TYPE.int,		// return
+				self.TYPE.int		// flags
+			);
+		},
+		inotify_rm_watch: function() {
+			/* http://linux.die.net/man/2/inotify_rm_watch
+			 * int inotify_rm_watch(
+			 *   int fd,
+			 *   int wd
+			 * );
+			 */
+			return lib('libc').declare('inotify_rm_watch', self.TYPE.ABI,
+				self.TYPE.int,		// return
+				self.TYPE.int,		// fd
+				self.TYPE.int		// wd
+			);
+		},
+		read: function() {
+		       /* http://linux.die.net/man/2/read
+			*  ssize_t read(
+			*    int fd, 
+			*    void *buf, 
+			*    size_t count;
+			*  );
+			*/
+			return lib('libc').declare('read', self.TYPE.ABI, 
+				self.TYPE.ssize_t,		// return
+				self.TYPE.int,			// fd
+				self.TYPE.void.ptr, 	// *buf
+				self.TYPE.size_t		// count
+			);
+		},
+		select: function() {
+			/* http://linux.die.net/man/2/select
+			 * int select (
+			 *   int nfds,
+			 *   fd_set *readfds,
+			 *   fd_set *writefds,
+			 *   fd_set *exceptfds,
+			 *   struct timeval *timeout
+			 * );
+			 */
+			return lib('libc').declare('select', self.TYPE.ABI,
+				self.TYPE.int,			// return
+				self.TYPE.int,			// nfds
+				self.TYPE.fd_set.ptr,	// *readfds  // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
+				self.TYPE.fd_set.ptr,	// *writefds // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
+				self.TYPE.fd_set.ptr,	// *exceptfds // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
+				self.TYPE.timeval.ptr	// *timeout
+			);
+		}
+	};
+	// end - predefine your declares here
+	// end - function declares
+  
+  this.HELPER = {
+	fd_set_get_idx: function(fd) {
+		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
+		if (core.os.name == 'linux' /*is_linux*/) {
+			// Unfortunately, we actually have an array of long ints, which is
+			// a) platform dependent and b) not handled by typed arrays. We manually
+			// figure out which byte we should be in. We assume a 64-bit platform
+			// that is little endian (aka x86_64 linux).
+			let elem64 = Math.floor(fd / 64);
+			let bitpos64 = fd % 64;
+			let elem8 = elem64 * 8;
+			let bitpos8 = bitpos64;
+			if (bitpos8 >= 8) {     // 8
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 16
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 24
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 32
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 40
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 48
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 56
+				bitpos8 -= 8;
+				elem8++;
+			}
+
+			return {'elem8': elem8, 'bitpos8': bitpos8};
+		} else if (core.os.name == 'darwin' /*is_mac*/) {
+			// We have an array of int32. This should hopefully work on Darwin
+			// 32 and 64 bit.
+			let elem32 = Math.floor(fd / 32);
+			let bitpos32 = fd % 32;
+			let elem8 = elem32 * 8;
+			let bitpos8 = bitpos32;
+			if (bitpos8 >= 8) {     // 8
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 16
+				bitpos8 -= 8;
+				elem8++;
+			}
+			if (bitpos8 >= 8) {     // 24
+				bitpos8 -= 8;
+				elem8++;
+			}
+        
+			return {'elem8': elem8, 'bitpos8': bitpos8};
+		}
+	},
+	fd_set_set: function(fdset, fd) {
+		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
+		let { elem8, bitpos8 } = self.HELPER.fd_set_get_idx(fd);
+		console.info('elem8:', elem8.toString());
+		console.info('bitpos8:', bitpos8.toString());
+		fdset[elem8] = 1 << bitpos8;
+	},
+	fd_set_isset: function(fdset, fd) {
+		// https://github.com/pioneers/tenshi/blob/9b3273298c34b9615e02ac8f021550b8e8291b69/angel-player/src/chrome/content/common/serport_posix.js#L497
+		let { elem8, bitpos8 } = self.HELPER.fd_set_get_idx(fd);
+		console.info('elem8:', elem8.toString());
+		console.info('bitpos8:', bitpos8.toString());
+		return !!(fdset[elem8] & (1 << bitpos8));
+	}
+  };
+	
 };
-// ADV CONSTANTS
-// Helper events.
-nixInit.prototype.CONST.IN_CLOSE = nixInit.prototype.CONST.IN_CLOSE_WRITE | nixInit.prototype.CONST.IN_CLOSE_NOWRITE,
-nixInit.prototype.CONST.IN_MOVE = nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO,
-    
-// All events which a program can wait on.
-nixInit.prototype.CONST.IN_ALL_EVENTS = (nixInit.prototype.CONST.IN_ACCESS | nixInit.prototype.CONST.IN_MODIFY | nixInit.prototype.CONST.IN_ATTRIB | nixInit.prototype.CONST.IN_CLOSE_WRITE | nixInit.prototype.CONST.IN_CLOSE_NOWRITE | nixInit.prototype.CONST.IN_OPEN | nixInit.prototype.CONST.IN_MOVED_FROM | nixInit.prototype.CONST.IN_MOVED_TO | nixInit.prototype.CONST.IN_CREATE | nixInit.prototype.CONST.IN_DELETE | nixInit.prototype.CONST.IN_DELETE_SELF | nixInit.prototype.CONST.IN_MOVE_SELF);
 
 var ostypes = new nixInit();

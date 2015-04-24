@@ -19,9 +19,9 @@ const core = { // have to set up the main keys
 	},
 	firefox: {}
 };
-const loopIntervalMS = 500;
-const loopIntervalS = 0.5;
-const loopIntervalNS = 500000000;
+const loopIntervalMS = 5000; // only modify here
+const loopIntervalS = loopIntervalMS  / 1000; // do not modify
+const loopIntervalNS = loopIntervalMS * 1000000; // do not modify
 
 // START - OS Specific
 var winStuff;
@@ -143,6 +143,23 @@ function init(objCore) {
 		
 				nixStuff = {};
 				nixStuff._cache_aRenamed = {}; // key is cookie and val is aExtra of rename-from, and on reanmed-to, it finds the cookie and deletes it and triggers callback with renamed-to with aExtra holding oldFileName
+		
+				nixStuff.sizeUnaligned_inotify_event = 
+					ostypes.TYPE.inotify_event.fields[0].wd.size + 
+					ostypes.TYPE.inotify_event.fields[1].mask.size + 
+					ostypes.TYPE.inotify_event.fields[2].cookie.size + 
+					ostypes.TYPE.inotify_event.fields[3].len.size + 
+					ostypes.TYPE.inotify_event.fields[4].name.size; // has built in length of MAX_NAME + 1 (the + 1 is for null terminator)
+				nixStuff.size_inotify_event = ostypes.TYPE.inotify_event.size;
+				nixStuff.sizeField0 = ostypes.TYPE.inotify_event.fields[0].wd.size;
+				nixStuff.sizeField1 = ostypes.TYPE.inotify_event.fields[1].mask.size;
+				nixStuff.sizeField2 = ostypes.TYPE.inotify_event.fields[2].cookie.size;
+				nixStuff.sizeField3 = ostypes.TYPE.inotify_event.fields[3].len.size;
+				nixStuff.sizeField4 = ostypes.TYPE.inotify_event.fields[4].name.size;
+				
+				console.info('sizeUnaligned_inotify_event:', nixStuff.sizeUnaligned_inotify_event.toString());
+				console.info('size_inotify_event:', nixStuff.sizeUnaligned_inotify_event.toString());
+				console.info('sizeField4:', nixStuff.sizeField4.toString());
 		
 			break;
 		case 'darwin':
@@ -602,138 +619,184 @@ function poll(aArgs) {
 			{
 				// uses inotify
 				console.log('ok in pollThis of nixPoll');
-				let fd = aArgs.fd;
+				let fd = parseInt(aArgs.fd);
 				
-				var sizeUnaligned_inotify_event = 
-					ostypes.TYPE.inotify_event.fields[0].wd.size + 
-					ostypes.TYPE.inotify_event.fields[1].mask.size + 
-					ostypes.TYPE.inotify_event.fields[2].cookie.size + 
-					ostypes.TYPE.inotify_event.fields[3].len.size + 
-					ostypes.TYPE.inotify_event.fields[4].name.size; // has built in length of MAX_NAME + 1 (the + 1 is for null terminator)
-				var size_inotify_event = ostypes.TYPE.inotify_event.size;
-				var sizeField0 = ostypes.TYPE.inotify_event.fields[0].wd.size;
-				var sizeField1 = ostypes.TYPE.inotify_event.fields[1].mask.size;
-				var sizeField2 = ostypes.TYPE.inotify_event.fields[2].cookie.size;
-				var sizeField3 = ostypes.TYPE.inotify_event.fields[3].len.size;
-				var sizeField4 = ostypes.TYPE.inotify_event.fields[4].name.size;
+				if (!('cInt_numPaths' in nixStuff)) {
+					nixStuff.cInt_numPaths = ctypes.int.ptr(ctypes.UInt64(aArgs.ptrStrOf__cInt_numPaths));
+				}
 				
-				console.info('sizeUnaligned_inotify_event:', sizeUnaligned_inotify_event.toString());
-				console.info('size_inotify_event:', sizeUnaligned_inotify_event.toString());
-				console.info('sizeField4:', sizeField4.toString());
+
 				
-				let count = size_inotify_event * 10; // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
+				let count = nixStuff.size_inotify_event * 10; // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
 				let buf = ctypes.ArrayType(ostypes.TYPE.char, count)(); // docs page here http://linux.die.net/man/7/inotify says sizeof(struct inotify_event) + NAME_MAX + 1 will be sufficient to read at least one event.
+				// let readbuf = new Uint8Array(size);
+				// let _buf = new ostypes.TYPE.fd_set.ptr(readbuf.buffer);
+				// let buf = ctypes.cast(_buf, ostypes.TYPE.char.array(size).ptr);
+				let fdset = new Uint8Array(128); // needs to be big enough to handle the largest fd, im guessing largest is 3 integers long so 3*8 at max is 24 but i give it 128 as i was having issues getting 1, 8, and 16 to work
+				/* no need as it initializes at 0
+				for (let i = 0; i < fdset.length; i++) {
+					fdset[i] = 0;
+				}
+				*/
+				let timeoutStruct = ostypes.TYPE.timeval();
+				// Note: not the full range of timeouts works due to limited range of double.
+				timeoutStruct.tv_sec = Math.floor(loopIntervalS);
+				timeoutStruct.tv_usec = Math.floor((loopIntervalS % 1) * 1000000);
 				
+				let readlength = 0;
 				console.log('starting the loop, fd:', fd, 'count:', count);
 				count = ostypes.TYPE.size_t(count); // for use with read
 				while (true) {
-					let length = ostypes.API('read')(fd, buf, count);
-
-					length = parseInt(cutils.jscGetDeepest(length));
-					console.info('length read:', length, length.toString(), uneval(length));
+					console.warn('at top of INFINITE loop');
+					if (nixStuff.cInt_numPaths.contents == 0) {
+						throw new Error({
+							name: 'poll-aborted-nopaths',
+							message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+						});
+					}
+				
+					// no need to loop through and set everything to 0 as we will be just putting back the same fd
+					// must set fd every time otherwise it detects no changes
+					ostypes.HELPER.fd_set_set(fdset, fd);
 					
-					if (cutils.jscEqual(length, -1)) {
+					let ret = ostypes.API('select')(fd + 1, fdset, null, null, timeoutStruct.address());
+					timeoutStruct.tv_sec = Math.floor(loopIntervalS);
+					timeoutStruct.tv_usec = Math.floor((loopIntervalS % 1) * 1000000);
+					if (cutils.jscEqual(ret, -1)) {
 						throw new Error({
 							name: 'os-api-error',
-							message: 'Failed to read during poll',
+							message: 'Failed to select during poll',
 							uniEerrno: ctypes.errno
 						});
-					} else if (!cutils.jscEqual(length, 0)) {
-						// then its > 0 as its not -1
-						// something happend, read struct
-						let FSChanges = [];
-						var i = 0;
-						var numElementsRead = 0;
-						console.error('starting loop');
+					}
+					//let ready = ostypes.HELPER.fd_set_isset(fdset, fd);
+					//if (!ready) {
+					if (cutils.jscEqual(ret, 0)) {
+						console.error('timeout');
+						continue;  // timeout
+					} else {
+						console.error('no time out data exists!! ret:', ret.toString());
+						/*
+						for (let i = 0; i < fdset.length; i++) {
+							fdset[i] = 0;
+						}
+						ostypes.HELPER.fd_set_set(fdset, fd);
+						*/
+					}
+
+						let length = ostypes.API('read')(fd, buf, count);
+
 						length = parseInt(cutils.jscGetDeepest(length));
-						do {
-							let iHoisted = i;
-							numElementsRead++;
-							var casted = ctypes.cast(buf.addressOfElement(iHoisted), ostypes.TYPE.inotify_event.ptr).contents;
-							console.log('casted:', casted.toString());
-							var fileName = casted.addressOfField('name').contents.readString();
-							var mask = casted.addressOfField('mask').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-							var len = casted.addressOfField('len').contents; // need to iterate to next item that was read in // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-							var cookie = cutils.jscGetDeepest(casted.addressOfField('cookie').contents); // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
-							var wd = casted.addressOfField('wd').contents; // ostypes.TYPE.int which is ctypes.int so no need to get deepest, its already a number
-							
-							var aEvent = convertFlagsToAEventStr(mask);
-							
-							console.info('aFileName:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
-							
-							if (aEvent == 'renamed-to') {
-								if (cookie in nixStuff._cache_aRenamed) {
-									// renamed-to message came second, so obtain the renamed-from from the _cache_aRenamed and push a rezObj
-									var rezObj = nixStuff._cache_aRenamed[cookie];
-									delete nixStuff._cache_aRenamed[cookie];
-									
-									rezObj.aFileName = fileName;
-									FSChanges.push(rezObj);
-								} else {
-									// renamed-to message came first, so just store in _cache_aRenamed
-									var rezObj = {
-										aFileName: fileName,
-										aEvent: 'renamed',
-										aExtra: {
-											aOSPath_parentDir_identifier: wd,
-											nixInotifyFlags: mask // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
-											//aOld: {}
+						console.info('length read:', length, length.toString(), uneval(length));
+						
+						if (cutils.jscEqual(length, -1)) {
+							throw new Error({
+								name: 'os-api-error',
+								message: 'Failed to read during poll',
+								uniEerrno: ctypes.errno
+							});
+						} else if (!cutils.jscEqual(length, 0)) {
+							// then its > 0 as its not -1
+							// something happend, read struct
+							let FSChanges = [];
+							var i = 0;
+							var numElementsRead = 0;
+							console.error('starting read notif loop');
+							length = parseInt(cutils.jscGetDeepest(length));
+							var _cache_aRenamed_local = {}; // local means per buffer
+							do {
+								let iHoisted = i;
+								numElementsRead++;
+								var casted = ctypes.cast(buf.addressOfElement(iHoisted), ostypes.TYPE.inotify_event.ptr).contents;
+								console.log('casted:', casted.toString());
+								var fileName = casted.addressOfField('name').contents.readString();
+								var mask = casted.addressOfField('mask').contents; // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+								var len = casted.addressOfField('len').contents; // need to iterate to next item that was read in // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+								var cookie = cutils.jscGetDeepest(casted.addressOfField('cookie').contents); // ostypes.TYPE.uint32_t which is ctypes.uint32_t so no need to get deepest, its already a number
+								var wd = casted.addressOfField('wd').contents; // ostypes.TYPE.int which is ctypes.int so no need to get deepest, its already a number
+								
+								var aEvent = convertFlagsToAEventStr(mask);
+								
+								console.info('aFileName:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
+								
+								if (aEvent == 'renamed-to') {
+									if (cookie in _cache_aRenamed_local) { // assuming that renamed-from must happen before rename-to otherwise its a added
+										if (_cache_aRenamed_local[cookie].aExtra.aOSPath_parentDir_identifier == wd) {
+											var rezObj = {
+												aFileName: fileName,
+												aEvent: 'renamed',
+												aExtra: {
+													nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+													aOSPath_parentDir_identifier: wd,
+													aOld: {
+														aFileName: _cache_aRenamed_local[cookie].aFileName,
+														aExtra: {
+															nixInotifyFlags: _cache_aRenamed_local[cookie].aExtra.nixInotifyFlags
+														}
+													}
+												}
+											}
+											FSChanges.push(rezObj);
+										} else {
+											// the one in cache was removed from its parent folder, this one here was added to parent folder. so this is detect as file moved from one watched dir to another watched dir
+											_cache_aRenamed_local[cookie].aEvent = 'removed';
+											FSChanges.push(_cache_aRenamed_local[cookie]);
 										}
-									}
-									nixStuff._cache_aRenamed[cookie] = rezObj;
-								}
-							} else if (aEvent == 'renamed-from') {
-								if (cookie in nixStuff._cache_aRenamed) {
-									// renamed-from message came second, so obtain the renamed-to from the _cache_aRenamed and push a rezObj
-									var rezObj = nixStuff._cache_aRenamed[cookie];
-									delete nixStuff._cache_aRenamed[cookie];
-									
-									rezObj.aExtra.aOld = {
-										aFileName: fileName,
-										nixInotifyFlags: mask
-									};
-									FSChanges.push(rezObj);
-								} else {
-									// renamed-from message came first, so just store in _cache_aRenamed
-									var rezObj = {
-										//aFileName: fileName,
-										aEvent: 'renamed',
-										aExtra: {
-											aOSPath_parentDir_identifier: wd,
-											aOld: {
+										delete _cache_aRenamed_local[cookie];
+									} else {
+										var rezObj = {
+											aFileName: fileName,
+											aEvent: 'added',
+											aExtra: {
 												nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
-												aFileName: fileName
+												aOSPath_parentDir_identifier: wd
 											}
 										}
+										FSChanges.push(rezObj);
 									}
-									nixStuff._cache_aRenamed[cookie] = rezObj;
-								}							
-							} else {
-								var rezObj = {
-									aFileName: fileName,
-									aEvent: aEvent,
-									aExtra: {
-										nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
-										aOSPath_parentDir_identifier: wd
+								} else if (aEvent == 'renamed-from') {
+									var rezObj = {
+										aFileName: fileName,
+										aEvent: aEvent,
+										aExtra: {
+											nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+											aOSPath_parentDir_identifier: wd
+										}
 									}
+									_cache_aRenamed_local[cookie] = rezObj;
+								} else {
+									var rezObj = {
+										aFileName: fileName,
+										aEvent: aEvent,
+										aExtra: {
+											nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+											aOSPath_parentDir_identifier: wd
+										}
+									}
+									FSChanges.push(rezObj);
 								}
+								
+								if (len == 0) {
+									break;
+								};
+								i += nixStuff.sizeField0 + nixStuff.sizeField1 + nixStuff.sizeField2 + nixStuff.sizeField3 + parseInt(len);
+								console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (nixStuff.sizeField0 + nixStuff.sizeField1 + nixStuff.sizeField2 + nixStuff.sizeField3 + parseInt(len)));
+							} while (i < length);
+							for (var cookieLeft in _cache_aRenamed_local) {
+								// whatever is left in _cache_aRenamed_local is `removed` things
+								_cache_aRenamed_local[cookieLeft].aEvent = 'removed';
 								FSChanges.push(rezObj);
 							}
+							console.error('loop ended:', 'numElementsRead:', numElementsRead);
 							
-							if (len == 0) {
-								break;
-							};
-							i += sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len);
-							console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (sizeField0 + sizeField1 + sizeField2 + sizeField3 + parseInt(len)));
-						} while (i < length);
-						
-						console.error('loop ended:', 'numElementsRead:', numElementsRead);
-						
-						if (FSChanges.length > 0) {
-							return FSChanges;
+							if (FSChanges.length > 0) {
+								return FSChanges;
+							}
 						}
-					}
+					
 				}
+				
+				// old way - didnt use select
 			}
 			break;
 		default:
@@ -791,7 +854,11 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 	//console.info('readTotal:', readTotal.toString());
 	var inode_and_filename_patt = /^(\d+) (.*?)$/gm;
 	var inode_and_filename_match;
-	while (inode_and_filename_match = inode_and_filename_patt.exec(readTotal)) {
+	while (true) {
+		inode_and_filename_match = inode_and_filename_patt.exec(readTotal);
+		if (!inode_and_filename_match) {
+			break;
+		}
 		obj_inodeAndFns[inode_and_filename_match[1]] = {
 			filename: inode_and_filename_match[2],
 			lastmod: OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2])).lastModificationDate.toString()
