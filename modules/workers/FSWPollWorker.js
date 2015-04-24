@@ -703,6 +703,7 @@ function poll(aArgs) {
 							var numElementsRead = 0;
 							console.error('starting read notif loop');
 							length = parseInt(cutils.jscGetDeepest(length));
+							var _cache_aRenamed_local = {}; // local means per buffer
 							do {
 								let iHoisted = i;
 								numElementsRead++;
@@ -719,52 +720,50 @@ function poll(aArgs) {
 								console.info('aFileName:', fileName, 'aEvent:', convertFlagsToAEventStr(mask), 'len:', len, 'cookie:', cookie);
 								
 								if (aEvent == 'renamed-to') {
-									if (cookie in nixStuff._cache_aRenamed) {
-										// renamed-to message came second, so obtain the renamed-from from the _cache_aRenamed and push a rezObj
-										var rezObj = nixStuff._cache_aRenamed[cookie];
-										delete nixStuff._cache_aRenamed[cookie];
-										
-										rezObj.aFileName = fileName;
-										FSChanges.push(rezObj);
-									} else {
-										// renamed-to message came first, so just store in _cache_aRenamed
-										var rezObj = {
-											aFileName: fileName,
-											aEvent: 'renamed',
-											aExtra: {
-												aOSPath_parentDir_identifier: wd,
-												nixInotifyFlags: mask // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
-												//aOld: {}
-											}
-										}
-										nixStuff._cache_aRenamed[cookie] = rezObj;
-									}
-								} else if (aEvent == 'renamed-from') {
-									if (cookie in nixStuff._cache_aRenamed) {
-										// renamed-from message came second, so obtain the renamed-to from the _cache_aRenamed and push a rezObj
-										var rezObj = nixStuff._cache_aRenamed[cookie];
-										delete nixStuff._cache_aRenamed[cookie];
-										
-										rezObj.aExtra.aOld = {
-											aFileName: fileName,
-											nixInotifyFlags: mask
-										};
-										FSChanges.push(rezObj);
-									} else {
-										// renamed-from message came first, so just store in _cache_aRenamed
-										var rezObj = {
-											//aFileName: fileName,
-											aEvent: 'renamed',
-											aExtra: {
-												aOSPath_parentDir_identifier: wd,
-												aOld: {
+									if (cookie in _cache_aRenamed_local) { // assuming that renamed-from must happen before rename-to otherwise its a added
+										if (_cache_aRenamed_local[cookie].aExtra.aOSPath_parentDir_identifier == wd) {
+											var rezObj = {
+												aFileName: fileName,
+												aEvent: 'renamed',
+												aExtra: {
 													nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
-													aFileName: fileName
+													aOSPath_parentDir_identifier: wd,
+													aOld: {
+														aFileName: _cache_aRenamed_local[cookie].aFileName,
+														aExtra: {
+															nixInotifyFlags: _cache_aRenamed_local[cookie].aExtra.nixInotifyFlags
+														}
+													}
 												}
 											}
+											FSChanges.push(rezObj);
+										} else {
+											// the one in cache was removed from its parent folder, this one here was added to parent folder. so this is detect as file moved from one watched dir to another watched dir
+											_cache_aRenamed_local[cookie].aEvent = 'removed';
+											FSChanges.push(_cache_aRenamed_local[cookie]);
 										}
-										nixStuff._cache_aRenamed[cookie] = rezObj;
-									}							
+										delete _cache_aRenamed_local[cookie];
+									} else {
+										var rezObj = {
+											aFileName: fileName,
+											aEvent: 'added',
+											aExtra: {
+												nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+												aOSPath_parentDir_identifier: wd
+											}
+										}
+										FSChanges.push(rezObj);
+									}
+								} else if (aEvent == 'renamed-from') {
+									var rezObj = {
+										aFileName: fileName,
+										aEvent: aEvent,
+										aExtra: {
+											nixInotifyFlags: mask, // i should pass this, as if user did modify the flags, they might want to figure out what exactly changed
+											aOSPath_parentDir_identifier: wd
+										}
+									}
+									_cache_aRenamed_local[cookie] = rezObj;
 								} else {
 									var rezObj = {
 										aFileName: fileName,
@@ -783,7 +782,11 @@ function poll(aArgs) {
 								i += nixStuff.sizeField0 + nixStuff.sizeField1 + nixStuff.sizeField2 + nixStuff.sizeField3 + parseInt(len);
 								console.info('incremented i is now:', i, 'length:', length, 'incremented i by:', (nixStuff.sizeField0 + nixStuff.sizeField1 + nixStuff.sizeField2 + nixStuff.sizeField3 + parseInt(len)));
 							} while (i < length);
-							
+							for (var cookieLeft in _cache_aRenamed_local) {
+								// whatever is left in _cache_aRenamed_local is `removed` things
+								_cache_aRenamed_local[cookieLeft].aEvent = 'removed';
+								FSChanges.push(rezObj);
+							}
 							console.error('loop ended:', 'numElementsRead:', numElementsRead);
 							
 							if (FSChanges.length > 0) {
