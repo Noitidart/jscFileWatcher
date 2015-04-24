@@ -840,7 +840,7 @@ function shutdown(aData, aReason) {
 		FSWatcherWorker._worker.terminate(); // do this for PromiserWorker's // C:\Users\Vayeate\Pictures\PromiseWorker console.info.png
 		// terminate all FSWPollWorker's - can do this inside this `if (FSWatcherWorker)` block because obviously if that doesnt exist then no FSWPollWorker's exist
 		for (var aWatcherId in _Watcher_UnterminatedFSWPollWorkers) {
-			_Watcher_UnterminatedFSWPollWorkers[aWatcherId].terminate();
+			_Watcher_UnterminatedFSWPollWorkers[aWatcherId]._worker.terminate();
 		}
 	}
 	
