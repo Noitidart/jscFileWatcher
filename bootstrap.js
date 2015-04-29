@@ -817,6 +817,58 @@ function extendCore() {
 		console.log('done adding to core, it is now:', core);
 }
 
+function pipe_test() {
+	
+	var doPipeStuff = function() {
+		var promise_pipesTst = FSWatcherWorker.post('doPipeTest', []);
+		promise_pipesTst.then(
+		  function(aVal) {
+			console.log('Fullfilled - promise_pipesTst - ', aVal);
+			// start - do stuff here - promise_pipesTst
+			
+			// end - do stuff here - promise_pipesTst
+		  },
+		  function(aReason) {
+			var rejObj = {name:'promise_pipesTst', aReason:aReason};
+			console.warn('Rejected - promise_pipesTst - ', rejObj);
+			//deferred_createWatcher.reject(rejObj);
+		  }
+		).catch(
+		  function(aCaught) {
+			var rejObj = {name:'promise_pipesTst', aCaught:aCaught};
+			console.error('Caught - promise_pipesTst - ', rejObj);
+			//deferred_createWatcher.reject(rejObj);
+		  }
+		);
+	};
+	
+	var doEnsureMainWatcher = function() {
+		var promise_ensureFSWatcherWorkerStarted = _FSWatcherWorker_start();
+		promise_ensureFSWatcherWorkerStarted.then(
+		  function(aVal) {
+			console.log('Fullfilled - promise_ensureFSWatcherWorkerStarted - ', aVal);
+			// start - do stuff here - promise_ensureFSWatcherWorkerStarted
+			doPipeStuff();
+			// end - do stuff here - promise_ensureFSWatcherWorkerStarted
+		  },
+		  function(aReason) {
+			var rejObj = {name:'promise_ensureFSWatcherWorkerStarted', aReason:aReason};
+			console.warn('Rejected - promise_ensureFSWatcherWorkerStarted - ', rejObj);
+			//deferred_ensureWatcherWorker.reject(rejObj);
+		  }
+		).catch(
+		  function(aCaught) {
+			var rejObj = {name:'promise_ensureFSWatcherWorkerStarted', aCaught:aCaught};
+			console.error('Caught - promise_ensureFSWatcherWorkerStarted - ', rejObj);
+			//deferred_ensureWatcherWorker.reject(rejObj);
+		  }
+		);
+	};
+	
+	doEnsureMainWatcher();
+	
+}
+
 function install() {}
 function uninstall() {}
 
@@ -830,7 +882,8 @@ function startup(aData, aReason) {
 
 	//Services.prompt.alert(null, myServices.sb.GetStringFromName('startup_prompt_title'), myServices.sb.GetStringFromName('startup_prompt_title'));
 	
-	main();
+	//main();
+	pipe_test();
 }
  
 function shutdown(aData, aReason) {

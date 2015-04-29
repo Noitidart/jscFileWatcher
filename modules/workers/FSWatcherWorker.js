@@ -542,4 +542,32 @@ function closeWatcher(aWatcherID) {
 	// _Watcher_cache[aWatcherID] = 
 	throw new Error('in dev3');
 }
+
+function doPipeTest() {
+	
+	switch (core.os.name) {
+		case 'winnt':
+
+				// do winnt pipe
+				
+			break;
+		case 'darwin':
+		case 'freebsd':
+		case 'openbsd':
+		case 'linux':
+		case 'webos': // Palm Pre
+		case 'android':
+		
+				// do nix pipe
+				
+			break;
+		default:
+			throw new Error({
+				name: 'watcher-api-error',
+				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
+			});
+	}
+	
+	// for winnt, check if aOSPath is a directory, if its not then throw error
+}
 // end - OS.File.Watcher API
