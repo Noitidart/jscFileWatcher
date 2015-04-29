@@ -96,7 +96,7 @@ var nixInit = function() {
     // start - INOTIFY - from https://github.com/dsoprea/PyInotify/blob/980610f91d4c3819dce54988cfec8f138599cedf/inotify/constants.py
 	// had to use https://github.com/D-Programming-Language/druntime/blob/61ba4b8d3c0052065c17ffc8eef4f11496f3db3e/src/core/sys/linux/sys/inotify.d#L53
 		// cuz otherwise it would throw SyntaxError: octal literals and octal escape sequences are deprecated
-    // inotify_init1 flags.
+    // inotify_init1/pipe2 flags.
     IN_CLOEXEC      : 0x80000, // octal!2000000 
     IN_NONBLOCK     : 0x800, // octal!4000
     
@@ -152,7 +152,7 @@ var nixInit = function() {
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
 		close: function() {
-		       /* http://linux.die.net/man/2/close	
+		   /* http://linux.die.net/man/2/close
 			*  int close(
 			*    int fd
 			*  );
@@ -162,6 +162,21 @@ var nixInit = function() {
 				ctypes.int		// fd
 			);
 		},
+        fcntl: function() {
+           /* http://linux.die.net/man/2/fcntl
+            * int fcntl(
+            *   int fd,
+            *   int cmd,
+            *   ... arg NOTES: either int or void when not required
+            * );
+            */
+            return lib('libc').declare('fcntl', self.TYPE.ABI,
+              self.TYPE.int,	// return
+              self.TYPE.int,	// fd
+              self.TYPE.int,	// cmd
+              self.TYPE.void
+            );
+        },
 		inotify_add_watch: function() {
 			/* http://linux.die.net/man/2/inotify_add_watch
 			 * int inotify_add_watch(
@@ -202,8 +217,22 @@ var nixInit = function() {
 				self.TYPE.int		// wd
 			);
 		},
+        pipe2: function() {
+           /* http://linux.die.net/man/2/pipe
+            * Notes: If flags is 0, then pipe2() is the same as pipe()
+            * int pipe2(
+            *   int pipefd[2],
+            *   int flags
+            * );
+            */
+          return lib('libc').declare('pipe2', self.TYPE.ABI,
+             self.TYPE.int,		// return
+             self.TYPE.int,		// pipefd[2]
+             self.TYPE.int		// flags
+          );
+        },
 		read: function() {
-		       /* http://linux.die.net/man/2/read
+		   /* http://linux.die.net/man/2/read
 			*  ssize_t read(
 			*    int fd, 
 			*    void *buf, 
