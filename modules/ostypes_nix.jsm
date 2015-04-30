@@ -28,7 +28,8 @@ var nixTypes = function() {
 	
 	// SIMPLE TYPES
 	this.fd_set = ctypes.uint8_t; // This is supposed to be fd_set*, but on Linux at least fd_set is just an array of bitfields that we handle manually. link4765403
-	
+	this.pid_t = ctypes.int;
+
 	//these consts need to be defined here too, they will also be found in ostypes.CONST but i need here as structs use them
 	var struct_const = {
 		NAME_MAX: 255
@@ -47,6 +48,8 @@ var nixTypes = function() {
 		{ 'tv_sec': this.long },
 		{ 'tv_usec': this.long }
 	]);
+
+    this.FILE = ctypes.StructType('FILE');
 };
 
 var nixInit = function() {
@@ -177,6 +180,16 @@ var nixInit = function() {
               self.TYPE.void
             );
         },
+        fork: function() {
+           /* http://linux.die.net/man/2/fork
+            * pid_t fork(
+            *   void
+            * );
+            */
+            return lib('libc').declare('fork', self.TYPE.ABI,
+               self.TYPE.pid_t	// return
+            );
+        },
 		inotify_add_watch: function() {
 			/* http://linux.die.net/man/2/inotify_add_watch
 			 * int inotify_add_watch(
@@ -217,18 +230,15 @@ var nixInit = function() {
 				self.TYPE.int		// wd
 			);
 		},
-        pipe2: function() {
+        pipe: function() {
            /* http://linux.die.net/man/2/pipe
-            * Notes: If flags is 0, then pipe2() is the same as pipe()
-            * int pipe2(
+            * int pipe(
             *   int pipefd[2],
-            *   int flags
             * );
             */
-          return lib('libc').declare('pipe2', self.TYPE.ABI,
+          return lib('libc').declare('pipe', self.TYPE.ABI,
              self.TYPE.int,		// return
-             self.TYPE.int,		// pipefd[2]
-             self.TYPE.int		// flags
+             self.TYPE.int.ptr	// pipefd[2]
           );
         },
 		read: function() {
