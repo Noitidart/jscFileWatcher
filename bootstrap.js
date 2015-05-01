@@ -825,7 +825,11 @@ function pipe_test() {
 		  function(aVal) {
 			console.log('Fullfilled - promise_pipesTst - ', aVal);
 			// start - do stuff here - promise_pipesTst
-			
+			var callback_logPath = function(aFileName, aEvent, aExtra) {
+				console.log('callback_logPath triggered', 'aEvent:', aEvent, 'aFileName:', aFileName, 'aExtra:', aExtra);
+			};
+			var watcher1 = new Watcher(callback_logPath);
+			var promise_watcher1_addpath = watcher1.addPath(OS.Constants.Path.desktopDir);			
 			// end - do stuff here - promise_pipesTst
 		  },
 		  function(aReason) {
