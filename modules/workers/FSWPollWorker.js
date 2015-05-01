@@ -192,7 +192,7 @@ function init(objCore) {
 					macStuff._c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(js_FSEvStrCB);
 					macStuff.FSChanges = null;
 					
-					//macStuff.cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
+					macStuff.cId = ostypes.TYPE.UInt64(ostypes.CONST.kFSEventStreamEventIdSinceNow); //ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
 					//console.info('macStuff.cId:', macStuff.cId.toString());
 					macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
 					console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
@@ -580,7 +580,7 @@ function poll(aArgs) {
 						var cfArrRef = ostypes.TYPE.CFArrayRef.ptr(ctypes.UInt64(now_jsStr_ptrOf_cfArrRef)).contents;
 						console.info('from poll worker cfArrRef:', cfArrRef.toString());
 						
-						macStuff.fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, ostypes.CONST.kFSEventStreamEventIdSinceNow, 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
+						macStuff.fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
 						console.info('macStuff.fsstream:', macStuff.fsstream.toString(), uneval(macStuff.fsstream));
 						if (macStuff.fsstream.isNull()) { // i have seen this null when cfArr had no paths added to it, so was an empty cfarr
 							console.error('Failed FSEventStreamCreate');
