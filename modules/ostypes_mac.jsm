@@ -232,7 +232,7 @@ var macInit = function() {
 		kFSEventStreamEventFlagItemIsFile: 0x00010000,
 		kFSEventStreamEventFlagItemIsDir: 0x00020000,
 		kFSEventStreamEventFlagItemIsSymlink: 0x00040000,
-		kFSEventStreamEventIdSinceNow: self.TYPE.UInt64('0xFFFFFFFFFFFFFFFF');
+		kFSEventStreamEventIdSinceNow: self.TYPE.UInt64('0xFFFFFFFFFFFFFFFF')
 	};
 	
 	// start - function declares
