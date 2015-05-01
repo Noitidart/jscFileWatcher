@@ -487,7 +487,7 @@ function poll(aArgs) {
 									});
 								} else {
 									// its there, lets check if it was contents-modified and/or renamed
-									if (bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod != nowDirStat[nowInode].lastmod) {
+									if (!nowDirStat.isdir /*to match inotify we dont check contents-modified for directories and also kq doesnt offer a way (any flags) to detect if a subdir had its contents-modified*/ && bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod != nowDirStat[nowInode].lastmod) {
 										// contents-modified
 										FSChanges.push({
 											aFileName: nowDirStat[nowInode].filename,
@@ -846,7 +846,8 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 
 	// START - popen method
 	console.time('popen ls -i');
-	var rez_popen = ostypes.API('popen')('ls -i "' + aOSPath + '"', 'r');
+	var rez_popen = ostypes.API('popen')('ls -i -a -F "' + aOSPath + '"', 'r');
+	// -F	Puts a / (slash) after each file name if the file is a directory, an * (asterisk) if the file can be executed, an = (equal sign) if the file is a socket, a | (pipe) sign if the file is a FIFO, and an @ for a symbolic link.
 	if (ctypes.errno != 0 || rez_popen.isNull()) {
 		console.error('Failed rez_popen, errno:', ctypes.errno);
 		throw new Error({
@@ -889,9 +890,11 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		if (!inode_and_filename_match) {
 			break;
 		}
+		var cStat = OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2]));
 		obj_inodeAndFns[inode_and_filename_match[1]] = {
 			filename: inode_and_filename_match[2],
-			lastmod: OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2])).lastModificationDate.toString()
+			lastmod: cStat.lastModificationDate.toString(),
+			isdir: cStat.isDir
 		}
 	}
 	console.timeEnd('popen ls -i'); // avg of 25ms max of 55ms
