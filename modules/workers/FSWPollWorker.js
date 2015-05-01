@@ -220,13 +220,13 @@ function poll(aArgs) {
 		case 'wince':
 				
 				console.error('here in poll');
+				if (!('numHandlesWaitingAdd' in winStuff)) {
+					winStuff.numHandlesWaitingAdd = ctypes.int.ptr(ctypes.UInt64(aArgs.numHandlesWaitingAdd_ptrStr));
+					winStuff.cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(aArgs.strOfHandlePtrStrsWaitingAdd_ptrStr));
+				}
 				
 				while (true) {
 					console.log('top of loop');
-					if (!('numHandlesWaitingAdd' in winStuff)) {
-						winStuff.numHandlesWaitingAdd = ctypes.int.ptr(ctypes.UInt64(aArgs.numHandlesWaitingAdd_ptrStr));
-						winStuff.cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(aArgs.strOfHandlePtrStrsWaitingAdd_ptrStr));
-					}
 					if (winStuff.numHandlesWaitingAdd.contents > 0) { // i dont do .contents.value because .contents makesit primitive per @arai on irc #jsctypes
 						var jsStrOfHandlePtrStrsWaitingAdd = winStuff.cStrOfHandlePtrStrsWaitingAdd.contents.readString();
 						console.info('jsStrOfHandlePtrStrsWaitingAdd:', jsStrOfHandlePtrStrsWaitingAdd);
@@ -246,6 +246,7 @@ function poll(aArgs) {
 							var hDirectory = ostypes.TYPE.HANDLE.ptr(ctypes.UInt64(hDirectory_ptrStr)).contents;
 							
 							winStuff.handles_watched_jsArr.push(hDirectory);
+							var indexInJsArr = winStuff.handles_watched_jsArr - 1;
 							
 							var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
 							
@@ -257,7 +258,8 @@ function poll(aArgs) {
 								o: o,
 								notif_buf: notif_buf,
 								path_id: getPathId(),
-								hDirectory: hDirectory
+								hDirectory: hDirectory,
+								indexInJsArr: indexInJsArr
 							};
 							o.hEvent = ctypes.int(winStuff.handles_watched[hDirectory_ptrStr].path_id).address(); //notif_buf.address(); 
 							
@@ -285,6 +287,9 @@ function poll(aArgs) {
 					var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(winStuff.handles_watched_cArr.length, winStuff.handles_watched_cArr, false, loopIntervalMS, true);
 					console.error('hang completed for WaitForMultipleObjectsEx');
 					//console.error('value of did callback happen first:', winStuff.didCBHap); // learned that WaitForMultipleObjectsEx un-blocks/hangs after the callback ran, this is perfect aH! so now i can return the promise with the callbacks work, just store it to global then return it here (clear global so future functions wont double return)
+					
+					// :TODO: i have to figure out what happens when CancelIoEx is called, and then get that hDirectory and remove it from win.handles_watched_jsArr and winStuff.handles_watched_cArr
+					
 					if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_FAILED)) {
 						console.error('Failed rez_WaitForMultipleObjectsEx, winLastError:', ctypes.winLastError);
 						throw new Error({
@@ -352,6 +357,14 @@ function poll(aArgs) {
 					if (now_eventsToMonitorPtrStr != last_eventsToMonitorPtrStr) { // link584732
 						// so paths were added or removed OR added and remove you get what im trying to say
 						console.info('CHANGE ON last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr, 'now one is:', now_eventsToMonitorPtrStr);
+						
+						if (now_eventsToMonitorPtrStr == '0') {
+							throw new Error({
+								name: 'poll-aborted-nopaths',
+								message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+							});
+						}
+						
 						last_eventsToMonitorPtrStr = now_eventsToMonitorPtrStr;
 						
 						console.info('num_files.contents:', bsd_mac_kqStuff.num_files.contents); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
@@ -542,6 +555,12 @@ function poll(aArgs) {
 					console.info('LOOP TOP last:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'now:', now_jsStr_ptrOf_cfArrRef.toString());
 					if (macStuff.last_jsStr_ptrOf_cfArrRef != now_jsStr_ptrOf_cfArrRef) {
 						console.info('cfArr changed, so make new stream');
+						if (now_jsStr_ptrOf_cfArrRef == '0') {
+							throw new Error({
+								name: 'poll-aborted-nopaths',
+								message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+							});
+						}
 						// invalidate old stream, create new stream
 						if ('fsstream' in macStuff) {
 							ostypes.API('FSEventStreamStop')(macStuff.fsstream); // i dont think i need this but lets leave it just in case
@@ -1105,66 +1124,91 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 	}
 	
 	console.info('found hDir_ptrStr:', hDir_ptrStr.toString());
-	var notif_buf = winStuff.handles_watched[hDir_ptrStr].notif_buf;
-	console.log('notif_buf:', notif_buf.toString());
-	var cPos = 0;
 	
-	do {
-		var fni = ctypes.cast(notif_buf.addressOfElement(cPos), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
-		console.log(cPos, 'fni:', fni.toString());
-		var fileNameLen = parseInt(cutils.jscGetDeepest(fni.FileNameLength)) / ostypes.TYPE.WCHAR.size;
-		console.log('fileNameLen', fileNameLen);
-		var filenamePtr = ctypes.cast(fni.FileName.address(), ostypes.TYPE.WCHAR.array(fileNameLen).ptr);
-		console.info('filenamePtr:', filenamePtr.toString());
-		var filename = '';
-		for (var i=0; i<fileNameLen; i++) {
-			filename += filenamePtr.contents[i];
-		}
-		console.info('filename:', filename);
-
-		var aEvent = convertFlagsToAEventStr(fni.Action);
+	if (cutils.jscEqual(dwErrorCode, ostypes.CONST.ERROR_OPERATION_ABORTED)) {
+		// this one was canceled via CancelIoEx so lets release the handle
+		var targetObjToRem = winStuff.handles_watched[hDir_ptrStr];
+		delete winStuff.handles_watched[hDir_ptrStr];
+		// remove from handles_watched_jsArr
+		winStuff.handles_watched_jsArr.splice(targetObjToRem.indexInJsArr, 1);
+		// remove from handles_watched_cArr
+		winStuff.handles_watched_cArr = ostypes.TYPE.VOID.ptr.array()(winStuff.handles_watched_jsArr);
 		
-		if (aEvent == 'renamed-from') {
-			var rezObj = {
-				aExtra: {
-					aOld: {
-						aFileName: filename
-					},
-					aOSPath_parentDir_identifier: hDir_ptrStr
-				},
-				aEvent: 'renamed'
-			};
-			winStuff.FSChanges.push(rezObj);
-		} else if (aEvent == 'renamed-to') {
-			winStuff.FSChanges[winStuff.FSChanges.length-1].aFileName = filename;
+		// release hDir
+		var rez_CloseHandle = ostypes.API('CloseHandle')(targetObjToRem.hDirectory);
+		if (rez_CloseHandle == false) {
+			console.error('Failed to CloseHandle on targetObjToRem.hDirectory, winLastError:', ctypes.winLastError);
+			throw new Error({
+				name: 'os-api-error',
+				message: 'Failed to CloseHandle on ' + targetObjToRem.hDirectory.toString(),
+				winLastError: ctypes.winLastError
+			});
 		} else {
-			var rezObj = {
-				aFileName: filename,
-				aEvent: convertFlagsToAEventStr(fni.Action),
-				aExtra: {
-					aOSPath_parentDir_identifier: hDir_ptrStr
-				}
-			};
-			winStuff.FSChanges.push(rezObj);
+			console.info('handle closed, it should now be null:', targetObjToRem.hDirectory.toString());
 		}
+	} else {
+	
+		var notif_buf = winStuff.handles_watched[hDir_ptrStr].notif_buf;
+		console.log('notif_buf:', notif_buf.toString());
+		var cPos = 0;
 		
-		cPos = parseInt(cutils.jscGetDeepest(fni.NextEntryOffset)) / ostypes.TYPE.DWORD.size;
-	} while (cPos != 0);
-	
-	// restart listen
-	//winStuff.handles_watched[hDir_ptrStr].notif_buf = ostypes.TYPE.DWORD.array(winStuff.NOTIFICATION_BUFFER_SIZE)();
-	var rez_RDC = ostypes.API('ReadDirectoryChanges')(winStuff.handles_watched[hDir_ptrStr].hDirectory, winStuff.handles_watched[hDir_ptrStr].notif_buf.address(), winStuff.handles_watched[hDir_ptrStr].notif_buf.constructor.size, false, winStuff.changes_to_watch, null, winStuff.handles_watched[hDir_ptrStr].o.address(), winStuff.lpCompletionRoutine);
-	console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
+		do {
+			var fni = ctypes.cast(notif_buf.addressOfElement(cPos), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+			console.log(cPos, 'fni:', fni.toString());
+			var fileNameLen = parseInt(cutils.jscGetDeepest(fni.FileNameLength)) / ostypes.TYPE.WCHAR.size;
+			console.log('fileNameLen', fileNameLen);
+			var filenamePtr = ctypes.cast(fni.FileName.address(), ostypes.TYPE.WCHAR.array(fileNameLen).ptr);
+			console.info('filenamePtr:', filenamePtr.toString());
+			var filename = '';
+			for (var i=0; i<fileNameLen; i++) {
+				filename += filenamePtr.contents[i];
+			}
+			console.info('filename:', filename);
 
-	//console.error('ok got here didnt hang, this is good as i wanted it async');
-	
-	if (rez_RDC == false || ctypes.winLastError != 0) {
-		console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
-		throw new Error({
-			name: 'os-api-error',
-			message: 'Failed to ReadDirectoryChanges on handle: ' + hDirectory_ptrStr,
-			winLastError: ctypes.winLastError
-		});
+			var aEvent = convertFlagsToAEventStr(fni.Action);
+			
+			if (aEvent == 'renamed-from') {
+				var rezObj = {
+					aExtra: {
+						aOld: {
+							aFileName: filename
+						},
+						aOSPath_parentDir_identifier: hDir_ptrStr
+					},
+					aEvent: 'renamed'
+				};
+				winStuff.FSChanges.push(rezObj);
+			} else if (aEvent == 'renamed-to') {
+				winStuff.FSChanges[winStuff.FSChanges.length-1].aFileName = filename;
+			} else {
+				var rezObj = {
+					aFileName: filename,
+					aEvent: convertFlagsToAEventStr(fni.Action),
+					aExtra: {
+						aOSPath_parentDir_identifier: hDir_ptrStr
+					}
+				};
+				winStuff.FSChanges.push(rezObj);
+			}
+			
+			cPos = parseInt(cutils.jscGetDeepest(fni.NextEntryOffset)) / ostypes.TYPE.DWORD.size;
+		} while (cPos != 0);
+		
+		// restart listen
+		//winStuff.handles_watched[hDir_ptrStr].notif_buf = ostypes.TYPE.DWORD.array(winStuff.NOTIFICATION_BUFFER_SIZE)();
+		var rez_RDC = ostypes.API('ReadDirectoryChanges')(winStuff.handles_watched[hDir_ptrStr].hDirectory, winStuff.handles_watched[hDir_ptrStr].notif_buf.address(), winStuff.handles_watched[hDir_ptrStr].notif_buf.constructor.size, false, winStuff.changes_to_watch, null, winStuff.handles_watched[hDir_ptrStr].o.address(), winStuff.lpCompletionRoutine);
+		console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
+
+		//console.error('ok got here didnt hang, this is good as i wanted it async');
+		
+		if (rez_RDC == false || ctypes.winLastError != 0) {
+			console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
+			throw new Error({
+				name: 'os-api-error',
+				message: 'Failed to ReadDirectoryChanges on handle: ' + hDirectory_ptrStr,
+				winLastError: ctypes.winLastError
+			});
+		}
 	}
 	return null;
 }

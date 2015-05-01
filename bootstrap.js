@@ -580,13 +580,13 @@ Watcher.prototype.removePath = function(aOSPath) {
 				delete thisW.removes_pendingAddC[aOSPath];
 			}
 			if (aOSPath in thisW.paths_watched) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
+				//thisW.paths_watched.splice(thisW.paths_watched.indexOf(aOSPath), 1);
+				delete thisW.paths_watched[aOSPath]; // moved this to before the promise worker post, because the callback may trigger, for like windows on final remove. so we want to remove it from the main-thread object so it doesnt trigger the main-thread callback // PER `CancelIo causes Windows to automatically call the Completion Routine for each ` from http://qualapps.blogspot.ch/2010/05/understanding-readdirectorychangesw_19.html AND MSDN: https://msdn.microsoft.com/en-us/library/windows/desktop/aa363792%28v=vs.85%29.aspx "The operation being canceled is completed with one of three statuses; you must check the completion status to determine the completion state. The three statuses are: "
 				var promise_removePath = FSWatcherWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
 				promise_removePath.then(
 				  function(aVal) {
 					console.log('Fullfilled - promise_removePath - ', aVal);
 					// start - do stuff here - promise_removePath
-					//thisW.paths_watched.splice(thisW.paths_watched.indexOf(aOSPath), 1);
-					delete thisW.paths_watched[aOSPath];
 					deferredMain_Watcher_removePath.resolve(true);
 					// end - do stuff here - promise_removePath
 				  },
@@ -718,7 +718,7 @@ function managePoll(instanceWatcher) {
 						}
 						delete cVal.aExtra.aOSPath_parentDir_identifier;
 					}
-					if (core.os.name == 'darwin' && core.os.version >= 7 && 'aOSPath_parentDir' in cVal.aExtra) {
+					if (/*core.os.name == 'darwin' && core.os.version >= 7 && */'aOSPath_parentDir' in cVal.aExtra) {
 						// this is for osx 10.7+ as we want to discard subdir of watched dirs
 						if (!(cVal.aExtra.aOSPath_parentDir in thisW.paths_watched)) {
 							console.error('will not trigger cb for this obj as its path was not found in thisW.paths_watched, this is likely a subdir:', cVal);
