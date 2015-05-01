@@ -846,8 +846,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 
 	// START - popen method
 	console.time('popen ls -i');
-	var rez_popen = ostypes.API('popen')('ls -i -a -F "' + aOSPath + '"', 'r');
-	// -F	Puts a / (slash) after each file name if the file is a directory, an * (asterisk) if the file can be executed, an = (equal sign) if the file is a socket, a | (pipe) sign if the file is a FIFO, and an @ for a symbolic link.
+	var rez_popen = ostypes.API('popen')('ls -i -a "' + aOSPath + '"', 'r');
 	if (ctypes.errno != 0 || rez_popen.isNull()) {
 		console.error('Failed rez_popen, errno:', ctypes.errno);
 		throw new Error({
@@ -891,6 +890,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 			break;
 		}
 		var cStat = OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2]));
+		console.log('cstated:', cStat);
 		obj_inodeAndFns[inode_and_filename_match[1]] = {
 			filename: inode_and_filename_match[2],
 			lastmod: cStat.lastModificationDate.toString(),
