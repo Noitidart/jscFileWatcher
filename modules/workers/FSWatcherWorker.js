@@ -408,7 +408,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					var ptrStr = cutils.strOfPtr(Watcher.cStr_OSPath_obj[cOSPath].address()).substr(2); //strptr to the c string holding the path
 					
 					console.error('INFO ptrStr:', ptrStr.toString());
-					var udata = ctypes.cast(Watcher.cStr_OSPath_obj[cOSPath].address(), ctypes.intptr_t.ptr);
+					var udata = ctypes.cast(Watcher.cStr_OSPath_obj[cOSPath].address(), ostypes.TYPE.void.ptr);
 					console.info('udata from fsww:', udata.toString(), 'Watcher.cStr_OSPath_obj[cOSPath].address():', Watcher.cStr_OSPath_obj[cOSPath].address().toString());
 					
 					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), Watcher.paths_watched[cOSPath], ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, udata);
