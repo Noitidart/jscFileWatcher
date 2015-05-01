@@ -30,7 +30,7 @@ var PromiseWorker;
 var pathsSplitterStr = '/////////'; // i use this as joiner as `/////////` is disallowed on winnt, linux, and darwin, in file names, im pretty sure
 
 ////// end of imports and definitions
-
+var watcher1;
 function main() {
 	var callback_logPath = function(aFileName, aEvent, aExtra) {
 		// aExtra, on all os'es should hold:
@@ -44,7 +44,7 @@ function main() {
 			// contents-modified
 		console.log('callback_logPath triggered', 'aEvent:', aEvent, 'aFileName:', aFileName, 'aExtra:', aExtra);
 	};
-	var watcher1 = new Watcher(callback_logPath);
+	watcher1 = new Watcher(callback_logPath);
 	var promise_removeSomePath = watcher1.removePath('blah'); //test1 - remove non-added path before Watcher closes
 	var promise_watcher1_addpath = watcher1.addPath(OS.Constants.Path.desktopDir);
 	//var promise_removeSomePath = watcher1.removePath(OS.Constants.Path.desktopDir); //test2 - remove existing path before Watcher closes
@@ -731,9 +731,9 @@ function managePoll(instanceWatcher) {
 			// end - do stuff here - promise_waitForNextChange
 		  },
 		  function(aReason) {
+			  thisW.pollBeingManaged = false;
 			if (aReason.name == 'poll-aborted-nopaths') {
 				// poll aborted due to no paths being watched
-				thisW.pollBeingManaged = false;
 				if (Object.keys(thisW.paths_watched).length > 0) {
 					aReason.API_ERROR = {
 						name: 'watcher-api-error',

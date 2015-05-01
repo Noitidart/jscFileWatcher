@@ -281,11 +281,16 @@ function poll(aArgs) {
 						}
 						
 						winStuff.handles_watched_cArr = ostypes.TYPE.VOID.ptr.array()(winStuff.handles_watched_jsArr);
+					} else if (winStuff.handles_watched_jsArr.length == 0) {
+						throw new Error({
+							name: 'poll-aborted-nopaths',
+							message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+						});
 					}
 					
 					winStuff.FSChanges = [];
 					var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(winStuff.handles_watched_cArr.length, winStuff.handles_watched_cArr, false, loopIntervalMS, true);
-					console.error('hang completed for WaitForMultipleObjectsEx');
+					console.error('hang completed for WaitForMultipleObjectsEx info:', rez_WaitForMultipleObjectsEx.toString(), uneval(rez_WaitForMultipleObjectsEx));
 					//console.error('value of did callback happen first:', winStuff.didCBHap); // learned that WaitForMultipleObjectsEx un-blocks/hangs after the callback ran, this is perfect aH! so now i can return the promise with the callbacks work, just store it to global then return it here (clear global so future functions wont double return)
 					
 					// :TODO: i have to figure out what happens when CancelIoEx is called, and then get that hDirectory and remove it from win.handles_watched_jsArr and winStuff.handles_watched_cArr
@@ -1197,6 +1202,8 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 			});
 		}
 	}
+	
+	
 	return null;
 }
 // END - OS Specific - helpers for windows
