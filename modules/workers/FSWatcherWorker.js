@@ -403,7 +403,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					// i have to make udata intptr_t as in bsd the field is inptr_t while in mac it is void*
 					
 					if (!(cOSPath in Watcher.cStr_OSPath_obj)) {
-						Watcher.cStr_OSPath_obj[cOSPath] = ctypes.jschar.array()(cOSPath); // link321354 in FSWPollWorker
+						Watcher.cStr_OSPath_obj[cOSPath] = ctypes.char.array()(cOSPath); // link321354 in FSWPollWorker
 					}
 					var ptrStr = cutils.strOfPtr(Watcher.cStr_OSPath_obj[cOSPath].address()).substr(2); //strptr to the c string holding the path
 					
