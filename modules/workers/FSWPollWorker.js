@@ -388,7 +388,7 @@ function poll(aArgs) {
 							}
 							// start - even if it was there, i want to make sure the path is right
 							// get the cstr
-							var ptrStr = ctypes.cast(events_to_monitor[iHoisted].udata.address(), cutils.typeOfField(ostypes.TYPE.kevent, 'udata').ptr).contents;
+							var ptrStr = ctypes.cast(events_to_monitor[iHoisted].udata.address(), ctypes.intptr_t).contents;
 							console.info('ptrStr:', ptrStr.toString());
 							var cStr_cOSPath = ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr)); //jschar due to link321354 in FSWatcherWorker
 							console.info('cStr_cOSPath:', cStr_cOSPath.toString());

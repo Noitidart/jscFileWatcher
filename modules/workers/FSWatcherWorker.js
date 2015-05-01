@@ -405,10 +405,11 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					if (!(cOSPath in Watcher.cStr_OSPath_obj)) {
 						Watcher.cStr_OSPath_obj[cOSPath] = ctypes.jschar.array()(cOSPath); // link321354 in FSWPollWorker
 					}
-					var ptrStr = cutils.strOfPtr(Watcher.cStr_OSPath_obj[cOSPath].address()); //strptr to the c string holding the path
+					//var ptrStr = cutils.strOfPtr(Watcher.cStr_OSPath_obj[cOSPath].address()).substr(2); //strptr to the c string holding the path
 					
-					console.error('INFO ptrStr:', ptrStr.toString());
-					var udata = ctypes.cast(ostypes.TYPE.intptr_t(ptrStr), cutils.typeOfField(ostypes.TYPE.kevent, 'udata').ptr);
+					//console.error('INFO ptrStr:', ptrStr.toString());
+					console.error('INFO ptrStr:', Watcher.cStr_OSPath_obj[cOSPath].toString());
+					var udata = ctypes.cast(Watcher.cStr_OSPath_obj[cOSPath], ctyes.intptr_t);
 					
 					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), Watcher.paths_watched[cOSPath], ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, udata);
 				}
