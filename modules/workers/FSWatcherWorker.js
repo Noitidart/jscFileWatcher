@@ -703,21 +703,22 @@ function removePathFromWatcher(aWatcherID, aOSPath, removeAll) {
 				
 				var thisPObj = Watcher.paths_watched_props[aOSPath];
 				
-				delete Watcher.paths_watched_props[aOSPath];
+				delete Watcher.paths_watched_props[aOSPath];			
+
+				// recreate events list without the path we just removed
 				
-				if (newNumFilesVal == 0 || removeAll) {
+				// start - mod of block link3210255
+				var jsStrArr = [];
+				// add in old watched paths
+				for (var cOSPath in Watcher.paths_watched_props) {
+					jsStrArr.push(Watcher.paths_watched_props[cOSPath].cfStr);
+				}
+				
+				if (jsStrArr.length == 0 || removeAll) {
 					cutils.modifyCStr(Watcher.cStr_ptrOf_cfArrRef, '0'); // causes poll to abort
 					Watcher.cfArrRef = 0; // free memory? probably but not sure
 				} else {
-					// recreate events list without the path we just removed
-					
-					// start - mod of block link3210255
-					var jsStrArr = [];
-					// add in old watched paths
-					for (var cOSPath in Watcher.paths_watched_props) {
-						jsStrArr.push(Watcher.paths_watched_props[cOSPath].cfStr);
-					}
-					
+				
 					var cfStrArr = ostypes.TYPE.void.ptr.array()(jsStrArr);
 
 					Watcher.cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.CONST.kCFTypeArrayCallBacks.address()); // putting into Watcher. because otherwise it might GC im not sure i didnt test
@@ -731,8 +732,8 @@ function removePathFromWatcher(aWatcherID, aOSPath, removeAll) {
 					}
 					
 					cutils.modifyCStr(Watcher.cStr_ptrOf_cfArrRef, cutils.strOfPtr(Watcher.cfArrRef.address()));
-					// end - mod of block link3210255
 				}
+				// end - mod of block link3210255
 				
 				// can now release cfstr, as now if loop happens in PollWorker it takes the new array, so releasing of this cfstr is safe as it wont be called upon
 				ostypes.API('CFRelease')(thisPObj.cfStr); // returns void
