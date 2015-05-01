@@ -562,6 +562,7 @@ function removePathFromWatcher(aWatcherID, aOSPath, removeAll) {
 				
 				var rez_cancel = ostypes.API('CancelIoEx')(targetHandleToRem, null); // use CancelIoEx and not CancelIo because the Ex version cancels in all threads in this process. the non Ex version only works in per thread
 				console.info('rez_cancel:', rez_cancel.toString(), uneval(rez_cancel));
+				
 				if (!rez_cancel) {
 					console.error('Failed rez_cancel, winLastError:', ctypes.winLastError);
 					var rezCancelWinLastErr = ctypes.winLastError;
@@ -583,7 +584,19 @@ function removePathFromWatcher(aWatcherID, aOSPath, removeAll) {
 						message: 'Failed to CancelIoEx on ' + targetHandleToRem.toString(),
 						winLastError: rezCancelWinLastErr
 					});
+				} else {					
+					// just release it
+					var rez_CloseHandle = ostypes.API('CloseHandle')(targetHandleToRem);
+					if (rez_CloseHandle == false) {
+						console.error('Failed to CloseHandle on targetHandleToRem, winLastError:', ctypes.winLastError);
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed to CloseHandle on ' + targetHandleToRem.toString(),
+							winLastError: ctypes.winLastError
+						});
+					}
 				}
+				// a race condition exists with mainthread watcher-api, in that i ideally dont want to return until the callback triggers in PollWorker thread that remove has completed. however that requires using GetOverlappedResult blocking, and i cant use that here as i dont have access to that overlapped structure, and passing it from there to here is something i dont want to setup right now, i feel the race condition is very very rare. it happens if user removes path then adds it back back to back and IF the callback does not immediately free up in the poll worker (by free up i mean remove from the jsArr the hDir) <<< THIS IS ALL THEORIZING
 		
 				return cutils.strOfPtr(targetHandleToRem.address());
 				

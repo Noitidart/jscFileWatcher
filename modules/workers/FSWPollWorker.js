@@ -1133,19 +1133,6 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 		winStuff.handles_watched_jsArr.splice(targetObjToRem.indexInJsArr, 1);
 		// remove from handles_watched_cArr
 		winStuff.handles_watched_cArr = ostypes.TYPE.VOID.ptr.array()(winStuff.handles_watched_jsArr);
-		
-		// release hDir
-		var rez_CloseHandle = ostypes.API('CloseHandle')(targetObjToRem.hDirectory);
-		if (rez_CloseHandle == false) {
-			console.error('Failed to CloseHandle on targetObjToRem.hDirectory, winLastError:', ctypes.winLastError);
-			throw new Error({
-				name: 'os-api-error',
-				message: 'Failed to CloseHandle on ' + targetObjToRem.hDirectory.toString(),
-				winLastError: ctypes.winLastError
-			});
-		} else {
-			console.info('handle closed, it should now be null:', targetObjToRem.hDirectory.toString());
-		}
 	} else {
 	
 		var notif_buf = winStuff.handles_watched[hDir_ptrStr].notif_buf;
