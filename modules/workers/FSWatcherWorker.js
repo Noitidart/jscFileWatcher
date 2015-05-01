@@ -781,9 +781,6 @@ function removePathFromWatcher(aWatcherID, aOSPath, removeAll) {
 						message: 'Failed to inotify_rm_watch',
 						errno: ctypes.errno
 					});
-				} else {
-					delete Watcher.paths_watched[aOSPath];
-					Watcher.cInt_numPaths.value = Watcher.cInt_numPaths.value - 1;
 				}
 				
 				return targetFdToRem; // main-thread currently doesnt need this, it doesnt need aVal at all but doing it to be consisten with addPath
