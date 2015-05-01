@@ -1,3 +1,4 @@
+/*jshint esnext: true, moz: true, worker: true, node: true, -W117*/
 'use strict';
 
 // Imports
@@ -22,7 +23,7 @@ const core = { // have to set up the main keys
 
 var winStuff = {
 	maxLen_cStrOfHandlePtrStrsWaitingAdd: 100 // if update this here, update it in FSWPollWorker too
-}
+};
 
 var macStuff = {
 	maxLenCfArrRefPtrStr: 20 // if update this update in FSWPollWorker
@@ -556,10 +557,20 @@ function doPipeTest() {
 		case 'openbsd':
 		case 'linux':
 		case 'webos': // Palm Pre
-		case 'android':
-		
-				// do nix pipe
-				
+        case 'android':
+        { // http://www.gnu.org/software/libc/manual/html_node/Creating-a-Pipe.html
+          let pipefd = ctypes.int.array(2)();
+          let pipe = ostypes.API('pipe')(pipefd);
+          if (pipe === -1) {
+            throw new Error('Failed to set a pipe!');
+          }
+          let cpid = ostypes.API('fork')();
+          if (cpid === -1) {
+            throw new Error('Failed to fork');
+          }
+          ostypes.API('close')(pipefd[cpid === 0 ? 1 : 0]);
+
+        }
 			break;
 		default:
 			throw new Error({
