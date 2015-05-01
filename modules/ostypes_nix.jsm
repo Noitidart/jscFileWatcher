@@ -160,7 +160,7 @@ var nixInit = function() {
 			*    int fd
 			*  );
 			*/
-			return lib('libc').declare('close', self.TYPE_ABI,
+			return lib('libc').declare('close', self.TYPE.ABI,
 				ctypes.int,		// return
 				ctypes.int		// fd
 			);
