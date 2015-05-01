@@ -391,9 +391,8 @@ function poll(aArgs) {
 							console.info('pw: udata.address():', events_to_monitor[iHoisted].udata.address().toString());
 							console.info('pw: udata:', events_to_monitor[iHoisted].udata.toString());
 							var cStr_cOSPath = ctypes.cast(events_to_monitor[iHoisted].udata, ctypes.char.array(OS.Constants.libc.PATH_MAX).ptr).contents; // char due to link321354 in FSWatcherWorker
-							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
+							//console.info('cStr_cOSPath:', cStr_cOSPath.toString());
 							var jsStr_cOSPath = cStr_cOSPath.readString(); //ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr)); //jschar due to link321354 in FSWatcherWorker
-							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
 							//console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
 							/*
 							// if jschar on udata but im doing char on udata
@@ -444,8 +443,8 @@ function poll(aArgs) {
 						// commented out as otherwise i have to make it setTimeout for half second // i also dont want to make this an infinite poll, as after addPath i need to update kevent arguments, which i do by reading hte num_files_ptrStr
 						// there is at least 1 file to watch
 						console.info('pre kevent events_to_monitor:', events_to_monitor.toString());
-						var event_count = ostypes.API('kevent')(kq, events_to_monitor, events_to_monitor.length, event_data, event_data.length, timeout.address());
-						//var event_count = ostypes.API('kevent')(kq, ctypes.cast(events_to_monitor.address(), ostypes.TYPE.kevent.ptr), events_to_monitor.length, ctypes.cast(event_data.address(), ostypes.TYPE.kevent.ptr), event_data.length, timeout.address());
+						//var event_count = ostypes.API('kevent')(kq, events_to_monitor, events_to_monitor.length, event_data, event_data.length, timeout.address());
+						var event_count = ostypes.API('kevent')(kq, ctypes.cast(events_to_monitor.address(), ostypes.TYPE.kevent.ptr), events_to_monitor.length, ctypes.cast(event_data.address(), ostypes.TYPE.kevent.ptr), event_data.length, timeout.address());
 						console.info('event_count:', event_count.toString(), uneval(event_count));
 						if (ctypes.errno !== 0) {
 							console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
