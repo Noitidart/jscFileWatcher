@@ -193,7 +193,7 @@ function init(objCore) {
 					macStuff.FSChanges = null;
 					
 					//macStuff.cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
-					console.info('macStuff.cId:', macStuff.cId.toString());
+					//console.info('macStuff.cId:', macStuff.cId.toString());
 					macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
 					console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
 					
