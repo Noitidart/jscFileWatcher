@@ -560,12 +560,6 @@ function poll(aArgs) {
 					console.info('LOOP TOP last:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'now:', now_jsStr_ptrOf_cfArrRef.toString());
 					if (macStuff.last_jsStr_ptrOf_cfArrRef != now_jsStr_ptrOf_cfArrRef) {
 						console.info('cfArr changed, so make new stream');
-						if (now_jsStr_ptrOf_cfArrRef == '0') {
-							throw new Error({
-								name: 'poll-aborted-nopaths',
-								message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
-							});
-						}
 						// invalidate old stream, create new stream
 						if ('fsstream' in macStuff) {
 							ostypes.API('FSEventStreamStop')(macStuff.fsstream); // i dont think i need this but lets leave it just in case
@@ -573,7 +567,12 @@ function poll(aArgs) {
 							// just doing the above two will make runLoopRun break but we want to totally clean up the stream as we dont want it anymore as we are making a new one
 							ostypes.API('FSEventStreamRelease')(macStuff.fsstream);
 						}
-						
+						if (now_jsStr_ptrOf_cfArrRef == '0') {
+							throw new Error({
+								name: 'poll-aborted-nopaths',
+								message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+							});
+						}
 						// create new
 						macStuff.last_jsStr_ptrOf_cfArrRef = now_jsStr_ptrOf_cfArrRef;
 						console.log('set last to now so last is now:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'and again now is:', now_jsStr_ptrOf_cfArrRef.toString());
@@ -890,7 +889,6 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 			break;
 		}
 		var cStat = OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2]));
-		console.log('cstated:', cStat);
 		obj_inodeAndFns[inode_and_filename_match[1]] = {
 			filename: inode_and_filename_match[2],
 			lastmod: cStat.lastModificationDate.toString(),
