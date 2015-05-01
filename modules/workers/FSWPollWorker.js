@@ -390,11 +390,13 @@ function poll(aArgs) {
 							// get the cstr
 							console.info('pw: udata.address():', events_to_monitor[iHoisted].udata.address().toString());
 							console.info('pw: udata:', events_to_monitor[iHoisted].udata.toString());
-							var ptrStr = ctypes.cast(events_to_monitor[iHoisted].udata, ctypes.char.array(OS.Constants.libc.PATH_MAX).ptr).contents;
-							console.info('ptrStr:', ptrStr.toString());
-							var cStr_cOSPath = ptrStr.readString(); //ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr)); //jschar due to link321354 in FSWatcherWorker
+							var cStr_cOSPath = ctypes.cast(events_to_monitor[iHoisted].udata, ctypes.char.array(OS.Constants.libc.PATH_MAX).ptr).contents; // char due to link321354 in FSWatcherWorker
+							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
+							var jsStr_cOSPath = cStr_cOSPath.readString(); //ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr)); //jschar due to link321354 in FSWatcherWorker
 							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
 							//console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
+							/*
+							// if jschar on udata but im doing char on udata
 							var jsStr_cOSPath = '';
 							for (var j=0; j<cStr_cOSPath.contents.length; j++) {
 								let jHoisted = j;
@@ -403,7 +405,7 @@ function poll(aArgs) {
 									break; // reached null-terminator
 								}
 								jsStr_cOSPath += cChar;
-							}
+							}*/
 							cStr_cOSPath = null; // as i took out a lot OS.Constants.libc.PATH_MAX so lets just set it to null so it GC's, well im hoping this makes it GC
 							
 							var aOSPath_watchedDir = jsStr_cOSPath; // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
