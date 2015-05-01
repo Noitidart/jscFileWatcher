@@ -367,7 +367,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				}
 				
 				// Open a file descriptor for the file/directory that you want to monitor.
-				var event_fd = core.os.name == 'darwin' ? ostypes.API('open')(aOSPath, OS.Constants.libc.O_EVTONLY) : /*bsd*/ ostypes.API('open')(aOSPath, OS.Constants.libc.O_RDONLY);
+				var event_fd = ostypes.API('open')(aOSPath, core.os.name == 'darwin' ? /*mac*/ OS.Constants.libc.O_EVTONLY : /*bsd*/ OS.Constants.libc.O_RDONLY);
 				console.info('event_fd:', event_fd.toString(), uneval(event_fd));
 				if (ctypes.errno != 0) {
 					console.error('Failed event_fd, errno:', ctypes.errno);
@@ -408,11 +408,8 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					var ptrStr = cutils.strOfPtr(Watcher.cStr_OSPath_obj[cOSPath].address()); //strptr to the c string holding the path
 					
 					console.error('INFO ptrStr:', ptrStr.toString());
-					if (core.os.name == 'darwin') {
-						var udata = ctypes.cast(ostypes.TYPE.intptr_t(ptrStr), ostypes.TYPE.void.ptr);
-					} else {
-						var udata = ostypes.TYPE.intptr_t(ptrStr);
-					}
+					var udata = ctypes.cast(ostypes.TYPE.intptr_t(ptrStr), cutils.typeOfField(ostypes.TYPE.kevent, 'udata').ptr);
+					
 					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), Watcher.paths_watched[cOSPath], ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, udata);
 				}
 				

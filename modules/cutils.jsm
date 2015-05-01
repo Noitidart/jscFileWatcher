@@ -261,6 +261,16 @@ function utilsInit() {
 		
 		//console.info('post mod readString():', ctypesCharArr.readString().toString());
 	};
+	this.typeOfField = function(structDef, fieldName) {
+		for (var i=0; i<structDef.fields.length; i++) {
+			for (var f in structDef.fields[i]) {
+				if (f == fieldName) {
+					return structDef.fields[i][f];
+				}
+				break; // there is only one
+			}
+		}
+	}
 }
 
 var cutils = new utilsInit();

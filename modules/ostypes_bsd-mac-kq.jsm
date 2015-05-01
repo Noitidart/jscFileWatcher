@@ -24,8 +24,11 @@ var kqTypes = function() {
 	this.intptr_t = ctypes.intptr_t;
 	this.long = ctypes.long;
 	this.off_t = ctypes.off_t;
+	this.quad_t = ctypes.long_long;
 	this.short = ctypes.short;
 	this.size_t = ctypes.size_t;
+	this.u_int = ctypes.unsigned_int;
+	this.u_short = ctypes.unsigned_short;
 	this.uint16_t = ctypes.uint16_t;
 	this.uint32_t = ctypes.uint32_t;
 	this.uintptr_t = ctypes.uintptr_t
@@ -41,14 +44,37 @@ var kqTypes = function() {
 	this.FILE = ctypes.StructType('FILE');
 	
 	// SIMPLE STRUCTS
-	this.kevent = ctypes.StructType('kevent', [ // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/kqueue.2.html
-		{ ident: this.uintptr_t },
-		{ filter: core.os.name == 'darwin' ? this.int16_t : this.uint32_t },
-		{ flags: core.os.name == 'darwin' ? this.uint16_t : this.uint32_t },
-		{ fflags: this.uint32_t },
-		{ data: core.os.name == 'darwin' ? this.intptr_t : this.int64_t },
-		{ udata: core.os.name == 'darwin' ? this.void.ptr : this.intptr_t }
-	]);
+	// mac: http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/bsd/sys/event.h
+	// freebsd: 
+	if (core.os.name == 'darwin') {
+		this.kevent = ctypes.StructType('kevent', [ // http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/bsd/sys/event.h
+			{ ident: this.uintptr_t },
+			{ filter: this.int16_t },
+			{ flags: this.uint16_t },
+			{ fflags: this.uint32_t },
+			{ data: this.intptr_t },
+			{ udata: this.void.ptr }
+		]);
+	} else if (core.os.name == 'freebsd' || core.os.name == 'openbsd') {
+		this.kevent = ctypes.StructType('kevent', [
+			{ ident: this.uintptr_t },
+			{ filter: this.short },
+			{ flags: this.u_short },
+			{ fflags: this.u_int },
+			{ data: this.quad_t },
+			{ udata: this.void.ptr }
+		]);
+	} else if (core.os.name == 'netbsd') {
+		this.kevent = ctypes.StructType('kevent', [ // http://netbsd.gw.com/cgi-bin/man-cgi?kqueue++NetBSD-current
+			{ ident: this.uintptr_t },
+			{ filter: this.uint32_t },
+			{ flags: this.uint32_t },
+			{ fflags: this.uint32_t },
+			{ data: this.int64_t },
+			{ udata: this.intptr_t }
+		]);
+	}
+	
 	this.timespec = ctypes.StructType('timespec', [ // http://www.opensource.apple.com/source/text_cmds/text_cmds-69/sort/timespec.h
 		{ tv_sec: this.time_t },
 		{ tv_nsec: this.long }
