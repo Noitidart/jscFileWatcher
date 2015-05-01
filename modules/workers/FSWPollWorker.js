@@ -443,7 +443,7 @@ function poll(aArgs) {
 					} else {
 						// commented out as otherwise i have to make it setTimeout for half second // i also dont want to make this an infinite poll, as after addPath i need to update kevent arguments, which i do by reading hte num_files_ptrStr
 						// there is at least 1 file to watch
-						var event_count = ostypes.API('kevent')(kq, events_to_monitor/*.address()*/, events_to_monitor.length, event_data/*.address()*/, event_data.length, timeout.address());
+						var event_count = ostypes.API('kevent')(kq, events_to_monitor.address(), events_to_monitor.length, event_data.address(), event_data.length, timeout.address());
 						console.info('event_count:', event_count.toString(), uneval(event_count));
 						if (ctypes.errno !== 0) {
 							console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
