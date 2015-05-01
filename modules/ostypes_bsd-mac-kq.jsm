@@ -53,7 +53,7 @@ var kqTypes = function() {
 			{ flags: this.uint16_t },
 			{ fflags: this.uint32_t },
 			{ data: this.intptr_t },
-			{ udata: this.void.ptr }
+			{ udata: this.intptr_t }
 		]);
 	} else if (core.os.name == 'freebsd' || core.os.name == 'openbsd') {
 		this.kevent = ctypes.StructType('kevent', [
@@ -62,7 +62,7 @@ var kqTypes = function() {
 			{ flags: this.u_short },
 			{ fflags: this.u_int },
 			{ data: this.quad_t },
-			{ udata: this.void.ptr }
+			{ udata: this.intptr_t }
 		]);
 	} else if (core.os.name == 'netbsd') {
 		this.kevent = ctypes.StructType('kevent', [ // http://netbsd.gw.com/cgi-bin/man-cgi?kqueue++NetBSD-current
