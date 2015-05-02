@@ -875,6 +875,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		} catch (ex) {
 			console.error('ex on readString :', ex.message.toString());
 		}
+		console.info('after loop readSize:', readSize.toString(), 'readInChunksOf:', readInChunksOf.toString());
 	} while (cutils.jscEqual(readSize, readInChunksOf)) // if read less then readInChunksOf size then obviously there's no more
 	console.log('time to close');
 	var rez_pclose = ostypes.API('pclose')(rez_popen);
