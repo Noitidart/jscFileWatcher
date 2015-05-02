@@ -482,7 +482,8 @@ function poll(aArgs) {
 										aFileName: nowDirStat[nowInode].filename,
 										aEvent: 'added',
 										aExtra: {
-											aOSPath_parentDir: aOSPath_parentDir
+											aOSPath_parentDir: aOSPath_parentDir,
+											orderMod: nowDirStat[nowInode].lastmod.toString()
 										}
 									});
 								} else {
@@ -494,6 +495,7 @@ function poll(aArgs) {
 											aEvent: 'contents-modified',
 											aExtra: {
 												aOSPath_parentDir: aOSPath_parentDir,
+												orderMod: nowDirStat[nowInode].lastmod.toString(),
 												previousMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod.toString(),
 												nowMod: nowDirStat[nowInode].lastmod.toString()
 											}
@@ -506,6 +508,7 @@ function poll(aArgs) {
 											aEvent: 'renamed',
 											aExtra: {
 												aOSPath_parentDir: aOSPath_parentDir,
+												orderMod: nowDirStat[nowInode].lastmod.toString(),
 												aOld: {
 													aFileName: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].filename
 												}
@@ -523,6 +526,7 @@ function poll(aArgs) {
 									aEvent: 'removed',
 									aExtra: {
 										aOSPath_parentDir: aOSPath_parentDir,
+										orderMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].toString()
 									}
 								});
 							}
