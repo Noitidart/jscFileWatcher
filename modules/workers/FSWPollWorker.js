@@ -855,7 +855,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 
 	// START - popen method
 	console.time('popen ls -i');
-	var rez_popen = ostypes.API('popen')('ls -i -a "' + aOSPath + '"', 'r');
+	var rez_popen = ostypes.API('popen')('ls -i -A -1 "' + aOSPath + '"', 'r');
 	if (ctypes.errno != 0 || rez_popen.isNull()) {
 		console.error('Failed rez_popen, errno:', ctypes.errno);
 		throw new Error({
@@ -907,9 +907,6 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 			break;
 		}
 		console.log('top of reg loop, match:', inode_and_filename_match.toString());
-		if (inode_and_filename_match[2] == '.' || inode_and_filename_match[2] == '..') {
-			continue; // we dont want to watch . or .. as . gets contents-modified every time and other watchers dont watch it
-		}
 		try {
 			var cStat = OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2]));
 		} catch(ex) {
@@ -1271,7 +1268,6 @@ function convertFlagsToAEventStr(flags) {
 						NOTE_RENAME: 'renamed',
 						NOTE_EXTEND: 'note extended - i dont know what this action entails',
 						NOTE_LINK: 'note link - i dont know what this action entails',
-						NOTE_UNLINK: 'note unlink - i dont know what this action entails',
 						NOTE_REVOKE: 'note revoke - i dont know what this action entails',
 						NOTE_ATTRIB: 'note attrib - i dont know what this action entails'
 					};
