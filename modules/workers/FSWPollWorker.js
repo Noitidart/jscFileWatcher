@@ -888,6 +888,9 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		if (!inode_and_filename_match) {
 			break;
 		}
+		if (inode_and_filename_match[2] == '.' || inode_and_filename_match[2] == '..') {
+			continue; // we dont want to watch . or .. as . gets contents-modified every time and other watchers dont watch it
+		}
 		var cStat = OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2]));
 		obj_inodeAndFns[inode_and_filename_match[1]] = {
 			filename: inode_and_filename_match[2],
