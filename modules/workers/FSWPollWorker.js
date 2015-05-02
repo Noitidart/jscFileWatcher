@@ -505,7 +505,7 @@ function poll(aArgs) {
 											aFileName: nowDirStat[nowInode].filename,
 											aEvent: 'renamed',
 											aExtra: {
-												aOSPath_parentDir_identifier: aOSPath_parentDir,
+												aOSPath_parentDir: aOSPath_parentDir,
 												aOld: {
 													aFileName: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].filename
 												}
