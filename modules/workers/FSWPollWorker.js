@@ -483,7 +483,8 @@ function poll(aArgs) {
 										aEvent: 'added',
 										aExtra: {
 											aOSPath_parentDir: aOSPath_parentDir,
-											orderMod: nowDirStat[nowInode].laststatus
+											orderMod: nowDirStat[nowInode].laststatus,
+											orderModUnused: nowDirStat[nowInode].lastmod
 										}
 									});
 								} else {
@@ -496,6 +497,7 @@ function poll(aArgs) {
 											aExtra: {
 												aOSPath_parentDir: aOSPath_parentDir,
 												orderMod: nowDirStat[nowInode].laststatus,
+												orderModUnused: nowDirStat[nowInode].lastmod,
 												previousMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod,
 												nowMod: nowDirStat[nowInode].lastmod
 											}
@@ -509,6 +511,7 @@ function poll(aArgs) {
 											aExtra: {
 												aOSPath_parentDir: aOSPath_parentDir,
 												orderMod: nowDirStat[nowInode].laststatus,
+												orderModUnused: nowDirStat[nowInode].lastmod,
 												aOld: {
 													aFileName: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].filename
 												}
@@ -526,7 +529,8 @@ function poll(aArgs) {
 									aEvent: 'removed',
 									aExtra: {
 										aOSPath_parentDir: aOSPath_parentDir,
-										orderMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].laststatus
+										orderMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].laststatus,
+										orderModUnused: nowDirStat[nowInode].lastmod
 									}
 								});
 							}
