@@ -483,7 +483,7 @@ function poll(aArgs) {
 										aEvent: 'added',
 										aExtra: {
 											aOSPath_parentDir: aOSPath_parentDir,
-											orderMod: new Date(nowDirStat[nowInode].lastmod)
+											orderMod: nowDirStat[nowInode].lastmod
 										}
 									});
 								} else {
@@ -495,7 +495,7 @@ function poll(aArgs) {
 											aEvent: 'contents-modified',
 											aExtra: {
 												aOSPath_parentDir: aOSPath_parentDir,
-												orderMod: new Date(nowDirStat[nowInode].lastmod),
+												orderMod: nowDirStat[nowInode].lastmod,
 												previousMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod.toString(),
 												nowMod: nowDirStat[nowInode].lastmod.toString()
 											}
@@ -508,7 +508,7 @@ function poll(aArgs) {
 											aEvent: 'renamed',
 											aExtra: {
 												aOSPath_parentDir: aOSPath_parentDir,
-												orderMod: new Date(nowDirStat[nowInode].lastmod),
+												orderMod: nowDirStat[nowInode].lastmod,
 												aOld: {
 													aFileName: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].filename
 												}
@@ -526,7 +526,7 @@ function poll(aArgs) {
 									aEvent: 'removed',
 									aExtra: {
 										aOSPath_parentDir: aOSPath_parentDir,
-										orderMod: new Date(bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].lastmod)
+										orderMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].lastmod
 									}
 								});
 							}
@@ -534,7 +534,7 @@ function poll(aArgs) {
 							
 							if (FSChanges.length > 0) {
 								return FSChanges.sort(function(a,b) {
-									return a.aExtra.orderMod > b.aExtra.orderMod;
+									return new Date(a.aExtra.orderMod) > new Date(b.aExtra.orderMod);
 								});
 							}
 						} else {
