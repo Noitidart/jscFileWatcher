@@ -526,7 +526,7 @@ function poll(aArgs) {
 									aEvent: 'removed',
 									aExtra: {
 										aOSPath_parentDir: aOSPath_parentDir,
-										orderMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].toString()
+										orderMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].lastmod.toString()
 									}
 								});
 							}
