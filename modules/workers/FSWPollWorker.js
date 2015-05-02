@@ -483,7 +483,7 @@ function poll(aArgs) {
 										aEvent: 'added',
 										aExtra: {
 											aOSPath_parentDir: aOSPath_parentDir,
-											orderMod: nowDirStat[nowInode].lastmod
+											orderMod: nowDirStat[nowInode].laststatus
 										}
 									});
 								} else {
@@ -495,9 +495,9 @@ function poll(aArgs) {
 											aEvent: 'contents-modified',
 											aExtra: {
 												aOSPath_parentDir: aOSPath_parentDir,
-												orderMod: nowDirStat[nowInode].lastmod,
-												previousMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod.toString(),
-												nowMod: nowDirStat[nowInode].lastmod.toString()
+												orderMod: nowDirStat[nowInode].laststatus,
+												previousMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod,
+												nowMod: nowDirStat[nowInode].lastmod
 											}
 										});
 									}
@@ -508,7 +508,7 @@ function poll(aArgs) {
 											aEvent: 'renamed',
 											aExtra: {
 												aOSPath_parentDir: aOSPath_parentDir,
-												orderMod: nowDirStat[nowInode].lastmod,
+												orderMod: nowDirStat[nowInode].laststatus,
 												aOld: {
 													aFileName: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].filename
 												}
@@ -526,7 +526,7 @@ function poll(aArgs) {
 									aEvent: 'removed',
 									aExtra: {
 										aOSPath_parentDir: aOSPath_parentDir,
-										orderMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].lastmod
+										orderMod: new Date().toString() //bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].laststatus
 									}
 								});
 							}
@@ -910,6 +910,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		obj_inodeAndFns[inode_and_filename_match[1]] = {
 			filename: inode_and_filename_match[2],
 			lastmod: cStat.lastModificationDate.toString(),
+			laststatus: cStat.unixLastStatusChangeDate.toString(),
 			isdir: cStat.isDir
 		}
 	}
