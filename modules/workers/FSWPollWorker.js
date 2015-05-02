@@ -888,11 +888,11 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 	}
 	var readTotal = readChunks.join('');
 	console.info('readTotal:', readTotal.toString());
-	var inode_and_filename_patt = /^(\d+) (.*?)$/gm;
+	var inode_and_filename_patt = /^(\d+) (.*)$/gm;
 	var inode_and_filename_match;
 	while (true) {
-		console.log('top of reg loop');
 		inode_and_filename_match = inode_and_filename_patt.exec(readTotal);
+		console.log('top of reg loop, match:', inode_and_filename_match.toString());
 		if (!inode_and_filename_match) {
 			break;
 		}
