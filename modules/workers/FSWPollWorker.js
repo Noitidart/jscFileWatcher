@@ -855,10 +855,10 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		});
 	}
 	var readInChunksOf = 1000; // bytes
-	var readBuf = ctypes.char.array(readInChunksOf)(); // not ostypes.TYPE.char as we are free to use what we want, asit expects a void* link6321887
 	var readSize = 0;
 	var readChunks = [];
 	do { 
+		var readBuf = ctypes.char.array(readInChunksOf)(); // not ostypes.TYPE.char as we are free to use what we want, asit expects a void* link6321887
 		console.log('top of read loop');
 		readSize = ostypes.API('fread')(readBuf, ctypes.char.size, readBuf.constructor.size, rez_popen); // ctypes.char link6321887
 		if (ctypes.errno != 0) {
