@@ -21,7 +21,7 @@ const core = { // have to set up the main keys
 };
 const loopIntervalMS = 5000; // only modify here
 const loopIntervalS = loopIntervalMS  / 1000; // do not modify
-const loopIntervalNS = loopIntervalMS * 1000000; // do not modify
+const loopIntervalNS = loopIntervalMS * 100000; // do not modify
 
 // START - OS Specific
 var winStuff;
@@ -450,7 +450,7 @@ function poll(aArgs) {
 							console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
 							throw new Error({
 								name: 'os-api-error',
-								message: 'Failed to event_count due to failed kevent call',
+								message: 'Failed to event_count due to failed kevent call result - event_count:' + cutils.jscGetDeepest(event_count),
 								uniEerrno: ctypes.errno
 							});
 						}
