@@ -30,7 +30,7 @@ var PromiseWorker;
 var pathsSplitterStr = '/////////'; // i use this as joiner as `/////////` is disallowed on winnt, linux, and darwin, in file names, im pretty sure
 
 ////// end of imports and definitions
-
+var watcher1;
 function main() {
 	var callback_logPath = function(aFileName, aEvent, aExtra) {
 		// aExtra, on all os'es should hold:
@@ -44,7 +44,7 @@ function main() {
 			// contents-modified
 		console.log('callback_logPath triggered', 'aEvent:', aEvent, 'aFileName:', aFileName, 'aExtra:', aExtra);
 	};
-	var watcher1 = new Watcher(callback_logPath);
+	watcher1 = new Watcher(callback_logPath);
 	var promise_removeSomePath = watcher1.removePath('blah'); //test1 - remove non-added path before Watcher closes
 	var promise_watcher1_addpath = watcher1.addPath(OS.Constants.Path.desktopDir);
 	//var promise_removeSomePath = watcher1.removePath(OS.Constants.Path.desktopDir); //test2 - remove existing path before Watcher closes
@@ -580,13 +580,13 @@ Watcher.prototype.removePath = function(aOSPath) {
 				delete thisW.removes_pendingAddC[aOSPath];
 			}
 			if (aOSPath in thisW.paths_watched) { // moved this if block here because removes_pendingAddC call this function after pendingC is done (pendingC is ctypes addPathToWatcher code running) and if that fails then it will run this which will reject the pending deferred
+				//thisW.paths_watched.splice(thisW.paths_watched.indexOf(aOSPath), 1);
+				delete thisW.paths_watched[aOSPath]; // moved this to before the promise worker post, because the callback may trigger, for like windows on final remove. so we want to remove it from the main-thread object so it doesnt trigger the main-thread callback // PER `CancelIo causes Windows to automatically call the Completion Routine for each ` from http://qualapps.blogspot.ch/2010/05/understanding-readdirectorychangesw_19.html AND MSDN: https://msdn.microsoft.com/en-us/library/windows/desktop/aa363792%28v=vs.85%29.aspx "The operation being canceled is completed with one of three statuses; you must check the completion status to determine the completion state. The three statuses are: "
 				var promise_removePath = FSWatcherWorker.post('removePathFromWatcher', [thisW.id, aOSPath]);
 				promise_removePath.then(
 				  function(aVal) {
 					console.log('Fullfilled - promise_removePath - ', aVal);
 					// start - do stuff here - promise_removePath
-					//thisW.paths_watched.splice(thisW.paths_watched.indexOf(aOSPath), 1);
-					delete thisW.paths_watched[aOSPath];
 					deferredMain_Watcher_removePath.resolve(true);
 					// end - do stuff here - promise_removePath
 				  },
@@ -718,7 +718,7 @@ function managePoll(instanceWatcher) {
 						}
 						delete cVal.aExtra.aOSPath_parentDir_identifier;
 					}
-					if (core.os.name == 'darwin' && core.os.version >= 7 && 'aOSPath_parentDir' in cVal.aExtra) {
+					if (/*core.os.name == 'darwin' && core.os.version >= 7 && */'aOSPath_parentDir' in cVal.aExtra) {
 						// this is for osx 10.7+ as we want to discard subdir of watched dirs
 						if (!(cVal.aExtra.aOSPath_parentDir in thisW.paths_watched)) {
 							console.error('will not trigger cb for this obj as its path was not found in thisW.paths_watched, this is likely a subdir:', cVal);
@@ -731,9 +731,9 @@ function managePoll(instanceWatcher) {
 			// end - do stuff here - promise_waitForNextChange
 		  },
 		  function(aReason) {
+			  thisW.pollBeingManaged = false;
 			if (aReason.name == 'poll-aborted-nopaths') {
 				// poll aborted due to no paths being watched
-				thisW.pollBeingManaged = false;
 				if (Object.keys(thisW.paths_watched).length > 0) {
 					aReason.API_ERROR = {
 						name: 'watcher-api-error',
@@ -804,7 +804,7 @@ function extendCore() {
 					// 10.10.1 => 10.101
 					// so can compare numerically, as 10.100 is less then 10.101
 					
-					//core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
+					core.os.version = 6.9; // note: debug: temporarily forcing mac to be 10.6 so we can test kqueue
 				}
 				break;
 			default:

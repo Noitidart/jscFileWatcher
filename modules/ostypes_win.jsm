@@ -158,6 +158,7 @@ var winInit = function() {
 
 	// CONSTANTS
 	this.CONST = {
+		ERROR_OPERATION_ABORTED: 995,
 		FILE_ACTION_ADDED: 0x00000001,
 		FILE_ACTION_REMOVED: 0x00000002,
 		FILE_ACTION_MODIFIED: 0x00000003,
@@ -222,6 +223,19 @@ var winInit = function() {
 
 	// start - predefine your declares here
 	var preDec = { //stands for pre-declare (so its just lazy stuff) //this must be pre-populated by dev // do it alphabateized by key so its ez to look through
+		CancelIoEx: function() {
+			/* https://msdn.microsoft.com/en-us/library/windows/desktop/aa363792%28v=vs.85%29.aspx
+			 * BOOL WINAPI CancelIoEx(
+			 *   __in_     HANDLE       hFile,
+			 *   __in_opt_ LPOVERLAPPED lpOverlapped
+			 * );
+			 */
+			return lib('kernel32').declare('CancelIoEx', self.TYPE.ABI,
+				self.TYPE.BOOL,			// return
+				self.TYPE.HANDLE,		// hObject
+				self.TYPE.LPOVERLAPPED	// lpOverlapped
+			);
+		},
 		CloseHandle: function() {
 			/* https://msdn.microsoft.com/en-us/library/windows/desktop/ms724211%28v=vs.85%29.aspx
 			 * BOOL WINAPI CloseHandle(

@@ -21,7 +21,7 @@ const core = { // have to set up the main keys
 };
 const loopIntervalMS = 5000; // only modify here
 const loopIntervalS = loopIntervalMS  / 1000; // do not modify
-const loopIntervalNS = loopIntervalMS * 1000000; // do not modify
+const loopIntervalNS = loopIntervalMS * 100000; // do not modify
 
 // START - OS Specific
 var winStuff;
@@ -192,8 +192,8 @@ function init(objCore) {
 					macStuff._c_fsevents_callback = ostypes.TYPE.FSEventStreamCallback(js_FSEvStrCB);
 					macStuff.FSChanges = null;
 					
-					macStuff.cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
-					console.info('macStuff.cId:', macStuff.cId.toString());
+					//macStuff.cId = ostypes.API('FSEventsGetCurrentEventId')(); // ostypes.TYPE.FSEventStreamEventId(ostypes.CONST.kFSEventStreamEventIdSinceNow);
+					//console.info('macStuff.cId:', macStuff.cId.toString());
 					macStuff.rez_CFRunLoopGetCurrent = ostypes.API('CFRunLoopGetCurrent')();
 					console.info('rez_CFRunLoopGetCurrent:', macStuff.rez_CFRunLoopGetCurrent.toString());
 					
@@ -220,13 +220,13 @@ function poll(aArgs) {
 		case 'wince':
 				
 				console.error('here in poll');
+				if (!('numHandlesWaitingAdd' in winStuff)) {
+					winStuff.numHandlesWaitingAdd = ctypes.int.ptr(ctypes.UInt64(aArgs.numHandlesWaitingAdd_ptrStr));
+					winStuff.cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(aArgs.strOfHandlePtrStrsWaitingAdd_ptrStr));
+				}
 				
 				while (true) {
 					console.log('top of loop');
-					if (!('numHandlesWaitingAdd' in winStuff)) {
-						winStuff.numHandlesWaitingAdd = ctypes.int.ptr(ctypes.UInt64(aArgs.numHandlesWaitingAdd_ptrStr));
-						winStuff.cStrOfHandlePtrStrsWaitingAdd = ctypes.char.array(winStuff.maxLen_cStrOfHandlePtrStrsWaitingAdd).ptr(ctypes.UInt64(aArgs.strOfHandlePtrStrsWaitingAdd_ptrStr));
-					}
 					if (winStuff.numHandlesWaitingAdd.contents > 0) { // i dont do .contents.value because .contents makesit primitive per @arai on irc #jsctypes
 						var jsStrOfHandlePtrStrsWaitingAdd = winStuff.cStrOfHandlePtrStrsWaitingAdd.contents.readString();
 						console.info('jsStrOfHandlePtrStrsWaitingAdd:', jsStrOfHandlePtrStrsWaitingAdd);
@@ -246,6 +246,7 @@ function poll(aArgs) {
 							var hDirectory = ostypes.TYPE.HANDLE.ptr(ctypes.UInt64(hDirectory_ptrStr)).contents;
 							
 							winStuff.handles_watched_jsArr.push(hDirectory);
+							var indexInJsArr = winStuff.handles_watched_jsArr - 1;
 							
 							var o = ostypes.TYPE.OVERLAPPED(); //(ostypes.TYPE.ULONG_PTR(0), ostypes.TYPE.ULONG_PTR(0), null, null);
 							
@@ -257,7 +258,8 @@ function poll(aArgs) {
 								o: o,
 								notif_buf: notif_buf,
 								path_id: getPathId(),
-								hDirectory: hDirectory
+								hDirectory: hDirectory,
+								indexInJsArr: indexInJsArr
 							};
 							o.hEvent = ctypes.int(winStuff.handles_watched[hDirectory_ptrStr].path_id).address(); //notif_buf.address(); 
 							
@@ -279,12 +281,20 @@ function poll(aArgs) {
 						}
 						
 						winStuff.handles_watched_cArr = ostypes.TYPE.VOID.ptr.array()(winStuff.handles_watched_jsArr);
+					} else if (winStuff.handles_watched_jsArr.length == 0) {
+						throw new Error({
+							name: 'poll-aborted-nopaths',
+							message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+						});
 					}
 					
 					winStuff.FSChanges = [];
 					var rez_WaitForMultipleObjectsEx = ostypes.API('WaitForMultipleObjectsEx')(winStuff.handles_watched_cArr.length, winStuff.handles_watched_cArr, false, loopIntervalMS, true);
-					console.error('hang completed for WaitForMultipleObjectsEx');
+					console.error('hang completed for WaitForMultipleObjectsEx info:', rez_WaitForMultipleObjectsEx.toString(), uneval(rez_WaitForMultipleObjectsEx));
 					//console.error('value of did callback happen first:', winStuff.didCBHap); // learned that WaitForMultipleObjectsEx un-blocks/hangs after the callback ran, this is perfect aH! so now i can return the promise with the callbacks work, just store it to global then return it here (clear global so future functions wont double return)
+					
+					// :TODO: i have to figure out what happens when CancelIoEx is called, and then get that hDirectory and remove it from win.handles_watched_jsArr and winStuff.handles_watched_cArr
+					
 					if (cutils.jscEqual(rez_WaitForMultipleObjectsEx, ostypes.CONST.WAIT_FAILED)) {
 						console.error('Failed rez_WaitForMultipleObjectsEx, winLastError:', ctypes.winLastError);
 						throw new Error({
@@ -352,6 +362,14 @@ function poll(aArgs) {
 					if (now_eventsToMonitorPtrStr != last_eventsToMonitorPtrStr) { // link584732
 						// so paths were added or removed OR added and remove you get what im trying to say
 						console.info('CHANGE ON last_eventsToMonitorPtrStr:', last_eventsToMonitorPtrStr, 'now one is:', now_eventsToMonitorPtrStr);
+						
+						if (now_eventsToMonitorPtrStr == '0') {
+							throw new Error({
+								name: 'poll-aborted-nopaths',
+								message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+							});
+						}
+						
 						last_eventsToMonitorPtrStr = now_eventsToMonitorPtrStr;
 						
 						console.info('num_files.contents:', bsd_mac_kqStuff.num_files.contents); // testing if i really need to re read ptr or if it changes in this FSWPollWorker.js thread when FSWatcherWorker.js thread changes .value on it
@@ -370,16 +388,14 @@ function poll(aArgs) {
 							}
 							// start - even if it was there, i want to make sure the path is right
 							// get the cstr
-							if (core.os.name == 'darwin') {
-								var ptrStr = ctypes.cast(events_to_monitor[iHoisted].udata.address(), ctypes.intptr_t.ptr).contents;
-							} else {
-								// bsd
-								var ptrStr = cutils.jscGetDeepest(events_to_monitor[0].udata);
-							}
-							console.info('ptrStr:', ptrStr.toString());
-							var cStr_cOSPath = ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr)); //jschar due to link321354 in FSWatcherWorker
-							console.info('cStr_cOSPath:', cStr_cOSPath.toString());
+							console.info('pw: udata.address():', events_to_monitor[iHoisted].udata.address().toString());
+							console.info('pw: udata:', events_to_monitor[iHoisted].udata.toString());
+							var cStr_cOSPath = ctypes.cast(events_to_monitor[iHoisted].udata, ctypes.char.array(OS.Constants.libc.PATH_MAX).ptr).contents; // char due to link321354 in FSWatcherWorker
+							//console.info('cStr_cOSPath:', cStr_cOSPath.toString());
+							var jsStr_cOSPath = cStr_cOSPath.readString(); //ctypes.jschar.array(OS.Constants.libc.PATH_MAX).ptr(ctypes.UInt64(ptrStr)); //jschar due to link321354 in FSWatcherWorker
 							//console.info('cStr_cOSPath.contents:', cStr_cOSPath.contents.toString());
+							/*
+							// if jschar on udata but im doing char on udata
 							var jsStr_cOSPath = '';
 							for (var j=0; j<cStr_cOSPath.contents.length; j++) {
 								let jHoisted = j;
@@ -388,7 +404,7 @@ function poll(aArgs) {
 									break; // reached null-terminator
 								}
 								jsStr_cOSPath += cChar;
-							}
+							}*/
 							cStr_cOSPath = null; // as i took out a lot OS.Constants.libc.PATH_MAX so lets just set it to null so it GC's, well im hoping this makes it GC
 							
 							var aOSPath_watchedDir = jsStr_cOSPath; // ctypes.jschar due to link4874354 in ostypes_bsd-mac-kq.jsm
@@ -426,13 +442,15 @@ function poll(aArgs) {
 					} else {
 						// commented out as otherwise i have to make it setTimeout for half second // i also dont want to make this an infinite poll, as after addPath i need to update kevent arguments, which i do by reading hte num_files_ptrStr
 						// there is at least 1 file to watch
-						var event_count = ostypes.API('kevent')(kq, events_to_monitor/*.address()*/, events_to_monitor.length, event_data/*.address()*/, event_data.length, timeout.address());
+						//console.info('pre kevent events_to_monitor:', events_to_monitor.toString());
+						//var event_count = ostypes.API('kevent')(kq, events_to_monitor, events_to_monitor.length, event_data, event_data.length, timeout.address());
+						var event_count = ostypes.API('kevent')(kq, ctypes.cast(events_to_monitor.address(), ostypes.TYPE.kevent.ptr), events_to_monitor.length, ctypes.cast(event_data.address(), ostypes.TYPE.kevent.ptr), event_data.length, timeout.address());
 						console.info('event_count:', event_count.toString(), uneval(event_count));
 						if (ctypes.errno !== 0) {
 							console.error('Failed event_count, errno:', ctypes.errno, 'event_count:', cutils.jscGetDeepest(event_count));
 							throw new Error({
 								name: 'os-api-error',
-								message: 'Failed to event_count due to failed kevent call',
+								message: 'Failed to event_count due to failed kevent call result - event_count:' + cutils.jscGetDeepest(event_count),
 								uniEerrno: ctypes.errno
 							});
 						}
@@ -464,20 +482,24 @@ function poll(aArgs) {
 										aFileName: nowDirStat[nowInode].filename,
 										aEvent: 'added',
 										aExtra: {
-											aOSPath_parentDir: aOSPath_parentDir
+											aOSPath_parentDir: aOSPath_parentDir,
+											orderMod: nowDirStat[nowInode].laststatus,
+											orderModUnused: nowDirStat[nowInode].lastmod
 										}
 									});
 								} else {
 									// its there, lets check if it was contents-modified and/or renamed
-									if (bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod != nowDirStat[nowInode].lastmod) {
+									if (!nowDirStat.isdir /*to match inotify we dont check contents-modified for directories and also kq doesnt offer a way (any flags) to detect if a subdir had its contents-modified*/ && bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod != nowDirStat[nowInode].lastmod) {
 										// contents-modified
 										FSChanges.push({
 											aFileName: nowDirStat[nowInode].filename,
 											aEvent: 'contents-modified',
 											aExtra: {
 												aOSPath_parentDir: aOSPath_parentDir,
-												previousMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod.toString(),
-												nowMod: nowDirStat[nowInode].lastmod.toString()
+												orderMod: nowDirStat[nowInode].laststatus,
+												orderModUnused: nowDirStat[nowInode].lastmod,
+												previousMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].lastmod,
+												nowMod: nowDirStat[nowInode].lastmod
 											}
 										});
 									}
@@ -487,7 +509,9 @@ function poll(aArgs) {
 											aFileName: nowDirStat[nowInode].filename,
 											aEvent: 'renamed',
 											aExtra: {
-												aOSPath_parentDir_identifier: aOSPath_parentDir,
+												aOSPath_parentDir: aOSPath_parentDir,
+												orderMod: nowDirStat[nowInode].laststatus,
+												orderModUnused: nowDirStat[nowInode].lastmod,
 												aOld: {
 													aFileName: bsd_mac_kqStuff.watchedFd[evFd].dirStat[nowInode].filename
 												}
@@ -505,13 +529,17 @@ function poll(aArgs) {
 									aEvent: 'removed',
 									aExtra: {
 										aOSPath_parentDir: aOSPath_parentDir,
+										orderMod: bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].laststatus,
+										orderModUnused: nowDirStat[nowInode].lastmod
 									}
 								});
 							}
 							bsd_mac_kqStuff.watchedFd[evFd].dirStat = nowDirStat; // set old dirstat to the new dirstat
 							
 							if (FSChanges.length > 0) {
-								return FSChanges;
+								return FSChanges.sort(function(a,b) {
+									return new Date(a.aExtra.orderMod) > new Date(b.aExtra.orderMod);
+								});
 							}
 						} else {
 							// No event
@@ -549,14 +577,19 @@ function poll(aArgs) {
 							// just doing the above two will make runLoopRun break but we want to totally clean up the stream as we dont want it anymore as we are making a new one
 							ostypes.API('FSEventStreamRelease')(macStuff.fsstream);
 						}
-						
+						if (now_jsStr_ptrOf_cfArrRef == '0') {
+							throw new Error({
+								name: 'poll-aborted-nopaths',
+								message: 'This is not an error, just throwing to cause rejection due to no more paths being watched, so aborting poll, as it is useless overhead now'
+							});
+						}
 						// create new
 						macStuff.last_jsStr_ptrOf_cfArrRef = now_jsStr_ptrOf_cfArrRef;
 						console.log('set last to now so last is now:', macStuff.last_jsStr_ptrOf_cfArrRef.toString(), 'and again now is:', now_jsStr_ptrOf_cfArrRef.toString());
 						var cfArrRef = ostypes.TYPE.CFArrayRef.ptr(ctypes.UInt64(now_jsStr_ptrOf_cfArrRef)).contents;
 						console.info('from poll worker cfArrRef:', cfArrRef.toString());
 						
-						macStuff.fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, macStuff.cId, 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
+						macStuff.fsstream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macStuff._c_fsevents_callback, null, cfArrRef, ostypes.CONST.kFSEventStreamEventIdSinceNow, 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
 						console.info('macStuff.fsstream:', macStuff.fsstream.toString(), uneval(macStuff.fsstream));
 						if (macStuff.fsstream.isNull()) { // i have seen this null when cfArr had no paths added to it, so was an empty cfarr
 							console.error('Failed FSEventStreamCreate');
@@ -822,7 +855,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 
 	// START - popen method
 	console.time('popen ls -i');
-	var rez_popen = ostypes.API('popen')('ls -i "' + aOSPath + '"', 'r');
+	var rez_popen = ostypes.API('popen')('ls -i -A -1 "' + aOSPath + '"', 'r');
 	if (ctypes.errno != 0 || rez_popen.isNull()) {
 		console.error('Failed rez_popen, errno:', ctypes.errno);
 		throw new Error({
@@ -832,10 +865,11 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		});
 	}
 	var readInChunksOf = 1000; // bytes
-	var readBuf = ctypes.char.array(readInChunksOf)(); // not ostypes.TYPE.char as we are free to use what we want, asit expects a void* link6321887
 	var readSize = 0;
 	var readChunks = [];
 	do { 
+		var readBuf = ctypes.char.array(readInChunksOf)(); // not ostypes.TYPE.char as we are free to use what we want, asit expects a void* link6321887
+		console.log('top of read loop');
 		readSize = ostypes.API('fread')(readBuf, ctypes.char.size, readBuf.constructor.size, rez_popen); // ctypes.char link6321887
 		if (ctypes.errno != 0) {
 			console.error('Failed fread, errno:', ctypes.errno, readSize.toString());
@@ -845,8 +879,15 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 				uniEerrno: ctypes.errno
 			});
 		}
-		readChunks.push(readBuf.readString()/*.substring(0, size)*/); // due to ctypes.char can use readString link6321887
+		try {
+			readChunks.push(readBuf.readString()/*.substring(0, size)*/); // due to ctypes.char can use readString link6321887
+			console.log('readString');
+		} catch (ex) {
+			console.error('ex on readString :', ex.message.toString());
+		}
+		console.info('after loop readSize:', readSize.toString(), 'readInChunksOf:', readInChunksOf.toString());
 	} while (cutils.jscEqual(readSize, readInChunksOf)) // if read less then readInChunksOf size then obviously there's no more
+	console.log('time to close');
 	var rez_pclose = ostypes.API('pclose')(rez_popen);
 	if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
 		console.error('Failed rez_popen, errno:', ctypes.errno);
@@ -857,17 +898,25 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		});
 	}
 	var readTotal = readChunks.join('');
-	//console.info('readTotal:', readTotal.toString());
-	var inode_and_filename_patt = /^(\d+) (.*?)$/gm;
+	console.info('readTotal:', readTotal.toString());
+	var inode_and_filename_patt = /^(\d+) (.*)$/gm;
 	var inode_and_filename_match;
 	while (true) {
 		inode_and_filename_match = inode_and_filename_patt.exec(readTotal);
 		if (!inode_and_filename_match) {
 			break;
 		}
+		console.log('top of reg loop, match:', inode_and_filename_match.toString());
+		try {
+			var cStat = OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2]));
+		} catch(ex) {
+			throw new Error('cStat err: ' + cStat.toString());
+		}
 		obj_inodeAndFns[inode_and_filename_match[1]] = {
 			filename: inode_and_filename_match[2],
-			lastmod: OS.File.stat(OS.Path.join(aOSPath, inode_and_filename_match[2])).lastModificationDate.toString()
+			lastmod: cStat.lastModificationDate.toString(),
+			laststatus: cStat.unixLastStatusChangeDate.toString(),
+			isdir: cStat.isDir
 		}
 	}
 	console.timeEnd('popen ls -i'); // avg of 25ms max of 55ms
@@ -1105,67 +1154,81 @@ function lpCompletionRoutine_js(dwErrorCode, dwNumberOfBytesTransfered, lpOverla
 	}
 	
 	console.info('found hDir_ptrStr:', hDir_ptrStr.toString());
-	var notif_buf = winStuff.handles_watched[hDir_ptrStr].notif_buf;
-	console.log('notif_buf:', notif_buf.toString());
-	var cPos = 0;
 	
-	do {
-		var fni = ctypes.cast(notif_buf.addressOfElement(cPos), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
-		console.log(cPos, 'fni:', fni.toString());
-		var fileNameLen = parseInt(cutils.jscGetDeepest(fni.FileNameLength)) / ostypes.TYPE.WCHAR.size;
-		console.log('fileNameLen', fileNameLen);
-		var filenamePtr = ctypes.cast(fni.FileName.address(), ostypes.TYPE.WCHAR.array(fileNameLen).ptr);
-		console.info('filenamePtr:', filenamePtr.toString());
-		var filename = '';
-		for (var i=0; i<fileNameLen; i++) {
-			filename += filenamePtr.contents[i];
-		}
-		console.info('filename:', filename);
-
-		var aEvent = convertFlagsToAEventStr(fni.Action);
+	if (cutils.jscEqual(dwErrorCode, ostypes.CONST.ERROR_OPERATION_ABORTED)) {
+		// this one was canceled via CancelIoEx so lets release the handle
+		var targetObjToRem = winStuff.handles_watched[hDir_ptrStr];
+		delete winStuff.handles_watched[hDir_ptrStr];
+		// remove from handles_watched_jsArr
+		winStuff.handles_watched_jsArr.splice(targetObjToRem.indexInJsArr, 1);
+		// remove from handles_watched_cArr
+		winStuff.handles_watched_cArr = ostypes.TYPE.VOID.ptr.array()(winStuff.handles_watched_jsArr);
+	} else {
+	
+		var notif_buf = winStuff.handles_watched[hDir_ptrStr].notif_buf;
+		console.log('notif_buf:', notif_buf.toString());
+		var cPos = 0;
 		
-		if (aEvent == 'renamed-from') {
-			var rezObj = {
-				aExtra: {
-					aOld: {
-						aFileName: filename
+		do {
+			var fni = ctypes.cast(notif_buf.addressOfElement(cPos), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+			console.log(cPos, 'fni:', fni.toString());
+			var fileNameLen = parseInt(cutils.jscGetDeepest(fni.FileNameLength)) / ostypes.TYPE.WCHAR.size;
+			console.log('fileNameLen', fileNameLen);
+			var filenamePtr = ctypes.cast(fni.FileName.address(), ostypes.TYPE.WCHAR.array(fileNameLen).ptr);
+			console.info('filenamePtr:', filenamePtr.toString());
+			var filename = '';
+			for (var i=0; i<fileNameLen; i++) {
+				filename += filenamePtr.contents[i];
+			}
+			console.info('filename:', filename);
+
+			var aEvent = convertFlagsToAEventStr(fni.Action);
+			
+			if (aEvent == 'renamed-from') {
+				var rezObj = {
+					aExtra: {
+						aOld: {
+							aFileName: filename
+						},
+						aOSPath_parentDir_identifier: hDir_ptrStr
 					},
-					aOSPath_parentDir_identifier: hDir_ptrStr
-				},
-				aEvent: 'renamed'
-			};
-			winStuff.FSChanges.push(rezObj);
-		} else if (aEvent == 'renamed-to') {
-			winStuff.FSChanges[winStuff.FSChanges.length-1].aFileName = filename;
-		} else {
-			var rezObj = {
-				aFileName: filename,
-				aEvent: convertFlagsToAEventStr(fni.Action),
-				aExtra: {
-					aOSPath_parentDir_identifier: hDir_ptrStr
-				}
-			};
-			winStuff.FSChanges.push(rezObj);
-		}
+					aEvent: 'renamed'
+				};
+				winStuff.FSChanges.push(rezObj);
+			} else if (aEvent == 'renamed-to') {
+				winStuff.FSChanges[winStuff.FSChanges.length-1].aFileName = filename;
+			} else {
+				var rezObj = {
+					aFileName: filename,
+					aEvent: convertFlagsToAEventStr(fni.Action),
+					aExtra: {
+						aOSPath_parentDir_identifier: hDir_ptrStr
+					}
+				};
+				winStuff.FSChanges.push(rezObj);
+			}
+			
+			cPos = parseInt(cutils.jscGetDeepest(fni.NextEntryOffset)) / ostypes.TYPE.DWORD.size;
+		} while (cPos != 0);
 		
-		cPos = parseInt(cutils.jscGetDeepest(fni.NextEntryOffset)) / ostypes.TYPE.DWORD.size;
-	} while (cPos != 0);
-	
-	// restart listen
-	//winStuff.handles_watched[hDir_ptrStr].notif_buf = ostypes.TYPE.DWORD.array(winStuff.NOTIFICATION_BUFFER_SIZE)();
-	var rez_RDC = ostypes.API('ReadDirectoryChanges')(winStuff.handles_watched[hDir_ptrStr].hDirectory, winStuff.handles_watched[hDir_ptrStr].notif_buf.address(), winStuff.handles_watched[hDir_ptrStr].notif_buf.constructor.size, false, winStuff.changes_to_watch, null, winStuff.handles_watched[hDir_ptrStr].o.address(), winStuff.lpCompletionRoutine);
-	console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
+		// restart listen
+		//winStuff.handles_watched[hDir_ptrStr].notif_buf = ostypes.TYPE.DWORD.array(winStuff.NOTIFICATION_BUFFER_SIZE)();
+		var rez_RDC = ostypes.API('ReadDirectoryChanges')(winStuff.handles_watched[hDir_ptrStr].hDirectory, winStuff.handles_watched[hDir_ptrStr].notif_buf.address(), winStuff.handles_watched[hDir_ptrStr].notif_buf.constructor.size, false, winStuff.changes_to_watch, null, winStuff.handles_watched[hDir_ptrStr].o.address(), winStuff.lpCompletionRoutine);
+		console.info('rez_RDC:', rez_RDC.toString(), uneval(rez_RDC));
 
-	//console.error('ok got here didnt hang, this is good as i wanted it async');
-	
-	if (rez_RDC == false || ctypes.winLastError != 0) {
-		console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
-		throw new Error({
-			name: 'os-api-error',
-			message: 'Failed to ReadDirectoryChanges on handle: ' + hDirectory_ptrStr,
-			winLastError: ctypes.winLastError
-		});
+		//console.error('ok got here didnt hang, this is good as i wanted it async');
+		
+		if (rez_RDC == false || ctypes.winLastError != 0) {
+			console.error('Failed rez_RDC, winLastError:', ctypes.winLastError);
+			throw new Error({
+				name: 'os-api-error',
+				message: 'Failed to ReadDirectoryChanges on handle: ' + hDirectory_ptrStr,
+				winLastError: ctypes.winLastError
+			});
+		}
 	}
+	
+	
 	return null;
 }
 // END - OS Specific - helpers for windows
@@ -1205,7 +1268,6 @@ function convertFlagsToAEventStr(flags) {
 						NOTE_RENAME: 'renamed',
 						NOTE_EXTEND: 'note extended - i dont know what this action entails',
 						NOTE_LINK: 'note link - i dont know what this action entails',
-						NOTE_UNLINK: 'note unlink - i dont know what this action entails',
 						NOTE_REVOKE: 'note revoke - i dont know what this action entails',
 						NOTE_ATTRIB: 'note attrib - i dont know what this action entails'
 					};

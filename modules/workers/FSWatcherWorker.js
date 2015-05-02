@@ -367,7 +367,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				}
 				
 				// Open a file descriptor for the file/directory that you want to monitor.
-				var event_fd = core.os.name == 'darwin' ? ostypes.API('open')(aOSPath, OS.Constants.libc.O_EVTONLY) : /*bsd*/ ostypes.API('open')(aOSPath, OS.Constants.libc.O_RDONLY);
+				var event_fd = ostypes.API('open')(aOSPath, core.os.name == 'darwin' ? /*mac*/ OS.Constants.libc.O_EVTONLY : /*bsd*/ OS.Constants.libc.O_RDONLY);
 				console.info('event_fd:', event_fd.toString(), uneval(event_fd));
 				if (ctypes.errno != 0) {
 					console.error('Failed event_fd, errno:', ctypes.errno);
@@ -391,7 +391,8 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				if (aOptions.masks) {
 					Watcher.vnode_events_for_path[aOSPath] |= aOptions.masks;
 				}
-
+				
+				// start - block link68432130 - copied below
 				var newNumFilesVal = Object.keys(Watcher.paths_watched).length; // can alternatively do Watcher.num_files.value + 1
 				
 				// i dont change num_files.value until after the new events_to_monitor is created and pointer is set, because if i change this first, then my loop in FSWPollWorker /*link584732*/ might be at a time such that it takes the new num_files and the new events_to_monitor wasnt created and strPtr not set yet, so it will use old events_to_monitor with new num_files number which will probably make kevents throw error in this linked loop
@@ -402,16 +403,12 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 					// i have to make udata intptr_t as in bsd the field is inptr_t while in mac it is void*
 					
 					if (!(cOSPath in Watcher.cStr_OSPath_obj)) {
-						Watcher.cStr_OSPath_obj[cOSPath] = ctypes.jschar.array()(cOSPath); // link321354 in FSWPollWorker
+						Watcher.cStr_OSPath_obj[cOSPath] = ctypes.char.array()(cOSPath); // link321354 in FSWPollWorker
 					}
-					var ptrStr = cutils.strOfPtr(Watcher.cStr_OSPath_obj[cOSPath].address()); //strptr to the c string holding the path
+
+					var udata = ctypes.cast(Watcher.cStr_OSPath_obj[cOSPath].address(), ostypes.TYPE.void.ptr);
+					console.info('fsww', 'udata:', udata.toString(), 'Watcher.cStr_OSPath_obj[cOSPath].address():', Watcher.cStr_OSPath_obj[cOSPath].address().toString());
 					
-					console.error('INFO ptrStr:', ptrStr.toString());
-					if (core.os.name == 'darwin') {
-						var udata = ctypes.cast(ostypes.TYPE.intptr_t(ptrStr), ostypes.TYPE.void.ptr);
-					} else {
-						var udata = ostypes.TYPE.intptr_t(ptrStr);
-					}
 					ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), Watcher.paths_watched[cOSPath], ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, udata);
 				}
 				
@@ -419,6 +416,7 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 				
 				cutils.modifyCStr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr, cutils.strOfPtr(Watcher.events_to_monitor.address()));
 				Watcher.num_files.value = newNumFilesVal; // now after setting this, the next poll loop will find it is different from before
+				// end - block link68432130 - copied below
 				
 				// what if user does removePath of x addPath of x2, num_files.value stays same and loop wont trigger, so am changing it to check the pointer string to events_to_monitor
 				return event_fd;
@@ -533,9 +531,265 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 	// for winnt, check if aOSPath is a directory, if its not then throw error
 }
 
-function removePathFromWatcher(aWatcherID, aOSPath) {
+function removePathFromWatcher(aWatcherID, aOSPath, removeAll) {
 	// aOSPath is a jsStr os path
-	throw new Error('in dev1');
+	
+	switch (core.os.name) {
+		case 'winnt':
+
+				var Watcher = _Watcher_cache[aWatcherID];
+				console.info('Watcher:', JSON.stringify(Watcher));
+				if (Object.keys(Watcher.paths_watched).length == ostypes.CONST.MAXIMUM_WAIT_OBJECTS) {
+					throw new Error({
+						name: 'devuser-error',
+						message: 'Already watching maximum number of paths, the Windows API (WaitForMultipleObjectsEx) does not support waiting for more than ' + ostypes.CONST.MAXIMUM_WAIT_OBJECTS + ' paths'
+					});
+				}
+				
+				if (!(aOSPath in Watcher.paths_watched)) {
+					throw new Error({
+						name: 'dev-user-error',
+						message: 'Path of "' + aOSPath + '" was never added/watched by this watcher instance'
+					});
+				}
+				
+				var targetHandleToRem = Watcher.paths_watched[aOSPath];
+				delete Watcher.paths_watched[aOSPath];
+				
+				var rez_cancel = ostypes.API('CancelIoEx')(targetHandleToRem, null); // use CancelIoEx and not CancelIo because the Ex version cancels in all threads in this process. the non Ex version only works in per thread
+				console.info('rez_cancel:', rez_cancel.toString(), uneval(rez_cancel));
+				
+				if (!rez_cancel) {
+					console.error('Failed rez_cancel, winLastError:', ctypes.winLastError);
+					var rezCancelWinLastErr = ctypes.winLastError;
+					// i should release the handle myself then, as if it was succesful then the PollWorker will release the hDirectory
+					
+					var rez_CloseHandle = ostypes.API('CloseHandle')(targetHandleToRem);
+					if (rez_CloseHandle == false) {
+						console.error('Failed to CloseHandle on targetHandleToRem, winLastError:', ctypes.winLastError);
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed to CancelIoEx on ' + targetHandleToRem.toString() + ' AND it also failed in attempts to close this handle',
+							winLastError: rezCancelWinLastErr, // this is the winLastError_CancelIoEx
+							winLastError_CloseHandle: ctypes.winLastError
+						});
+					}
+					
+					throw new Error({
+						name: 'os-api-error',
+						message: 'Failed to CancelIoEx on ' + targetHandleToRem.toString(),
+						winLastError: rezCancelWinLastErr
+					});
+				} else {					
+					// just release it
+					var rez_CloseHandle = ostypes.API('CloseHandle')(targetHandleToRem);
+					if (rez_CloseHandle == false) {
+						console.error('Failed to CloseHandle on targetHandleToRem, winLastError:', ctypes.winLastError);
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed to CloseHandle on ' + targetHandleToRem.toString(),
+							winLastError: ctypes.winLastError
+						});
+					}
+				}
+				// a race condition exists with mainthread watcher-api, in that i ideally dont want to return until the callback triggers in PollWorker thread that remove has completed. however that requires using GetOverlappedResult blocking, and i cant use that here as i dont have access to that overlapped structure, and passing it from there to here is something i dont want to setup right now, i feel the race condition is very very rare. it happens if user removes path then adds it back back to back and IF the callback does not immediately free up in the poll worker (by free up i mean remove from the jsArr the hDir) <<< THIS IS ALL THEORIZING
+		
+				return cutils.strOfPtr(targetHandleToRem.address());
+				
+			break;
+		case 'darwin':
+		case 'freebsd':
+		case 'openbsd':
+		
+			// uses kqueue for core.os.version < 10.7 and FSEventFramework for core.os.version >= 10.7
+
+			if (core.os.name != 'darwin' /*is bsd*/ || core.os.version < 7 /*is old mac*/) {
+				// use kqueue
+				
+				var Watcher = _Watcher_cache[aWatcherID];
+				if (!Watcher) {
+					throw new Error({
+						name: 'watcher-api-error',
+						message: 'Watcher not found in cache'
+					});
+				}
+				
+				if (!(aOSPath in Watcher.paths_watched)) {
+					throw new Error({
+						name: 'dev-user-error',
+						message: 'Path of "' + aOSPath + '" was never added/watched by this watcher instance'
+					});
+				}
+				
+				var targetFdToRem = Watcher.paths_watched[aOSPath];
+				
+				
+				// Remove event_fd from list
+				delete Watcher.paths_watched[aOSPath];
+				delete Watcher.cStr_OSPath_obj[cOSPath];
+				
+				// start - mod of block link68432130
+				var newNumFilesVal = Object.keys(Watcher.paths_watched).length; // can alternatively do Watcher.num_files.value + 1
+				
+				if (newNumFilesVal == 0 || removeAll) {
+					cutils.modifyCStr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr, '0'); // causes poll to abort
+					Watcher.events_to_monitor = 0; // frees memory? not sure but propbably
+				} else {
+					
+					// i dont change num_files.value until after the new events_to_monitor is created and pointer is set, because if i change this first, then my loop in FSWPollWorker /*link584732*/ might be at a time such that it takes the new num_files and the new events_to_monitor wasnt created and strPtr not set yet, so it will use old events_to_monitor with new num_files number which will probably make kevents throw error in this linked loop
+					Watcher.events_to_monitor = ostypes.TYPE.kevent.array(newNumFilesVal)();
+					var i = -1;
+					for (var cOSPath in Watcher.paths_watched) {
+						i++;
+						// i have to make udata intptr_t as in bsd the field is inptr_t while in mac it is void*
+						
+						if (!(cOSPath in Watcher.cStr_OSPath_obj)) {
+							Watcher.cStr_OSPath_obj[cOSPath] = ctypes.jschar.array()(cOSPath); // link321354 in FSWPollWorker
+						}
+						var ptrStr = cutils.strOfPtr(Watcher.cStr_OSPath_obj[cOSPath].address()); //strptr to the c string holding the path
+						
+						console.error('INFO ptrStr:', ptrStr.toString());
+						if (core.os.name == 'darwin') {
+							var udata = ctypes.cast(ostypes.TYPE.intptr_t(ptrStr), ostypes.TYPE.void.ptr);
+						} else {
+							var udata = ostypes.TYPE.intptr_t(ptrStr);
+						}
+						ostypes.HELPER.EV_SET(Watcher.events_to_monitor.addressOfElement(i), Watcher.paths_watched[cOSPath], ostypes.CONST.EVFILT_VNODE, ostypes.CONST.EV_ADD | ostypes.CONST.EV_CLEAR, Watcher.vnode_events_for_path[cOSPath], 0, udata);
+					}
+					
+					console.log('created NEW after REMOVE event_to_monitor and its address:', cutils.strOfPtr(Watcher.events_to_monitor.address()));
+					
+					cutils.modifyCStr(Watcher.c_string_of_ptrStr_to_eventsToMonitorArr, cutils.strOfPtr(Watcher.events_to_monitor.address()));
+					Watcher.num_files.value = newNumFilesVal; // now after setting this, the next poll loop will find it is different from before
+					// end - mod of block link68432130
+				}
+					
+				// Close the file descriptor for the target file/directory - i dont close before removing from list in case the loop happens before i removed it from the event_list. which will likely cause it to crash. so i first remove it from array, then update num_files so on the next loop whenever it happens (even if before close) it will not take the closed fd
+				var close_fd = ostypes.API('close')(targetFdToRem);
+				console.info('close_fd:', close_fd.toString(), uneval(close_fd));
+				if (ctypes.errno != 0) {
+					console.error('Failed close_fd, errno:', ctypes.errno);
+					throw new Error({
+						name: 'os-api-error',
+						message: 'Failed to close path of "' + aOSPath + '", however it was removed from the watch, so no more events will trigger for this path',
+						errno: ctypes.errno
+					});
+				}
+				
+				return targetFdToRem; // main-thread currently doesnt need this, it doesnt need aVal at all but doing it to be consisten with addPath
+				// end kqueue
+			} else {
+				// its mac and os.version is >= 10.7
+				// use FSEventFramework
+				
+				var Watcher = _Watcher_cache[aWatcherID];
+				if (!Watcher) {
+					throw new Error({
+						name: 'watcher-api-error',
+						message: 'Watcher not found in cache'
+					});
+				}
+				
+				if (!(aOSPath in Watcher.paths_watched_props)) {
+					throw new Error({
+						name: 'dev-user-error',
+						message: 'Path of "' + aOSPath + '" was never added/watched by this watcher instance'
+					});
+				}
+				
+				var thisPObj = Watcher.paths_watched_props[aOSPath];
+				
+				delete Watcher.paths_watched_props[aOSPath];			
+
+				// recreate events list without the path we just removed
+				
+				// start - mod of block link3210255
+				var jsStrArr = [];
+				// add in old watched paths
+				for (var cOSPath in Watcher.paths_watched_props) {
+					jsStrArr.push(Watcher.paths_watched_props[cOSPath].cfStr);
+				}
+				
+				if (jsStrArr.length == 0 || removeAll) {
+					cutils.modifyCStr(Watcher.cStr_ptrOf_cfArrRef, '0'); // causes poll to abort
+					Watcher.cfArrRef = 0; // free memory? probably but not sure
+				} else {
+				
+					var cfStrArr = ostypes.TYPE.void.ptr.array()(jsStrArr);
+
+					Watcher.cfArrRef = ostypes.API('CFArrayCreate')(null, cfStrArr, cfStrArr.length, ostypes.CONST.kCFTypeArrayCallBacks.address()); // putting into Watcher. because otherwise it might GC im not sure i didnt test
+					console.info('cfArrRef:', Watcher.cfArrRef.toString());
+					if (Watcher.cfArrRef.isNull()) {
+						console.error('Failed cfArrRef');
+						throw new Error({
+							name: 'os-api-error',
+							message: 'Failed CFArrayCreate'
+						});
+					}
+					
+					cutils.modifyCStr(Watcher.cStr_ptrOf_cfArrRef, cutils.strOfPtr(Watcher.cfArrRef.address()));
+				}
+				// end - mod of block link3210255
+				
+				// can now release cfstr, as now if loop happens in PollWorker it takes the new array, so releasing of this cfstr is safe as it wont be called upon
+				ostypes.API('CFRelease')(thisPObj.cfStr); // returns void
+			
+				return thisPObj.path_id; // main-thread currently doesnt need this, it doesnt need aVal at all but doing it to be consisten with addPath
+			}
+
+		break;
+		case 'linux':
+		case 'webos': // Palm Pre // im guessng this has inotify, untested
+		case 'android': // im guessng this has inotify, untested
+		
+				// uses inotify
+				
+				var Watcher = _Watcher_cache[aWatcherID];
+				if (!Watcher) {
+					throw new Error({
+						name: 'watcher-api-error',
+						message: 'Watcher not found in cache'
+					});
+				}
+
+				if (!(aOSPath in Watcher.paths_watched)) {
+					throw new Error({
+						name: 'dev-user-error',
+						message: 'Path of "' + aOSPath + '" was never added/watched by this watcher instance'
+					});
+				}
+				
+				var targetFdToRem = Watcher.paths_watched[aOSPath];
+				
+				delete Watcher.paths_watched[aOSPath];
+				
+				if (removeAll) {
+					Watcher.cInt_numPaths.value = 0; // causes poll to abort
+				} else {
+					Watcher.cInt_numPaths.value = Watcher.cInt_numPaths.value - 1;
+				}
+				
+				var rem_watch_fd = ostypes.API('inotify_rm_watch')(Watcher.fd, targetFdToRem);
+				//console.info('rem_watch_fd:', rem_watch_fd.toString(), uneval(rem_watch_fd));
+				if (cutils.jscEqual(rem_watch_fd, -1)) {
+					console.error('Failed rem_watch_fd, errno:', ctypes.errno);
+					throw new Error({
+						name: 'os-api-error',
+						message: 'Failed to inotify_rm_watch',
+						errno: ctypes.errno
+					});
+				}
+				
+				return targetFdToRem; // main-thread currently doesnt need this, it doesnt need aVal at all but doing it to be consisten with addPath
+				
+			break;
+		default:
+			throw new Error({
+				name: 'watcher-api-error',
+				message: 'Operating system, "' + OS.Constants.Sys.Name + '" is not supported'
+			});
+	}
+	
 }
 
 function closeWatcher(aWatcherID) {
