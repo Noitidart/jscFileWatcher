@@ -868,7 +868,12 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 				uniEerrno: ctypes.errno
 			});
 		}
-		readChunks.push(readBuf.readString()/*.substring(0, size)*/); // due to ctypes.char can use readString link6321887
+		try {
+			readChunks.push(readBuf.readString()/*.substring(0, size)*/); // due to ctypes.char can use readString link6321887
+			console.log('readString');
+		} catch (ex) {
+			console.error('ex on readString :', ex.message.toString());
+		}
 	} while (cutils.jscEqual(readSize, readInChunksOf)) // if read less then readInChunksOf size then obviously there's no more
 	var rez_pclose = ostypes.API('pclose')(rez_popen);
 	if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
