@@ -859,6 +859,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 	var readSize = 0;
 	var readChunks = [];
 	do { 
+		console.log('top of read loop');
 		readSize = ostypes.API('fread')(readBuf, ctypes.char.size, readBuf.constructor.size, rez_popen); // ctypes.char link6321887
 		if (ctypes.errno != 0) {
 			console.error('Failed fread, errno:', ctypes.errno, readSize.toString());
@@ -875,6 +876,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 			console.error('ex on readString :', ex.message.toString());
 		}
 	} while (cutils.jscEqual(readSize, readInChunksOf)) // if read less then readInChunksOf size then obviously there's no more
+	console.log('time to close');
 	var rez_pclose = ostypes.API('pclose')(rez_popen);
 	if (ctypes.errno != 0 || cutils.jscEqual(rez_pclose, -1)) {
 		console.error('Failed rez_popen, errno:', ctypes.errno);
@@ -885,10 +887,11 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		});
 	}
 	var readTotal = readChunks.join('');
-	//console.info('readTotal:', readTotal.toString());
+	console.info('readTotal:', readTotal.toString());
 	var inode_and_filename_patt = /^(\d+) (.*?)$/gm;
 	var inode_and_filename_match;
 	while (true) {
+		console.log('top of reg loop');
 		inode_and_filename_match = inode_and_filename_patt.exec(readTotal);
 		if (!inode_and_filename_match) {
 			break;
