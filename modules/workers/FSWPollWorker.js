@@ -865,7 +865,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 	var readChunks = [];
 	do { 
 		var readBuf = ctypes.char.array(readInChunksOf)(); // not ostypes.TYPE.char as we are free to use what we want, asit expects a void* link6321887
-		//console.log('top of read loop');
+		console.log('top of read loop');
 		readSize = ostypes.API('fread')(readBuf, ctypes.char.size, readBuf.constructor.size, rez_popen); // ctypes.char link6321887
 		if (ctypes.errno != 0) {
 			console.error('Failed fread, errno:', ctypes.errno, readSize.toString());
@@ -881,7 +881,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		} catch (ex) {
 			console.error('ex on readString :', ex.message.toString());
 		}
-		//console.info('after loop readSize:', readSize.toString(), 'readInChunksOf:', readInChunksOf.toString());
+		console.info('after loop readSize:', readSize.toString(), 'readInChunksOf:', readInChunksOf.toString());
 	} while (cutils.jscEqual(readSize, readInChunksOf)) // if read less then readInChunksOf size then obviously there's no more
 	console.log('time to close');
 	var rez_pclose = ostypes.API('pclose')(rez_popen);
@@ -894,7 +894,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		});
 	}
 	var readTotal = readChunks.join('');
-	//console.info('readTotal:', readTotal.toString());
+	console.info('readTotal:', readTotal.toString());
 	var inode_and_filename_patt = /^(\d+) (.*)$/gm;
 	var inode_and_filename_match;
 	while (true) {
@@ -902,7 +902,7 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 		if (!inode_and_filename_match) {
 			break;
 		}
-		//console.log('top of reg loop, match:', inode_and_filename_match.toString());
+		console.log('top of reg loop, match:', inode_and_filename_match.toString());
 		if (inode_and_filename_match[2] == '.' || inode_and_filename_match[2] == '..') {
 			continue; // we dont want to watch . or .. as . gets contents-modified every time and other watchers dont watch it
 		}
