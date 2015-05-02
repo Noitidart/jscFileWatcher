@@ -475,6 +475,7 @@ function poll(aArgs) {
 							var aOSPath_parentDir = bsd_mac_kqStuff.watchedFd[evFd].OSPath;
 							
 							var nowDirStat = fetchInodeAndFilenamesInDir(aOSPath_parentDir);
+							var lastStatusChgForRem = new Date().toString();
 							for (var nowInode in nowDirStat) {
 								if (!(nowInode in bsd_mac_kqStuff.watchedFd[evFd].dirStat)) {
 									// added
@@ -526,7 +527,7 @@ function poll(aArgs) {
 									aEvent: 'removed',
 									aExtra: {
 										aOSPath_parentDir: aOSPath_parentDir,
-										orderMod: new Date().toString() //bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].laststatus
+										orderMod: lastStatusChgForRem //bsd_mac_kqStuff.watchedFd[evFd].dirStat[thenInode].laststatus
 									}
 								});
 							}
