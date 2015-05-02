@@ -892,10 +892,10 @@ function fetchInodeAndFilenamesInDir(aOSPath) {
 	var inode_and_filename_match;
 	while (true) {
 		inode_and_filename_match = inode_and_filename_patt.exec(readTotal);
-		console.log('top of reg loop, match:', inode_and_filename_match.toString());
 		if (!inode_and_filename_match) {
 			break;
 		}
+		console.log('top of reg loop, match:', inode_and_filename_match.toString());
 		if (inode_and_filename_match[2] == '.' || inode_and_filename_match[2] == '..') {
 			continue; // we dont want to watch . or .. as . gets contents-modified every time and other watchers dont watch it
 		}
