@@ -26,7 +26,7 @@ var gioTypes = function() {
 	this.GFile = ctypes.StructType('_GFile');
 	this.GFileMonitor = ctypes.StructType('_GFileMonitor');
 	this.gint = ctypes.int;
-	this.gpointer = ctypes.void.ptr;
+	this.gpointer = ctypes.void_t.ptr;
 	this.guint32 = ctypes.unsigned_int;
 	this.gulong = ctypes.unsigned_long;
 	
