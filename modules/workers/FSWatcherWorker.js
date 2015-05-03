@@ -144,6 +144,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 				  });
 				}
 				
+				ostypes.API('g_object_unref')(file);
+				
 				cb = function(aMonitor, aFile, aOtherFile, aEventType, aUserData) {
 					console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
 					
