@@ -144,7 +144,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 					console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
 				}
 				
-				var handler_id = ostypes.API('g_signal_connect')(monitor, 'changed', cb, null, null, null);
+				var handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', cb, null, null, null);
 				console.info('handler_id:', handler_id.toString());
 			break;
 			case 'winnt':

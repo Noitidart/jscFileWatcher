@@ -44,6 +44,8 @@ var gioTypes = function() {
 	this.GCallback = ctypes.voidptr_t;
 	this.GFileMonitorEvent = ctypes.unsigned_int;
 	this.GFileMonitorFlags = ctypes.unsigned_int;
+	this.GClosureNotify	= ctypes.voidptr_t;
+	this.GConnectFlags = ctypes.unsigned_int;
 	
 	// STRUCTURES
 	
@@ -218,21 +220,23 @@ var gioInit = function() {
 		},
 		g_signal_connect_data: function() {
 			/* https://developer.gnome.org/gobject/unstable/gobject-Signals.html#g-signal-connect
-			 * g_signal_connect(
-			 *   instance,
-			 *   detailed_signal,
-			 *   c_handler,
-			 *   data
+			 * gulong g_signal_connect_data (
+			 *   gpointer instance,
+			 *   const gchar *detailed_signal,
+			 *   GCallback c_handler,
+			 *   gpointer data,
+			 *   GClosureNotify destroy_data,
+			 *   GConnectFlags connect_flags
 			 * );
 			 */
 			return lib('libgobject-2.0.so.0').declare('g_signal_connect_data', self.TYPE.ABI,
-				self.TYPE.gulong,		// return // im guessing handler_id
-				self.TYPE.gpointer,		// instance // i think gpointer
-				self.TYPE.gchar.ptr,	// detailed_signal // i think *gchar
-				self.TYPE.GCallback,	// c_handler // i think G_CALLBACK
-				self.TYPE.gpointer,		// data // i think gpointer
-				ctypes.voidptr_t,
-				ctypes.voidptr_t
+				self.TYPE.gulong,			// return
+				self.TYPE.gpointer,			// instance
+				self.TYPE.gchar.ptr,		// *detailed_signal
+				self.TYPE.GCallback,		// c_handler
+				self.TYPE.gpointer,			// data
+				self.TYPE.GClosureNotify,	// destroy_data
+				self.TYPE.GConnectFlags		// connect_flags
 			);
 		},
 		g_signal_handler_disconnect: function() {
