@@ -139,6 +139,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 				monitor = ostypes.API('g_file_monitor_directory')(file, ostypes.CONST.G_FILE_MONITOR_NONE, null, null);
 				console.info('monitor:', monitor.toString());
 				
+				ostypes.API('g_object_unref')(file);
+				
 				if (monitor.isNull()) {
 				  console.error('Failed g_file_monitor_directory, monitor:', monitor.toString(), 'FOR path of:', aOSPath);
 				  throw new Error({
@@ -147,10 +149,10 @@ function createWatcher(aWatcherID, aOptions={}) {
 				  });
 				}
 				
-				ostypes.API('g_object_unref')(file);
+				
 				
 				cb = function(aMonitor, aFile, aOtherFile, aEventType, aUserData) {
-					console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
+					console.error('CB TRIGGERED: aMonitor');//:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
 					
 
 				}
