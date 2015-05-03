@@ -68,7 +68,7 @@ var gioInit = function() {
 	
 	this.IS64BIT = is64bit;
 	
-	this.TYPE = new winTypes();
+	this.TYPE = new gioTypes();
 
 	// CONSTANTS
 	this.CONST = {		
