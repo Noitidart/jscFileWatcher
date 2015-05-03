@@ -41,7 +41,7 @@ var gioTypes = function() {
 
 	
 	// GUESS/INACCURATE TYPES AS THEY ARE ENUM OR SOMETHING I COULDNT FIND BUT THE FOLLOWING WORK FOR MY APPLICATIONS
-	this.GCallback = ctypes.StructType('_GCallback');
+	this.GCallback = ctypes.StructType('_GCallback').ptr;
 	this.GFileMonitorEvent = ctypes.unsigned_int;
 	this.GFileMonitorFlags = ctypes.unsigned_int;
 	this.GClosureNotify	= ctypes.voidptr_t;
