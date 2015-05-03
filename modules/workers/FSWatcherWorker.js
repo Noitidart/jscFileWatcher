@@ -27,6 +27,7 @@ var winStuff = {
 var macStuff = {
 	maxLenCfArrRefPtrStr: 20 // if update this update in FSWPollWorker
 };
+var gioStuff = {};
 
 // Imports that use stuff defined in chrome
 // I don't import ostypes_*.jsm yet as I want to init core first, as they use core stuff like core.os.isWinXP etc
@@ -69,8 +70,15 @@ function init(objCore) {
 
 	//console.log('done merging objCore into core');
 	
+	if (core.os.toolkit == 'gtk2') {
+		core.os.name = 'gio';
+	}
+	
 	// I import ostypes_*.jsm in init as they may use things like core.os.isWinXp etc
 	switch (core.os.name) {
+		case 'gio':
+			importScripts(core.addon.path.content + 'modules/ostypes_gio.jsm');
+			break;
 		case 'winnt':
 		case 'winmo':
 		case 'wince':
@@ -112,6 +120,33 @@ function createWatcher(aWatcherID, aOptions={}) {
 	// returns object which should  be passed to FSWPollWorker.poll
 	
 	switch (core.os.name) {
+		case 'gio':
+				
+				var aOSPath = OS.Constants.Path.desktopDir;
+				//var cStr_path = ostypes.TYPE.char.array()(aOSPath);
+				
+				var file = ostypes.API('g_file_new_for_path')(aOSPath);
+				console.info('file:', file.toString());
+				
+				console.log('gio createWatcher');
+				var monitor = ostypes.API('g_file_monitor_directory')(file, ostypes.CONST.G_FILE_MONITOR_NONE, null, null);
+				console.info('monitor:', monitor.toString());
+				
+				if (monitor.isNull()) {
+				  console.error('Failed g_file_monitor_directory, monitor:', monitor.toString(), 'FOR path of:', aOSPath);
+				  throw new Error({
+					name: 'os-api-error',
+					message: 'Failed g_file_monitor_directory - monitor: ' + monitor.toString() + ' FOR path of: ' + aOSPath
+				  });
+				}
+				
+				var cb = function(aMonitor, aFile, aOtherFile, aEventType) {
+					console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
+				}
+				
+				var handler_id = ostypes.API('g_signal_connect')(monitor, 'changed', cb);
+				console.info('handler_id:', handler_id.toString());
+			break;
 			case 'winnt':
 			case 'winmo': // untested, im guessing it has ReadDirectoryChangesW
 			case 'wince': // untested, im guessing it has ReadDirectoryChangesW
@@ -257,6 +292,11 @@ function addPathToWatcher(aWatcherID, aOSPath, aOptions={}) {
 	// aOSPath is a jsStr os path
 	
 	switch (core.os.name) {
+		case 'gio':
+				
+				console.log('gio addPath');
+				
+			break;
 		case 'winnt':
 
 				var Watcher = _Watcher_cache[aWatcherID];
@@ -535,6 +575,11 @@ function removePathFromWatcher(aWatcherID, aOSPath, removeAll) {
 	// aOSPath is a jsStr os path
 	
 	switch (core.os.name) {
+		case 'gio':
+				
+				console.log('gio removePath');
+				
+			break;
 		case 'winnt':
 
 				var Watcher = _Watcher_cache[aWatcherID];

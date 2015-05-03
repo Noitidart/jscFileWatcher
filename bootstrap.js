@@ -174,7 +174,8 @@ function _FSWatcherWorker_start() {
 			os: {
 				name: core.os.name,
 				version: core.os.version, // exists for winnt and darwin, for others its undefined
-				version_name: core.os.version_name // for winnt
+				version_name: core.os.version_name, // for winnt
+				toolkit: core.os.toolkit
 			},
 			firefox: {
 				//version: core.firefox.version // i dont use this for jscFileWatcher
@@ -367,7 +368,8 @@ function Watcher(aCallback) {
 	
 		var promise_initPollWorker = initWorkerCore(thisW.FSWPollWorker, {
 			os: {
-				version: core.os.version // used for mac, for non-mac this may go in as undefined, but because os key exists in core by default, it wont throw an error
+				version: core.os.version, // used for mac, for non-mac this may go in as undefined, but because os key exists in core by default, it wont throw an error
+				toolkit: core.os.toolkit
 			}
 		}); // just need core.os.version added to PromiseWorker core as i use it for mac
 		
@@ -810,6 +812,8 @@ function extendCore() {
 			default:
 				// nothing special
 		}
+		
+		core.os.toolkit = Services.appinfo.widgetToolkit.toLowerCase();
 		
 		core.firefox = {};
 		core.firefox.version = Services.appinfo.version;

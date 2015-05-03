@@ -28,6 +28,7 @@ var winStuff;
 var nixStuff;
 var bsd_mac_kqStuff;
 var macStuff;
+var gioStuff;
 // END - OS Specific
 
 // Imports that use stuff defined in chrome
@@ -67,8 +68,15 @@ function init(objCore) {
 		}
 	}
 
+	if (core.os.toolkit == 'gtk2') {
+		core.os.name = 'gio';
+	}
+	
 	// I import ostypes_*.jsm in init as they may use things like core.os.isWinXp etc
 	switch (core.os.name) {
+		case 'gio':
+			importScripts(core.addon.path.content + 'modules/ostypes_gio.jsm');
+			break;
 		case 'winnt':
 		case 'winmo':
 		case 'wince':
@@ -100,6 +108,11 @@ function init(objCore) {
 	
 	// OS Specific Init
 	switch (core.os.name) {
+		case 'gio':
+				
+				gioStuff = {};
+				
+			break;
 		case 'winnt':
 		case 'winmo':
 		case 'wince':
@@ -215,6 +228,11 @@ function getPathId() {
 }
 function poll(aArgs) {
 	switch (core.os.name) {
+		case 'gio':
+				
+				console.log('gio fspw');
+				
+			break;
 		case 'winnt':
 		case 'winmo':
 		case 'wince':
