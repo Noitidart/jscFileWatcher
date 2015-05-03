@@ -149,7 +149,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				var ccb = ostypes.TYPE.user_function.ptr(cb);
 				var gcallback = ctypes.cast(ccb, ostypes.TYPE.GCallback);
 				
-				var handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', ccb, null, null, 0);
+				var handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', gcallback, null, null, 0);
 				console.info('handler_id:', handler_id.toString());
 			break;
 			case 'winnt':
