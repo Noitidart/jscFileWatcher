@@ -142,12 +142,14 @@ function createWatcher(aWatcherID, aOptions={}) {
 				
 				var cb = function(aMonitor, aFile, aOtherFile, aEventType) {
 					console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
+					
+
 				}
 				
 				var ccb = ostypes.TYPE.user_function.ptr(cb);
 				//var gcallback = ctypes.cast(ccb, ostypes.TYPE.GCallback);
 				
-				var handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', ccb, null, null, null);
+				var handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', ccb, null, null, 0);
 				console.info('handler_id:', handler_id.toString());
 			break;
 			case 'winnt':
