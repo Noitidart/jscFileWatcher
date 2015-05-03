@@ -115,6 +115,8 @@ function init(objCore) {
 var cb;
 var ccb;
 var gcallback;
+var monitor;
+var handler_id;
 
 // start - OS.File.Watcher API
 var _Watcher_cache = {};
@@ -133,7 +135,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				console.info('file:', file.toString());
 				
 				console.log('gio createWatcher');
-				var monitor = ostypes.API('g_file_monitor_directory')(file, ostypes.CONST.G_FILE_MONITOR_NONE, null, null);
+				monitor = ostypes.API('g_file_monitor_directory')(file, ostypes.CONST.G_FILE_MONITOR_NONE, null, null);
 				console.info('monitor:', monitor.toString());
 				
 				if (monitor.isNull()) {
@@ -155,7 +157,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				ccb = ostypes.TYPE.user_function.ptr(cb);
 				//gcallback = ctypes.cast(ccb, ostypes.TYPE.GCallback);
 				
-				var handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', ccb, null, null, ostypes.CONST.G_CONNECT_AFTER);
+				handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', ccb, null, null, ostypes.CONST.G_CONNECT_AFTER);
 				console.info('handler_id:', handler_id.toString());
 			break;
 			case 'winnt':
