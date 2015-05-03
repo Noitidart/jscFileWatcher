@@ -117,7 +117,8 @@ var ccb;
 var gcallback;
 var monitor;
 var handler_id;
-
+var cStr_path;
+var cStr_path2;
 // start - OS.File.Watcher API
 var _Watcher_cache = {};
 function createWatcher(aWatcherID, aOptions={}) {
@@ -129,9 +130,9 @@ function createWatcher(aWatcherID, aOptions={}) {
 		case 'gio':
 				
 				var aOSPath = OS.Constants.Path.desktopDir;
-				//var cStr_path = ostypes.TYPE.char.array()(aOSPath);
+				cStr_path = ostypes.TYPE.char.array()(aOSPath);
 				
-				var file = ostypes.API('g_file_new_for_path')(aOSPath);
+				var file = ostypes.API('g_file_new_for_path')(cStr_path);
 				console.info('file:', file.toString());
 				
 				console.log('gio createWatcher');
@@ -157,7 +158,8 @@ function createWatcher(aWatcherID, aOptions={}) {
 				ccb = ostypes.TYPE.user_function.ptr(cb);
 				//gcallback = ctypes.cast(ccb, ostypes.TYPE.GCallback);
 				
-				handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', ccb, null, null, ostypes.CONST.G_CONNECT_AFTER);
+				cStr_path2 = ostypes.TYPE.gchar.array()('changed');
+				handler_id = ostypes.API('g_signal_connect_data')(monitor, cStr_path2, ccb, null, null, ostypes.CONST.G_CONNECT_AFTER);
 				console.info('handler_id:', handler_id.toString());
 			break;
 			case 'winnt':
