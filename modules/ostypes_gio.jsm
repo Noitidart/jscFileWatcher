@@ -22,7 +22,7 @@ var gioTypes = function() {
 	
 	// SIMPLE TYPES // https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gint
 	this.gchar = ctypes.char;
-	this.GCancellable = ctype.StructType('_GCancellable');
+	this.GCancellable = ctypes.StructType('_GCancellable');
 	this.GFile = ctypes.StructType('_GFile');
 	this.GFileMonitor = ctypes.StructType('_GFileMonitor');
 	this.gint = ctypes.int;
