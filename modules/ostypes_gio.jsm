@@ -57,7 +57,7 @@ var gioTypes = function() {
 	// ADVANCED STRUCTS // based on "simple structs" to be defined first
 	
 	// FUNCTION TYPES
-	this.user_function = ctypes.FunctionTYPE(this.CALLBACK_ABI, this.void, [this.GFileMonitor.ptr, this.GFile.ptr, this.GFile.ptr, this.GFileMonitorEvent, this.gpointer]);
+	this.user_function = ctypes.FunctionType(this.CALLBACK_ABI, this.void, [this.GFileMonitor.ptr, this.GFile.ptr, this.GFile.ptr, this.GFileMonitorEvent, this.gpointer]);
 	
 	// STRUCTS USING FUNC TYPES
 	
