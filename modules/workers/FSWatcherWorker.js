@@ -112,6 +112,15 @@ function init(objCore) {
 	return true;
 }
 
+var cb = function(aMonitor, aFile, aOtherFile, aEventType, aUserData) {
+	console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
+	
+
+}
+
+var ccb = ostypes.TYPE.user_function.ptr(cb);
+var gcallback = ctypes.cast(ccb, ostypes.TYPE.GCallback);
+
 // start - OS.File.Watcher API
 var _Watcher_cache = {};
 function createWatcher(aWatcherID, aOptions={}) {
@@ -140,16 +149,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				  });
 				}
 				
-				var cb = function(aMonitor, aFile, aOtherFile, aEventType, aUserData) {
-					console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
-					
-
-				}
-				
-				var ccb = ostypes.TYPE.user_function.ptr(cb);
-				var gcallback = ctypes.cast(ccb, ostypes.TYPE.GCallback);
-				
-				var handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', gcallback, null, null, 0);
+				var handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', gcallback, null, null, ostypes.CONST.G_CONNECT_AFTER);
 				console.info('handler_id:', handler_id.toString());
 			break;
 			case 'winnt':
