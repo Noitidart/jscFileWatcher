@@ -112,14 +112,9 @@ function init(objCore) {
 	return true;
 }
 
-var cb = function(aMonitor, aFile, aOtherFile, aEventType, aUserData) {
-	console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
-	
-
-}
-
-var ccb = ostypes.TYPE.user_function.ptr(cb);
-var gcallback = ctypes.cast(ccb, ostypes.TYPE.GCallback);
+var cb;
+var ccb;
+var gcallback;
 
 // start - OS.File.Watcher API
 var _Watcher_cache = {};
@@ -148,6 +143,15 @@ function createWatcher(aWatcherID, aOptions={}) {
 					message: 'Failed g_file_monitor_directory - monitor: ' + monitor.toString() + ' FOR path of: ' + aOSPath
 				  });
 				}
+				
+				cb = function(aMonitor, aFile, aOtherFile, aEventType, aUserData) {
+					console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
+					
+
+				}
+				
+				ccb = ostypes.TYPE.user_function.ptr(cb);
+				gcallback = ctypes.cast(ccb, ostypes.TYPE.GCallback);
 				
 				var handler_id = ostypes.API('g_signal_connect_data')(monitor, 'changed', gcallback, null, null, ostypes.CONST.G_CONNECT_AFTER);
 				console.info('handler_id:', handler_id.toString());
