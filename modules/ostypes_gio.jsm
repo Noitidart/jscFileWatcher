@@ -216,7 +216,7 @@ var gioInit = function() {
 				self.TYPE.gpointer	// object
 			);
 		},
-		g_signal_connect: function() {
+		g_signal_connect_data: function() {
 			/* https://developer.gnome.org/gobject/unstable/gobject-Signals.html#g-signal-connect
 			 * g_signal_connect(
 			 *   instance,
@@ -225,12 +225,14 @@ var gioInit = function() {
 			 *   data
 			 * );
 			 */
-			return lib('libgio-2.0.so.0').declare('g_signal_connect', self.TYPE.ABI,
+			return lib('libgobject-2.0.so.0').declare('g_signal_connect_data', self.TYPE.ABI,
 				self.TYPE.gulong,		// return // im guessing handler_id
 				self.TYPE.gpointer,		// instance // i think gpointer
 				self.TYPE.gchar.ptr,	// detailed_signal // i think *gchar
 				self.TYPE.GCallback,	// c_handler // i think G_CALLBACK
-				self.TYPE.gpointer		// data // i think gpointer
+				self.TYPE.gpointer,		// data // i think gpointer
+				ctypes.voidptr_t,
+				ctypes.voidptr_t
 			);
 		},
 		g_signal_handler_disconnect: function() {
