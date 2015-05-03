@@ -140,7 +140,7 @@ function createWatcher(aWatcherID, aOptions={}) {
 				  });
 				}
 				
-				var cb = function(aMonitor, aFile, aOtherFile, aEventType) {
+				var cb = function(aMonitor, aFile, aOtherFile, aEventType, aUserData) {
 					console.error('CB TRIGGERED: aMonitor:', aMonitor, 'aFile:', aFile, 'aOtherFile:', aOtherFile, 'aEventType:', aEventType);
 					
 
