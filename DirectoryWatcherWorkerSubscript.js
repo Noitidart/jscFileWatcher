@@ -1,9 +1,9 @@
-// Currently designed to be imported to mainthread AND ChromeWorker ( as GTK needs to be on mainthread - https://github.com/Noitidart/jscFileWatcher/issues/22 )
+// DESIGN DECISION: Currently designed to be imported to mainthread AND ChromeWorker ( as GTK needs to be on mainthread - https://github.com/Noitidart/jscFileWatcher/issues/22 )
 
-var gDirectoryWatcherGlobal = this;
+// Globals
 var gDirectoryWatcherImportsDone = false;
-
-const isChromeWorker = () => (gDirectoryWatcherGlobal.DedicatedWorkerGlobalScope && gDirectoryWatcherGlobal.ctypes);
+if (typeof(gBsComm) == 'undefined') { var gBsComm; }
+if (typeof(callInBootstrap) == 'undefined') { var callInBootstrap; }
 
 function importImportsIfMissing() {
 	if (gDirectoryWatcherImportsDone) {
@@ -12,20 +12,12 @@ function importImportsIfMissing() {
 
 	gDirectoryWatcherImportsDone = true;
 
-	const importer = isChromeWorker() ? importScripts : function(path) { Services.scriptloader.loadSubScript(path, gDirectoryWatcherGlobal) };
+	const importer = importScripts;
 
-	// Services.jsm
-	if (!isChromeWorker() && typeof(Services) == 'undefined') {
-		Cu.import('resource://gre/modules/Services.jsm');
-	}
 
 	// Import OS.File if not present
 	if (typeof(OS) == 'undefined' || !OS.File) {
-		if (isChromeWorker()) {
-			importer('resource://gre/modules/osfile.jsm');
-		} else {
-			Cu.import('resource://gre/modules/osfile.jsm');
-		}
+		importer('resource://gre/modules/osfile.jsm');
 	}
 
 	// Import devuser defined paths
@@ -36,6 +28,14 @@ function importImportsIfMissing() {
 		importer(directorywatcher_paths.comm);
 	}
 
+	if (!callInBootstrap) {
+		callInBootstrap = CommHelper.mainworker.callInBootstrap;
+	}
+
+	if (!gBsComm) {
+		gBsComm = new Comm.client.worker();
+	}
+
 	// Import ostypes
 	if (typeof(ostypes) == 'undefined') {
 		importer(directorywatcher_paths.ostypes_dir + 'cutils.jsm');
@@ -44,19 +44,36 @@ function importImportsIfMissing() {
 			case 'winnt':
 			case 'winmo':
 			case 'wince':
-				importer(directorywatcher_paths.ostypes_dir + 'ostypes_win.jsm');
+					importer(directorywatcher_paths.ostypes_dir + 'ostypes_win.jsm');
 				break
 			case 'darwin':
-				importer(directorywatcher_paths.ostypes_dir + 'ostypes_mac.jsm');
+					importer(directorywatcher_paths.ostypes_dir + 'ostypes_mac.jsm');
 				break;
 			case 'android':
+					importer(directorywatcher_paths.ostypes_dir + 'ostypes_x11.jsm');
+				break;
 			default:
-				// assume gtk based system OR android
+				// assume gtk
+				// actually i think do need it, so disregard comment --> // // ostypes not needed as it is on the mainthread
 				importer(directorywatcher_paths.ostypes_dir + 'ostypes_x11.jsm');
 		}
 	}
 }
 
+function DirectoryWatcherCallOsHandlerById(aArg) {
+	var { id, handler_args } = aArg;
+	// id is undefined if gtk
+	if (id === undefined) {
+		// id is in user_data
+		var user_data = parseInt(cutils.jscGetDeepest(ctypes.uint16_t.ptr(ctypes.UInt64(handler_args[4]))));
+		id = handler_args[4] = user_data;
+		console.log('user_data:', user_data, 'id:', id, 'handler_args[4]:', handler_args[4]);
+	}
+	DirectoryWatcherById[id].oshandler(...handler_args);
+}
+
+var DirectoryWatcherById = {};
+var DirectoryWatcherNextId = 0;
 class DirectoryWatcher {
 	constructor(aCallback) {
 		/*
@@ -66,6 +83,8 @@ class DirectoryWatcher {
 			aExtra
 				aExtra depends on aEventType
 		*/
+		this.watcherid = DirectoryWatcherNextId++;
+		DirectoryWatcherById[this.watcherid] = this;
 
 		importImportsIfMissing();
 		this.devhandler = aCallback;
@@ -87,7 +106,6 @@ class DirectoryWatcher {
 			default:
 				// assume gtk based system
 				this.oshandler = this.gtkHandler;
-				this.oshandler_c = ostypes.TYPE.GFileMonitor_changed_signal(this.oshandler);
 		}
 	}
 	winHandler() {
@@ -95,7 +113,10 @@ class DirectoryWatcher {
 	}
 	gtkHandler(monitor, file, other_file, event_type, user_data) {
 		console.log('in gtkHandler', 'monitor:', monitor, 'file:', file, 'other_file:', other_file, 'event_type:', event_type, 'user_data:', user_data);
-
+		// monitor = ostypes.TYPE.GFileMonitor.ptr(ctypes.UInt64(monitor));
+		file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(file));
+		// other_file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(other_file));
+		event_type = parseInt(cutils.jscGetDeepest(event_type));
 	}
 	macHandler() {
 
@@ -118,28 +139,28 @@ class DirectoryWatcher {
 				break;
 			default:
 				// assume gtk based system
-				var gfile = ostypes.API('g_file_new_for_path')(aPath);
-			    console.log('gfile:', gfile);
 
-				if (gfile.isNull()) {
-			        console.error('failed to create gfile for path:', path);
-			        throw new Error('failed to create gfile for path: ' + path);
-			    }
-
-				var mon = ostypes.API('g_file_monitor_directory')(gfile, ostypes.CONST.G_FILE_MONITOR_NONE, null, null);
-				console.log('mon:', mon);
-
-				ostypes.API('g_object_unref')(gfile);
-
-				if (mon.isNull()) {
-			        console.error('failed to create dirwatcher for path:', path);
-			        throw new Error('failed to create dirwatcher for path: ' + path);
-			    }
-
-				var id = ostypes.API('g_signal_connect_data')(mon, 'changed', this.oshandler_c, null, null, 0);
-				console.log('id:', id);
-
-
+				// var gfile = ostypes.API('g_file_new_for_path')(aPath);
+			    // console.log('gfile:', gfile);
+				//
+				// if (gfile.isNull()) {
+			    //     console.error('failed to create gfile for path:', path);
+			    //     throw new Error('failed to create gfile for path: ' + path);
+			    // }
+				//
+				// var mon = ostypes.API('g_file_monitor_directory')(gfile, ostypes.CONST.G_FILE_MONITOR_NONE, null, null);
+				// console.log('mon:', mon);
+				//
+				// ostypes.API('g_object_unref')(gfile);
+				//
+				// if (mon.isNull()) {
+			    //     console.error('failed to create dirwatcher for path:', path);
+			    //     throw new Error('failed to create dirwatcher for path: ' + path);
+			    // }
+				//
+				// var id = ostypes.API('g_signal_connect_data')(mon, 'changed', this.oshandler_c, null, null, 0);
+				// console.log('id:', id);
+				callInBootstrap('DirectoryWatcherGtkAddPath', { aPath, aWatcherId:this.watcherid });
 		}
 	}
 	removePath(aPath) {
@@ -157,6 +178,7 @@ class DirectoryWatcher {
 				break;
 			default:
 				// assume gtk based system
+				callInBootstrap('DirectoryWatcherGtkRemovePath', { aPath, aWatcherId:this.watcherid });
 		}
 	}
 	close() {
@@ -174,6 +196,7 @@ class DirectoryWatcher {
 				break;
 			default:
 				// assume gtk based system
+				callInBootstrap('DirectoryWatcherGtkClose', { aWatcherId:this.watcherid });
 		}
 	}
 }
