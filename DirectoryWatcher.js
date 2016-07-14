@@ -1,4 +1,4 @@
-// DirectoryWatcher.js is meant to be imported to a ChromeWorker. You can import this to mainthread, however it will do the ctypes on the mainthread (except for polling)
+// Currently designed to be imported to mainthread AND ChromeWorker ( as GTK needs to be on mainthread - https://github.com/Noitidart/jscFileWatcher/issues/22 )
 
 var gDirectoryWatcherGlobal = this;
 var gDirectoryWatcherImportsDone = false;
