@@ -88,7 +88,8 @@ var DirectoryWatcherPollerIniter = function(aPollerId) {
 					}
 				}
 
-				poller.pipe = ostypes.API('CreateNamedPipe')('\\\\.\\pipe\\dirwatcher' + DirectoryWatcherSessionId + poller.pollerid, ostypes.CONST.PIPE_ACCESS_DUPLEX | ostypes.CONST.FILE_FLAG_OVERLAPPED, ostypes.CONST.PIPE_TYPE_BYTE, 1, 1, 1, 0, null);
+				// poller.pipe = ostypes.API('CreateNamedPipe')('\\\\.\\pipe\\dirwatcher' + DirectoryWatcherSessionId + poller.pollerid, ostypes.CONST.PIPE_ACCESS_DUPLEX | ostypes.CONST.FILE_FLAG_OVERLAPPED, ostypes.CONST.PIPE_TYPE_BYTE, 1, 1, 1, 0, null);
+				poller.pipe = ostypes.API('CreateEvent')(null, false, false, 'dirwatcher_event_' + DirectoryWatcherSessionId + poller.pollerid);
 				console.log('poller.pipe:', poller.pipe);
 				pipe_ptrstr = cutils.strOfPtr(poller.pipe);
 				console.log('pipe_ptrstr:', pipe_ptrstr);
@@ -184,7 +185,7 @@ class DirectoryWatcher {
 					// find available poller
 					var poller;
 					for (var a_poller of DirectoryWatcherPollers) {
-						if (a_poller.watching_cnt < MAX_WATCHING_CNT) {
+						if (a_poller.watching_cnt < this.MAX_WATCHING_CNT) {
 							poller = a_poller;
 							break;
 						}
@@ -203,6 +204,7 @@ class DirectoryWatcher {
 
 					if (poller.pipe) {
 						// trip it so it breaks the poll in worker
+						ostypes.API('PulseEvent')(poller.pipe);
 					}
 
 					// if the worker is not yet started, this call to addPath will start it (and call the init)
