@@ -1,11 +1,27 @@
 // MUST import this on mainthread with `Services.scriptloader.loadSubScript('xxxxx/xxx/DirectoryWatcherMainthread.js');`
-//
-var gDirectoryWatcherImportsDone = false;
-var gDirectoryWatcherGlobal = this;
 
-var callInDirectoryWatcherWorker;
-function DirectoryWatcherMainthreadInit(aCommServer_VarStr) {
-	// aCommServer_VarStr is string of the global variable that is a instance of new Comm.worker.server
+// Globals
+var gDWImportsDone = false;
+var callInDWWorker;
+var dwGtkHandler_c;
+var gDWActive = {};
+/*
+	path: {
+		all
+			...
+		win
+			...
+		mac
+			...
+		gio
+			...
+		inotify
+			...
+	}
+*/
+
+function dwMainthreadInit(aCommServer_VarStr) {
+	// aCommServer_VarStr is a var or a str if a instance of new Comm.worker.server. if str, the thing must be global.
 	if (!aCommServer_VarStr) {
 		throw new Error('MUST provide aCommServer_VarStr!');
 	}
@@ -14,38 +30,44 @@ function DirectoryWatcherMainthreadInit(aCommServer_VarStr) {
 		throw new Error('How on earth can you provie aCommServer_VarStr without having imported Comm?? You are doing things wrong. Make sure to import Comm and pass correct string to here!');
 	}
 
-	callInDirectoryWatcherWorker = Comm.callInX.bind(null, aCommServer_VarStr, null);
+	callInDWWorker = Comm.callInX.bind(null, aCommServer_VarStr, null);
 }
 
-var DirectoryWatcherGtkHandler_c;
-function DirectoryWatcherGtkHandler(monitor, file, other_file, event_type, user_data) {
-	console.log('in DirectoryWatcherGtkHandler', 'monitor:', monitor, 'file:', file, 'other_file:', other_file, 'event_type:', event_type, 'user_data:', user_data);
+function dwGtkHandler(monitor, file, other_file, event_type, user_data) {
+	console.log('in dwGtkHandler', 'monitor:', monitor, 'file:', file, 'other_file:', other_file, 'event_type:', event_type, 'user_data:', user_data);
 
-	callInDirectoryWatcherWorker('DirectoryWatcherCallOsHandlerById', {
-		handler_args: [cutils.strOfPtr(monitor), cutils.strOfPtr(file), cutils.strOfPtr(other_file), event_type, cutils.strOfPtr(user_data)]
-	});
+	var signalid = ctypes.cast(user_data, ctypes.uint16_t.ptr).contents;
+	var path_info = dwGetActiveInfo(signalid);
+	if (!path_info) {
+		console.error('how can path_info not be found? was it closed but this was a delayed receive?');
+	} else {
+		var path = path_info.path;
+		callInDWWorker('dwCallOsHandlerById', {
+			path,
+			rest_args: [cutils.strOfPtr(file), cutils.strOfPtr(other_file), event_type]
+		});
+	}
 };
 
-var DirectoryWatcherGtkPathMonIdCollection = {}; // key is path, value is object {id, mon}
-function DirectoryWatcherGtkAddPath(aArg) {
-	var { aPath, aWatcherId } = aArg;
-	console.log('aWatcherId:', aWatcherId);
+function dwAddPath(aArg) {
+	// gio only
 
-	importImportsIfMissing();
 
-	var watcher_entry = DirectoryWatcherGtkPathMonIdCollection[aWatcherId];
-	if (!watcher_entry) {
-		watcher_entry = DirectoryWatcherGtkPathMonIdCollection[aWatcherId] = {
-			data: {
-				watcherid_c: ctypes.uint16_t(aWatcherId)
-			},
-			paths: {}
-		};
-	}
-	if (watcher_entry.paths[aPath]) {
+	// returns
+		// true - successfully added
+		// false - already there
+		// undefined - error
+
+	var { aPath } = aArg;
+
+	dwImportImportsIfMissing();
+
+	var path_info = dwGetActiveInfo(aPath);
+	if (path_info) {
 		console.warn('already watching aPath:', aPath);
-		return;
+		return false;
 	}
+	var path_entry = path_entry.entry;
 
 	// assume gtk based system
 	var gfile = ostypes.API('g_file_new_for_path')(aPath);
@@ -53,7 +75,7 @@ function DirectoryWatcherGtkAddPath(aArg) {
 
 	if (gfile.isNull()) {
 		console.error('failed to create gfile for aPath:', aPath);
-		throw new Error('failed to create gfile for aPath: ' + aPath);
+		return undefined;
 	}
 
 	var mon = ostypes.API('g_file_monitor_directory')(gfile, ostypes.CONST.G_FILE_MONITOR_NONE, null, null);
@@ -63,61 +85,60 @@ function DirectoryWatcherGtkAddPath(aArg) {
 
 	if (mon.isNull()) {
 		console.error('failed to create dirwatcher for aPath:', aPath);
-		throw new Error('failed to create dirwatcher for aPath: ' + aPath);
+		return undefined;
 	}
 
-	var signalerid = ostypes.API('g_signal_connect_data')(mon, 'changed', DirectoryWatcherGtkHandler_c, ctypes.cast(watcher_entry.data.watcherid_c.address(), ctypes.voidptr_t), null, 0);
+	var signalerid = ostypes.API('g_signal_connect_data')(mon, 'changed', dwGtkHandler_c, ctypes.cast(watcher_entry.data.watcherid_c.address(), ctypes.voidptr_t), null, 0);
 	console.log('signalerid:', signalerid);
 	signalerid = parseInt(cutils.jscGetDeepest(signalerid));
 	if (signalerid === 0) {
 		console.error('failed to connect dirwatcher to signaler for aPath:', aPath);
-		throw new Error('failed to connect dirwatcher to signaler for aPath: ' + aPath);
+		return undefined;
 	}
 
-	watcher_entry.paths[aPath] = { signalerid, mon };
+	gDWActive[aPath] = { signalerid, mon };
 	console.log('ok watching aPath:', aPath);
+
+	return true;
 }
 
-function DirectoryWatcherGtkRemovePath(aArg) {
-	var { aPath, aWatcherId } = aArg;
-	var watcher_entry = DirectoryWatcherGtkPathMonIdCollection[aWatcherId];
-	if (!watcher_entry || !watcher_entry.paths[aPath]) {
-		console.warn('was not watching aPath:', aPath);
-		return;
-	}
+function dwRemovePath(aArg) {
+	// gio only
 
-	var path_entry = watcher_entry.paths[aPath];
+	// returns
+		// true - successfully removed
+		// false - wasnt there
+		// undefined - error
+
+	var { aPath } = aArg;
+
+	var path_info = dwGetActiveInfo(aPath);
+	if (!path_info) {
+		console.warn('was not watching aPath:', aPath);
+		return false;
+	}
+	var path_entry = path_info.entry;
 
 	var { mon, signalerid } = path_entry;
-	ostypes.API('g_signal_handler_disconnect')(mon, id);
+	ostypes.API('g_signal_handler_disconnect')(mon, signalerid);
 	ostypes.API('g_object_unref')(mon);
-	delete DirectoryWatcherGtkPathMonIdCollection[aWatcherId].paths[aPath];
+
+	delete gDWActive[aPath];
+
 	console.log('stopped watching aPath:', aPath);
-}
-function DirectoryWatcherGtkClose(aArg) {
-	var { aWatcherId } = aArg;
-	var watcher_entry = DirectoryWatcherGtkPathMonIdCollection[watcher_entry];
-	if (!watcher_entry) {
-		console.warn('cannot close this watcher id as it was never opened, meaning it wasnt watching anything');
-		return;
-	}
 
-	for (var path in watcher_entry.paths) {
-		DirectoryWatcherGtkRemovePath(path, aWatcherId);
-	}
-
-	delete DirectoryWatcherGtkPathMonIdCollection[watcher_entry];
+	return true;
 }
 
-function importImportsIfMissing() {
-	if (gDirectoryWatcherImportsDone) {
+function dwImportImportsIfMissing() {
+	if (gDWImportsDone) {
 		return;
 	}
-	console.log('in mainthread importImportsIfMissing');
+	console.log('in mainthread dwImportImportsIfMissing');
 
-	gDirectoryWatcherImportsDone = true;
+	gDWImportsDone = true;
 
-	// const importer = function(path) { Services.scriptloader.loadSubScript(path, gDirectoryWatcherGlobal) };
+	// const importer = function(path) { Services.scriptloader.loadSubScript(path) };
 	const importer = Services.scriptloader.loadSubScript;
 
 	// Services.jsm
@@ -155,7 +176,7 @@ function importImportsIfMissing() {
 		}
 	}
 	console.log('imports done');
-	DirectoryWatcherGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(DirectoryWatcherGtkHandler);
+	dwGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(dwGtkHandler);
 }
 
 function importServicesJsm() {
@@ -173,6 +194,27 @@ function importServicesJsm() {
 		}
 		if (typeof(Cu) != 'undefined') {
 			Cu.import('resource://gre/modules/Services.jsm');
+		}
+	}
+}
+
+function dwGetActiveInfo(aBy) {
+	// aBy
+		// string - path - platform path of directory watched
+		// int - signalid
+
+	// returns
+		// undefined if not found
+		// `{path, entry}` where `entry` in `gDWActive` by reference
+
+	if (typeof(aBy) == 'string') {
+		return gDWActive[aBy];
+	} else {
+		for (var path in gDWActive) {
+			var path_entry = gDWActive[path];
+			if (path_entry.signalid === aBy) {
+				return { path, entry:path_entry };
+			}
 		}
 	}
 }

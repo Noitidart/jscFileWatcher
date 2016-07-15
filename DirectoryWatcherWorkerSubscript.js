@@ -1,16 +1,401 @@
 // DESIGN DECISION: Currently designed to be imported to mainthread AND ChromeWorker ( as GTK needs to be on mainthread - https://github.com/Noitidart/jscFileWatcher/issues/22 )
 
 // Globals
-var gDirectoryWatcherImportsDone = false;
+var gDWImportsDone = false;
 if (typeof(gBsComm) == 'undefined') { var gBsComm; }
 if (typeof(callInBootstrap) == 'undefined') { var callInBootstrap; }
 
-function importImportsIfMissing() {
-	if (gDirectoryWatcherImportsDone) {
+var gDWSessionId = Date.now() + '';
+var gDWInstancesById = {};
+var gDWNextId = 0;
+var gDWPollerNextId = 0;
+var gDWOSName = OS.Constants.Sys.Name.toLowerCase();
+var gDWPollers = [];
+// each element is an object:
+	// {
+	// 	worker: instance of comm server
+	// 	callInPoller
+	// }
+
+var gDWActive = {};
+/*
+	path: {
+		all
+			watcherids: []
+		win
+			...
+		mac
+			...
+		gio
+			...
+		inotify
+			...
+	}
+*/
+
+var DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD;
+switch (gDWOSName) {
+	case 'winnt':
+	case 'winmo':
+	case 'wince':
+			DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD = 64;
+		break;
+	default:
+		DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD = 50; // guess, as i dont know the os
+}
+
+function dwCallOsHandlerById(aArg) {
+	// returns
+		// true if anything triggered
+		// false if nothing triggered - i think, by my design, this indicates error
+
+	var { path, rest_args } = aArg;
+
+	var path_entry = gDWActive[path];
+	if (!path_entry) {
+		console.error('how can path_info not be found? was it closed but this was a delayed receive?');
+		throw new Error('how can path_info not be found? was it closed but this was a delayed receive?');
+		return false;
+	} else {
+		if (!path_entry.watcherids.length) {
+			console.error('how path be in gDWActive but not have any watcherids??? maybe delayed receive?');
+			throw new Error('how path be in gDWActive but not have any watcherids??? maybe delayed receive?');
+			return false;
+		} else {
+			for (var watcherid of path_entry.watcherids) {
+				// console.log('watcherid:', watcherid);
+				gDWInstancesById[watcherid].oshandler(path, ...rest_args);
+			}
+		}
+	}
+}
+
+function dwPollerIniter(aPollerId) {
+	console.log('initier, aPollerId:', aPollerId);
+	var pipe_ptrstr = '0x0';
+
+	switch (gDWOSName) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+
+				// get poller by id
+				var poller;
+				for (var a_poller of gDWPollers) {
+					if (a_poller.pollerid === aPollerId) {
+						poller = a_poller;
+						break;
+					}
+				}
+
+				if (!poller) {
+					console.error('could not get poller! this is horrible should never ever happen!');
+					throw new Error('could not get poller! this is horrible should never ever happen!');
+				}
+
+				poller.pipe = ostypes.API('CreateEvent')(null, false, false, 'dirwatcher_event_' + gDWSessionId + poller.pollerid);
+				console.log('poller.pipe:', poller.pipe);
+				pipe_ptrstr = cutils.strOfPtr(poller.pipe);
+				console.log('pipe_ptrstr:', pipe_ptrstr);
+
+			break;
+	}
+
+	return { pipe_ptrstr };
+}
+
+class DirectoryWatcher {
+	constructor(aCallback) {
+		/*
+		aCallback called with these argumnets:
+			aFilePath - i dont give just file name, because multiple directories can be being watched, so i give full os path
+			aEventType - enum[ADDED, REMOVED, RENAMED, CONTENTS_MODIFIED]
+			aExtra
+				aExtra depends on aEventType
+		*/
+		this.watcherid = gDWNextId++;
+		gDWInstancesById[this.watcherid] = this;
+
+		dwImportImportsIfMissing();
+		this.devhandler = aCallback;
+
+		// set MAX_WATCHING_CNT for pollers (windows, mac, inotify/android) - Gio on mainthread has no limit but i manually limit it
+		this.MAX_WATCHING_CNT = 64; // https://bugzilla.mozilla.org/show_bug.cgi?id=958280#c42
+
+		// watching collection
+		this.watching_paths = {}; // key is path, value is object holding whatever info i need
+
+		// set oshandler - oshandler is responsible for triggering aCallback (this.devhandler)
+		switch (gDWOSName) {
+			case 'winnt':
+			case 'winmo':
+			case 'wince':
+					this.oshandler = this.winHandler;
+				break;
+			case 'darwin':
+					this.oshandler = this.macHandler;
+				break;
+			case 'android':
+					this.oshandler = this.andHandler;
+				break;
+			default:
+				// assume gtk based system
+				this.oshandler = this.gtkHandler;
+		}
+	}
+	winHandler(aPath, dwNumberOfBytesTransfered, changes) {
+		console.log('in mainworker winHandler:', 'aPath:', aPath, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'changes:', changes);
+		// path is the path of the directory that was watched
+
+		if (this.closed) {
+			console.warn('this watcher was closed so oshandler exiting');
+			return;
+		}
+
+		// TODO: inform devhandler
+	}
+	gtkHandler(path, file, other_file, event_type) {
+		// path is the path of the directory that was watched
+		console.log('in gtkHandler', 'path:', path, 'file:', file, 'other_file:', other_file, 'event_type:', event_type);
+
+		if (this.closed) {
+			console.warn('this watcher was closed so oshandler exiting');
+			return;
+		}
+
+		file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(file));
+		// other_file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(other_file));
+		event_type = parseInt(cutils.jscGetDeepest(event_type));
+
+		// TODO: inform devhandler
+	}
+	macHandler(path) {
+		// path is the path of the directory that was watched
+		console.log('in macHandler', 'path:', path);
+
+		if (this.closed) {
+			console.warn('this watcher was closed so oshandler exiting');
+			return;
+		}
+
+		// TODO: inform devhandler
+	}
+	andHandler(path) {
+		// path is the path of the directory that was watched
+		console.log('in andHandler', 'path:', path);
+
+		if (this.closed) {
+			console.warn('this watcher was closed so oshandler exiting');
+			return;
+		}
+
+		// TODO: inform devhandler
+	}
+	addPath(aPath) {
+		// returns
+			// actually not yet - due to async nature // true - successfully removed
+			// false - wasnt watching
+			// undefined - error
+
+		if (this.closed) {
+			console.warn('this watcher was cleaned up');
+			return;
+		}
+
+		var path_info = dwGetActiveInfo(aPath);
+		if (path_info) {
+			var path_entry = path_entry.entry;
+			if (path_entry.watcherids.includes(this.watcherid)) {
+				console.warn('THIS WATCHER is already watching aPath:', aPath);
+				return false;
+			} else {
+				path_entry.watcherids.push(this.watcherid);
+				return true;
+			}
+		} else {
+			switch (gDWOSName) {
+				case 'winnt':
+				case 'winmo':
+				case 'wince':
+
+						// find available poller
+						var poller;
+						for (var a_poller of gDWPollers) {
+							if (dwGetActiveCntByPollerId(a_poller.pollerid) < DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD) {
+								poller = a_poller;
+								break;
+							}
+						}
+
+						if (!poller) {
+							// none available so lets crate one
+							poller = {
+								pollerid: gDWPollerNextId++
+							};
+							poller.worker = new Comm.server.worker(directorywatcher_paths.watcher_dir + 'DirectoryWatcherPollWorker.js', dwPollerIniter.bind(null, poller.pollerid));
+							poller.callInPoller = Comm.callInX.bind(null, poller.worker, null);
+							gDWPollers.push(poller);
+						}
+
+						if (poller.pipe) {
+							// trip it so it breaks the poll in worker
+							ostypes.API('PulseEvent')(poller.pipe);
+						}
+
+						// if the worker is not yet started, this call to addPath will start it (and call the init)
+						var watcherid = this.watcherid;
+						poller.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, function(added) {
+							// TODO: due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this
+							if (added) {
+								gDWActive[aPath] = {
+									watcherids: [watcherid],
+									pollerid: poller.pollerid
+								};
+							}
+						});
+
+					break;
+				case 'darwin':
+						//
+					break;
+				case 'android':
+						//
+					break;
+				default:
+					// assume gtk based system
+					var watcherid = this.watcherid;
+					callInBootstrap('dwAddPath', { aPath }, function(added) {
+						// TODO: due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this
+						if (added) {
+							gDWActive[aPath] = {
+								watcherids: [watcherid]
+							};
+						}
+					});
+			}
+		}
+	}
+	removePath(aPath, aClosing) {
+		// aClosing is programtic value, devuser should never set this
+
+		// returns
+			// actually not yet - due to async nature // true - successfully removed
+			// false - wasnt watching
+			// undefined - error
+
+		if (!aClosing && this.closed) {
+			console.warn('this watcher was cleaned up');
+			return;
+		}
+
+		var path_info = dwGetActiveInfo(aPath);
+		if (!path_info) {
+			console.warn('cannot remove as NO WATCHER was ever watching aPath:', aPath);
+			return false;
+		}
+		var path_entry = path_entry.entry;
+
+		var ix_watcherid = path_entry.watcherids.indexOf(this.watcherid);
+		if (ix_watcherid == -1) {
+			console.warn('cannot remove as THIS WATCHER was never watching aPath:', aPath);
+			return false;
+		} else {
+			path_entry.watcherids.splice(ix_watcherid, 1);
+		}
+
+		if (path_entry.watcherids.length) {
+			switch (gDWOSName) {
+				case 'winnt':
+				case 'winmo':
+				case 'wince':
+						//
+					break;
+				case 'darwin':
+						//
+					break;
+				case 'android':
+						//
+					break;
+				default:
+					// assume gtk based system
+					callInBootstrap('dwRemovePath', { aPath }, function(removed) {
+						if (removed) {
+							delete gDWActive[aPath];
+						}
+					});
+			}
+		}
+	}
+	close() {
+		this.closed = true;
+
+		var path_infos = dwGetPathInfos(this.watcherid);
+		if (path_infos) {
+			for (var path_info of path_infos) {
+				this.removePath(path, true); // set aClosing to true, so removePath works even though this.closed was set
+			}
+		}
+	}
+}
+if (OS && OS.File) {
+	OS.File.DirectoryWatcher = DirectoryWatcher;
+}
+
+function dwGetActiveInfo(aBy) {
+	// aBy
+		// string - path - platform path of directory watched
+		// int - signalid
+
+	// returns
+		// undefined if not found
+		// `{path, entry}` where `entry` in `gDWActive` by reference
+
+	if (typeof(aBy) == 'string') {
+		return gDWActive[aBy];
+	} else {
+		for (var path in gDWActive) {
+			var path_entry = gDWActive[path];
+			if (path_entry.signalid === aBy) {
+				return { path, entry:path_entry };
+			}
+		}
+	}
+}
+
+function dwGetPathInfos(aWatcherId) {
+	// returns
+		// array if paths found that include aWatcherId
+		// undefined if no paths found that include aWatcherId
+
+	var path_infos = [];
+	for (var path in gDWActive) {
+		var path_entry = gDWActive[path];
+		if (path_entry.watcherids.includes(aWatcherId)) {
+			path_infos.push({
+				path,
+				path_entry
+			});
+		}
+	}
+
+	return path_infos;
+}
+function dwGetActiveCntByPollerId(aPollerId) {
+	var cnt = 0;
+	for (var path in gDWActive) {
+		var path_entry = gDWActive[path];
+		if (path_entry.pollerid === aPollerId) {
+			cnt++;
+		}
+	}
+	return cnt;
+}
+function dwImportImportsIfMissing() {
+	if (gDWImportsDone) {
 		return;
 	}
 
-	gDirectoryWatcherImportsDone = true;
+	gDWImportsDone = true;
 
 	const importer = importScripts;
 
@@ -40,7 +425,7 @@ function importImportsIfMissing() {
 	if (typeof(ostypes) == 'undefined') {
 		importer(directorywatcher_paths.ostypes_dir + 'cutils.jsm');
 		importer(directorywatcher_paths.ostypes_dir + 'ctypes_math.jsm');
-		switch (OS.Constants.Sys.Name.toLowerCase()) {
+		switch (gDWOSName) {
 			case 'winnt':
 			case 'winmo':
 			case 'wince':
@@ -58,247 +443,6 @@ function importImportsIfMissing() {
 				importer(directorywatcher_paths.ostypes_dir + 'ostypes_x11.jsm');
 		}
 	}
-}
-
-function DirectoryWatcherCallOsHandlerById(aArg) {
-	var { watcherid, handler_args } = aArg;
-	// watcherid is undefined if gtk
-	if (watcherid === undefined) {
-		// watcherid is in user_data
-		var user_data = parseInt(cutils.jscGetDeepest(ctypes.uint16_t.ptr(ctypes.UInt64(handler_args[4]))));
-		watcherid = handler_args[4] = user_data;
-		console.log('user_data:', user_data, 'watcherid:', watcherid, 'handler_args[4]:', handler_args[4]);
-	}
-	DirectoryWatcherById[watcherid].oshandler(...handler_args);
-}
-
-var DirectoryWatcherPollerIniter = function(aPollerId) {
-	console.log('initier, aPollerId:', aPollerId);
-	var pipe_ptrstr = '0x0';
-
-	switch (OS.Constants.Sys.Name.toLowerCase()) {
-		case 'winnt':
-		case 'winmo':
-		case 'wince':
-
-				// get poller by id
-				for (var poller of DirectoryWatcherPollers) {
-					if (poller.pollerid === aPollerId) {
-						break;
-					}
-				}
-
-				// poller.pipe = ostypes.API('CreateNamedPipe')('\\\\.\\pipe\\dirwatcher' + DirectoryWatcherSessionId + poller.pollerid, ostypes.CONST.PIPE_ACCESS_DUPLEX | ostypes.CONST.FILE_FLAG_OVERLAPPED, ostypes.CONST.PIPE_TYPE_BYTE, 1, 1, 1, 0, null);
-				poller.pipe = ostypes.API('CreateEvent')(null, false, false, 'dirwatcher_event_' + DirectoryWatcherSessionId + poller.pollerid);
-				console.log('poller.pipe:', poller.pipe);
-				pipe_ptrstr = cutils.strOfPtr(poller.pipe);
-				console.log('pipe_ptrstr:', pipe_ptrstr);
-
-			break;
-	}
-
-	return { pollerid:aPollerId, sessionid:DirectoryWatcherSessionId, pipe_ptrstr };
-};
-
-var DirectoryWatcherSessionId = Date.now() + '';
-var DirectoryWatcherById = {};
-var DirectoryWatcherNextId = 0;
-var DirectoryWatcherPollers = [];
-var DirectoryWatcherPollerNextId = 0;
-// each element is an object:
-	// {
-	// 	worker: instance of comm server
-	// 	callInPoller
-	// 	watching_cnt - increment when addPath, decrement when removePath, when count hits 0, it is terminated if nothing is added to it within 10sec
-	// }
-class DirectoryWatcher {
-	constructor(aCallback) {
-		/*
-		aCallback called with these argumnets:
-			aFilePath - i dont give just file name, because multiple directories can be being watched, so i give full os path
-			aEventType - enum[ADDED, REMOVED, RENAMED, CONTENTS_MODIFIED]
-			aExtra
-				aExtra depends on aEventType
-		*/
-		this.watcherid = DirectoryWatcherNextId++;
-		DirectoryWatcherById[this.watcherid] = this;
-
-		importImportsIfMissing();
-		this.devhandler = aCallback;
-		this.osname = OS.Constants.Sys.Name.toLowerCase();
-
-		// set MAX_WATCHING_CNT for pollers (windows, mac, inotify/android) - Gio on mainthread has no limit but i manually limit it
-		this.MAX_WATCHING_CNT = 64; // https://bugzilla.mozilla.org/show_bug.cgi?id=958280#c42
-
-		// watching collection
-		this.watching_paths = {}; // key is path, value is object holding whatever info i need
-
-		// set oshandler - oshandler is responsible for triggering aCallback (this.devhandler)
-		switch (this.osname) {
-			case 'winnt':
-			case 'winmo':
-			case 'wince':
-					this.oshandler = this.winHandler;
-				break;
-			case 'darwin':
-					this.oshandler = this.macHandler;
-				break;
-			case 'android':
-					this.oshandler = this.andHandler;
-				break;
-			default:
-				// assume gtk based system
-				this.oshandler = this.gtkHandler;
-		}
-	}
-	winHandler(dwNumberOfBytesTransfered, notif_buf, aPath) {
-		console.log('in mainworker winHandler:', dwNumberOfBytesTransfered, notif_buf, aPath);
-		// aPath is the path of the directory that was watched
-
-		// TODO: inform devhandler
-	}
-	gtkHandler(monitor, file, other_file, event_type, user_data) {
-		if (this.closed) {
-			console.warn('this watcher was cleaned up');
-			return;
-		}
-		console.log('in gtkHandler', 'monitor:', monitor, 'file:', file, 'other_file:', other_file, 'event_type:', event_type, 'user_data:', user_data);
-		// monitor = ostypes.TYPE.GFileMonitor.ptr(ctypes.UInt64(monitor));
-		file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(file));
-		// other_file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(other_file));
-		event_type = parseInt(cutils.jscGetDeepest(event_type));
-
-		// TODO: inform devhandler
-	}
-	macHandler() {
-
-	}
-	andHandler() {
-
-	}
-	addPath(aPath) {
-		if (this.closed) {
-			console.warn('this watcher was cleaned up');
-			return;
-		}
-		// on success add path to this.watching_paths
-		switch (this.osname) {
-			case 'winnt':
-			case 'winmo':
-			case 'wince':
-
-					// find available poller
-					var poller;
-					for (var a_poller of DirectoryWatcherPollers) {
-						if (a_poller.watching_cnt < this.MAX_WATCHING_CNT) {
-							poller = a_poller;
-							break;
-						}
-					}
-
-					if (!poller) {
-						// none available so lets crate one
-						poller = {
-							pollerid: DirectoryWatcherPollerNextId++,
-							watching_cnt: 0
-						};
-						poller.worker = new Comm.server.worker(directorywatcher_paths.watcher_dir + 'DirectoryWatcherPollWorker.js', DirectoryWatcherPollerIniter.bind(null, poller.pollerid));
-						poller.callInPoller = Comm.callInX.bind(null, poller.worker, null);
-						DirectoryWatcherPollers.push(poller);
-					}
-
-					if (poller.pipe) {
-						// trip it so it breaks the poll in worker
-						ostypes.API('PulseEvent')(poller.pipe);
-					}
-
-					// if the worker is not yet started, this call to addPath will start it (and call the init)
-					poller.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, function(aArg) {
-						var successfully_added = aArg;
-						if (successfully_added) {
-							poller.watching_cnt++;
-						}
-					});
-
-				break;
-			case 'darwin':
-					//
-				break;
-			case 'android':
-					//
-				break;
-			default:
-				// assume gtk based system
-
-				// var gfile = ostypes.API('g_file_new_for_path')(aPath);
-			    // console.log('gfile:', gfile);
-				//
-				// if (gfile.isNull()) {
-			    //     console.error('failed to create gfile for path:', path);
-			    //     throw new Error('failed to create gfile for path: ' + path);
-			    // }
-				//
-				// var mon = ostypes.API('g_file_monitor_directory')(gfile, ostypes.CONST.G_FILE_MONITOR_NONE, null, null);
-				// console.log('mon:', mon);
-				//
-				// ostypes.API('g_object_unref')(gfile);
-				//
-				// if (mon.isNull()) {
-			    //     console.error('failed to create dirwatcher for path:', path);
-			    //     throw new Error('failed to create dirwatcher for path: ' + path);
-			    // }
-				//
-				// var id = ostypes.API('g_signal_connect_data')(mon, 'changed', this.oshandler_c, null, null, 0);
-				// console.log('id:', id);
-				callInBootstrap('DirectoryWatcherGtkAddPath', { aPath, aWatcherId:this.watcherid });
-		}
-	}
-	removePath(aPath) {
-		if (this.closed) {
-			console.warn('this watcher was cleaned up');
-			return;
-		}
-		switch (this.osname) {
-			case 'winnt':
-			case 'winmo':
-			case 'wince':
-					//
-				break;
-			case 'darwin':
-					//
-				break;
-			case 'android':
-					//
-				break;
-			default:
-				// assume gtk based system
-				callInBootstrap('DirectoryWatcherGtkRemovePath', { aPath, aWatcherId:this.watcherid });
-		}
-	}
-	close() {
-		switch (this.osname) {
-			case 'winnt':
-			case 'winmo':
-			case 'wince':
-					//
-				break;
-			case 'darwin':
-					//
-				break;
-			case 'android':
-					//
-				break;
-			default:
-				// assume gtk based system
-				this.closed = true;
-				callInBootstrap('DirectoryWatcherGtkClose', { aWatcherId:this.watcherid }, function() {
-					delete DirectoryWatcherById[id];
-				});
-		}
-	}
-}
-if (OS && OS.File) {
-	OS.File.DirectoryWatcher = DirectoryWatcher;
 }
 
 // start - common helper functions

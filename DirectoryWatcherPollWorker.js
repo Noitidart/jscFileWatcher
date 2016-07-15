@@ -31,47 +31,37 @@ switch (core.os.name) {
 
 // Globals
 var { callInMainworker } = CommHelper.childworker;
-var Stuff = {};
 
 // Init
 var gWkComm = new Comm.client.worker();
-var pollerid;
-var sessionid;
-var pipe;
-var path_mon_id_collection = {};
-var next_signalid = 0;
-// key is watcherid
-// value is object:
-// {
-// 	data: {
-// 		// win
-//
-// 		// mac
-//
-// 		// inotify
-// 	},
-// 	paths: {
-// 		path: {
-// 			// win
-//				hdir
-//				o
-//				lp_index
-//				notif_buf
-// 			// mac
-//
-// 			// inotify
-//
-// 			// gtk
-// 			signalerid
-// 			mon
-// 		}
-// 	}
-// }
 
+var gPipe;
+var gNextSignalId = 0;
+var path_mon_id_collection = {};
+var gDWActive = {};
+/*
+	path: {
+		all
+			...
+		win
+			hdir
+			o
+			lp_index
+			notif_buf
+			signalid
+			signalid_c
+		mac
+			...
+		gio
+			...
+		inotify
+			...
+	}
+*/
 
 function init(aArg) {
-	({ pollerid, sessionid, pipe_ptrstr } = aArg);
-	console.log('pollerid:', pollerid, 'sessionid:', sessionid, 'pipe_ptrstr:', pipe_ptrstr);
+	var { pipe_ptrstr } = aArg;
+	console.log('pipe_ptrstr:', pipe_ptrstr);
 
 	// OS Specific Init
 	switch (core.os.name) {
@@ -80,12 +70,11 @@ function init(aArg) {
 		case 'wince':
 
 				// Globals
-				// pipe = ostypes.API('CreateFile')('\\\\.\\pipe\\dirwatcher' + sessionid + pollerid, ostypes.CONST.GENERIC_READ, ostypes.CONST.FILE_SHARE_READ, null, OS.Constants.Win.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
-				pipe = ostypes.TYPE.HANDLE(ctypes.UInt64(pipe_ptrstr));
-				console.log('pipe:', pipe);
-				LP_HANDLES = [pipe];
-				LP_HANDLES_C = ostypes.TYPE.HANDLE.array()(LP_HANDLES);
-				// set up a watcher on a pipe, send to mainthread the pipe so it can interrupt
+				gPipe = ostypes.TYPE.HANDLE(ctypes.UInt64(pipe_ptrstr));
+				console.log('gPipe:', gPipe);
+				gLpHandles = [gPipe];
+				gLpHandles_c = ostypes.TYPE.HANDLE.array()(gLpHandles);
+				// set up a watcher on a gPipe, send to mainthread the gPipe so it can interrupt
 
 				// notification buffer size and length stuff
 				WATCHED_RES_MAXIMUM_NOTIFICATIONS = 100; // 100; Dexter uses 100
@@ -114,18 +103,11 @@ function addPath(aArg) {
 		// true - successfully added
 		// false - already there
 		// undefined - error
-	var { aPath, aWatcherId } = aArg;
+	var { aPath } = aArg;
 
-	var watcher_entry = path_mon_id_collection[aWatcherId];
-	if (!watcher_entry) {
-		watcher_entry = path_mon_id_collection[aWatcherId] = {
-			data: {
-				watcherid_c: ctypes.uint16_t(aWatcherId)
-			},
-			paths: {}
-		};
-	}
-	if (watcher_entry.paths[aPath]) {
+	var path_info = dwGetActiveInfo(aPath);
+
+	if (path_info) {
 		console.warn('already watching aPath:', aPath);
 		return false;
 	}
@@ -141,15 +123,15 @@ function addPath(aArg) {
 		return undefined;
 	}
 
-	var signalid = next_signalid++;
+	var signalid = gNextSignalId++;
 	var signalid_c = ctypes.uint16_t(signalid);
 
 	// hEvent is equivalent of user_data in Gio/Gtk
 	o.hEvent = ctypes.cast(signalid_c.address(), ctypes.voidptr_t);
 
-	var lp_index = LP_HANDLES.length;
-	LP_HANDLES.push(hdir);
-	LP_HANDLES_C = ostypes.TYPE.HANDLE.array()(LP_HANDLES);
+	var lp_index = gLpHandles.length;
+	gLpHandles.push(hdir);
+	gLpHandles_c = ostypes.TYPE.HANDLE.array()(gLpHandles);
 
 	var rez_rdc = ostypes.API('ReadDirectoryChanges')(hdir, notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, o.address(), winHandler_c);
 	console.log('rez_rdc:', rez_rdc);
@@ -160,7 +142,7 @@ function addPath(aArg) {
 		setTimeout(poll, 0); // resume poll after return
 		return undefined;
 	} else {
-		watcher_entry.paths[aPath] = { hdir, o, lp_index, notif_buf, signalid, signalid_c };
+		gDWActive[aPath] = { hdir, o, lp_index, notif_buf, signalid, signalid_c };
 		setTimeout(poll, 0); // resume poll after return
 		return true;
 	}
@@ -174,10 +156,10 @@ function poll() {
 		case 'wince':
 
 				console.log('starting wait');
-				var rez_wait = ostypes.API('WaitForMultipleObjectsEx')(LP_HANDLES.length, LP_HANDLES_C, false, ostypes.CONST.INFINITE, true);
+				var rez_wait = ostypes.API('WaitForMultipleObjectsEx')(gLpHandles.length, gLpHandles_c, false, ostypes.CONST.INFINITE, true);
 				console.log('rez_wait:', rez_wait);
 				// if (cutils.jscEqual(rez_wait, 0)) {
-				// 	// its the pipe interrupt, so dont restart the loop
+				// 	// its the gPipe interrupt, so dont restart the loop
 				// } else {
 				// 	// i get 192 when my file watcher triggers, dont restart poll here as it will keep returning with `1` or the index of the one that triggered, i have to reset the signal by calling ReadDirectoryChanges again
 				// }
@@ -193,26 +175,14 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 	console.log('signalid:', signalid);
 
 	// get watcher_entry and path_entry
-	var watcher_entry;
-	var path_entry;
-	var path;
-	var watcherid;
-	get_entries: {
-		for (var a_watcherid in path_mon_id_collection) {
-			var a_watcher_entry = path_mon_id_collection[a_watcherid].paths;
-			for (var a_path in a_watcher_entry) {
-				var a_path_entry = a_watcher_entry[a_path];
-				if (a_path_entry.signalid === signalid) {
-					path_entry = a_path_entry;
-					path = a_path;
-					watcher_entry = a_watcher_entry;
-					watcherid = a_watcherid;
-					break get_entries;
-				}
-			}
-		}
+	var path_info = dwGetActiveInfo(signalid);
+	if (!path_info) {
+		console.error('what on earth? this should never happen! no path_info for signalid! this is bad!! aborting all watching in this worker');
+		throw new Error('what on earth? this should never happen! no path_info for signalid! this is bad!! aborting all watching in this worker');
 	}
-	// console.log('path:', path, 'watcherid:', watcherid, 'path_entry:', path_entry, 'watcher_entry:', watcher_entry);
+
+	var {entry:path_entry, path} = path_info;
+	// console.log('path:', path);
 
 	if (cutils.jscEqual(dwErrorCode, 0)) {
 		// ok no error, so a file change happened
@@ -221,12 +191,12 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 		var notif_buf = path_entry.notif_buf;
 
 		// inform mainworker oshandler
-		callInMainworker('DirectoryWatcherCallOsHandlerById', {
-			watcherid,
-			handler_args: [dwNumberOfBytesTransfered, cutils.strOfPtr(notif_buf.address()), path]
+		callInMainworker('dwCallOsHandlerById', {
+			path,
+			rest_args: [dwNumberOfBytesTransfered, cutils.strOfPtr(notif_buf.address())]
 		});
 
-		// retrigger ReadDirectoryChanges on this hdir, otherwise WaitForMultipleObjectsEx will return immediately with index of this hdir in LP_HANDLES
+		// retrigger ReadDirectoryChanges on this hdir, otherwise WaitForMultipleObjectsEx will return immediately with index of this hdir in gLpHandles
 		var rez_rdc = ostypes.API('ReadDirectoryChanges')(path_entry.hdir, path_entry.notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, path_entry.o.address(), winHandler_c);
 		console.log('rez_rdc:', rez_rdc);
 
@@ -242,3 +212,56 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 		console.error('UNKNOWN ERROR!!!! ABORTING!! dwErrorCode:', dwErrorCode);
 	}
 }
+
+function dwGetActiveInfo(aBy) {
+	// aBy
+		// string - path - platform path of directory watched
+		// int - signalid
+
+	// returns
+		// undefined if not found
+		// `{path, entry}` where `entry` in `gDWActive` by reference
+
+	if (typeof(aBy) == 'string') {
+		return gDWActive[aBy];
+	} else {
+		for (var path in gDWActive) {
+			var path_entry = gDWActive[path];
+			if (path_entry.signalid === aBy) {
+				return { path, entry:path_entry };
+			}
+		}
+	}
+}
+
+// start - common helper functions
+function Deferred() {
+	this.resolve = null;
+	this.reject = null;
+	this.promise = new Promise(function(resolve, reject) {
+		this.resolve = resolve;
+		this.reject = reject;
+	}.bind(this));
+	Object.freeze(this);
+}
+function genericReject(aPromiseName, aPromiseToReject, aReason) {
+	var rejObj = {
+		name: aPromiseName,
+		aReason: aReason
+	};
+	console.error('Rejected - ' + aPromiseName + ' - ', rejObj);
+	if (aPromiseToReject) {
+		aPromiseToReject.reject(rejObj);
+	}
+}
+function genericCatch(aPromiseName, aPromiseToReject, aCaught) {
+	var rejObj = {
+		name: aPromiseName,
+		aCaught: aCaught
+	};
+	console.error('Caught - ' + aPromiseName + ' - ', rejObj);
+	if (aPromiseToReject) {
+		aPromiseToReject.reject(rejObj);
+	}
+}
+// end - common helper functions
