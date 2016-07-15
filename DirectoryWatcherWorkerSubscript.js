@@ -72,8 +72,44 @@ function DirectoryWatcherCallOsHandlerById(aArg) {
 	DirectoryWatcherById[id].oshandler(...handler_args);
 }
 
+var DirectoryWatcherPollerIniter = function(aPollerId) {
+	console.log('initier, aPollerId:', aPollerId);
+	var pipe_ptrstr = '0x0';
+
+	switch (OS.Constants.Sys.Name.toLowerCase()) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+
+				// get poller by id
+				for (var poller of DirectoryWatcherPollers) {
+					if (poller.pollerid === aPollerId) {
+						break;
+					}
+				}
+
+				poller.pipe = ostypes.API('CreateNamedPipe')('\\\\.\\pipe\\dirwatcher' + DirectoryWatcherSessionId + poller.pollerid, ostypes.CONST.PIPE_ACCESS_DUPLEX | ostypes.CONST.FILE_FLAG_OVERLAPPED, ostypes.CONST.PIPE_TYPE_BYTE, 1, 1, 1, 0, null);
+				console.log('poller.pipe:', poller.pipe);
+				pipe_ptrstr = cutils.strOfPtr(poller.pipe);
+				console.log('pipe_ptrstr:', pipe_ptrstr);
+
+			break;
+	}
+
+	return { pollerid:aPollerId, sessionid:DirectoryWatcherSessionId, pipe_ptrstr };
+};
+
+var DirectoryWatcherSessionId = Date.now() + '';
 var DirectoryWatcherById = {};
 var DirectoryWatcherNextId = 0;
+var DirectoryWatcherPollers = [];
+var DirectoryWatcherPollerNextId = 0;
+// each element is an object:
+	// {
+	// 	worker: instance of comm server
+	// 	callInPoller
+	// 	watching_cnt - increment when addPath, decrement when removePath, when count hits 0, it is terminated if nothing is added to it within 10sec
+	// }
 class DirectoryWatcher {
 	constructor(aCallback) {
 		/*
@@ -89,6 +125,12 @@ class DirectoryWatcher {
 		importImportsIfMissing();
 		this.devhandler = aCallback;
 		this.osname = OS.Constants.Sys.Name.toLowerCase();
+
+		// set MAX_WATCHING_CNT for pollers (windows, mac, inotify/android) - Gio on mainthread has no limit but i manually limit it
+		this.MAX_WATCHING_CNT = 64; // https://bugzilla.mozilla.org/show_bug.cgi?id=958280#c42
+
+		// watching collection
+		this.watching_paths = {}; // key is path, value is object holding whatever info i need
 
 		// set oshandler - oshandler is responsible for triggering aCallback (this.devhandler)
 		switch (this.osname) {
@@ -112,6 +154,10 @@ class DirectoryWatcher {
 
 	}
 	gtkHandler(monitor, file, other_file, event_type, user_data) {
+		if (this.closed) {
+			console.warn('this watcher was cleaned up');
+			return;
+		}
 		console.log('in gtkHandler', 'monitor:', monitor, 'file:', file, 'other_file:', other_file, 'event_type:', event_type, 'user_data:', user_data);
 		// monitor = ostypes.TYPE.GFileMonitor.ptr(ctypes.UInt64(monitor));
 		file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(file));
@@ -125,11 +171,48 @@ class DirectoryWatcher {
 
 	}
 	addPath(aPath) {
+		if (this.closed) {
+			console.warn('this watcher was cleaned up');
+			return;
+		}
+		// on success add path to this.watching_paths
 		switch (this.osname) {
 			case 'winnt':
 			case 'winmo':
 			case 'wince':
-					//
+
+					// find available poller
+					var poller;
+					for (var a_poller of DirectoryWatcherPollers) {
+						if (a_poller.watching_cnt < MAX_WATCHING_CNT) {
+							poller = a_poller;
+							break;
+						}
+					}
+
+					if (!poller) {
+						// none available so lets crate one
+						poller = {
+							pollerid: DirectoryWatcherPollerNextId++,
+							watching_cnt: 0
+						};
+						poller.worker = new Comm.server.worker(directorywatcher_paths.watcher_dir + 'DirectoryWatcherPollWorker.js', DirectoryWatcherPollerIniter.bind(null, poller.pollerid));
+						poller.callInPoller = Comm.callInX.bind(null, poller.worker, null);
+						DirectoryWatcherPollers.push(poller);
+					}
+
+					if (poller.pipe) {
+						// trip it so it breaks the poll in worker
+					}
+
+					// if the worker is not yet started, this call to addPath will start it (and call the init)
+					poller.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, function(aArg) {
+						var successfully_added = aArg;
+						if (successfully_added) {
+							poller.watching_cnt++;
+						}
+					});
+
 				break;
 			case 'darwin':
 					//
@@ -164,6 +247,10 @@ class DirectoryWatcher {
 		}
 	}
 	removePath(aPath) {
+		if (this.closed) {
+			console.warn('this watcher was cleaned up');
+			return;
+		}
 		switch (this.osname) {
 			case 'winnt':
 			case 'winmo':
@@ -196,7 +283,10 @@ class DirectoryWatcher {
 				break;
 			default:
 				// assume gtk based system
-				callInBootstrap('DirectoryWatcherGtkClose', { aWatcherId:this.watcherid });
+				this.closed = true;
+				callInBootstrap('DirectoryWatcherGtkClose', { aWatcherId:this.watcherid }, function() {
+					delete DirectoryWatcherById[id];
+				});
 		}
 	}
 }
