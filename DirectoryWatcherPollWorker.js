@@ -39,6 +39,7 @@ var pollerid;
 var sessionid;
 var pipe;
 var path_mon_id_collection = {};
+var next_signalid = 0;
 // key is watcherid
 // value is object:
 // {
@@ -140,7 +141,11 @@ function addPath(aArg) {
 		return undefined;
 	}
 
-	o.hEvent = ctypes.cast(watcher_entry.data.watcherid_c.address(), ctypes.voidptr_t);
+	var signalid = next_signalid++;
+	var signalid_c = ctypes.uint16_t(signalid);
+
+	// hEvent is equivalent of user_data in Gio/Gtk
+	o.hEvent = ctypes.cast(signalid_c.address(), ctypes.voidptr_t);
 
 	var lp_index = LP_HANDLES.length;
 	LP_HANDLES.push(hdir);
@@ -149,19 +154,20 @@ function addPath(aArg) {
 	var rez_rdc = ostypes.API('ReadDirectoryChanges')(hdir, notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, o.address(), winHandler_c);
 	console.log('rez_rdc:', rez_rdc);
 
-	if (cutils.jscEqual(rez_rdc, 0)) {
+	if (!rez_rdc) {
 		// failed to add due to error
 		console.error('failed to add watcher due to error:', ctypes.winLastError);
 		setTimeout(poll, 0); // resume poll after return
 		return undefined;
 	} else {
-		watcher_entry.paths[aPath] = { hdir, o, lp_index, notif_buf };
+		watcher_entry.paths[aPath] = { hdir, o, lp_index, notif_buf, signalid, signalid_c };
 		setTimeout(poll, 0); // resume poll after return
 		return true;
 	}
 }
 
 function poll() {
+	// console.log('poll entered');
 	switch (core.os.name) {
 		case 'winnt':
 		case 'winmo':
@@ -170,11 +176,69 @@ function poll() {
 				console.log('starting wait');
 				var rez_wait = ostypes.API('WaitForMultipleObjectsEx')(LP_HANDLES.length, LP_HANDLES_C, false, ostypes.CONST.INFINITE, true);
 				console.log('rez_wait:', rez_wait);
-
+				// if (cutils.jscEqual(rez_wait, 0)) {
+				// 	// its the pipe interrupt, so dont restart the loop
+				// } else {
+				// 	// i get 192 when my file watcher triggers, dont restart poll here as it will keep returning with `1` or the index of the one that triggered, i have to reset the signal by calling ReadDirectoryChanges again
+				// }
 			break;
 	}
 }
 
 function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 	console.log('in winRoutine:', 'dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped:', lpOverlapped);
+
+	// get signalid
+	var signalid = ctypes.cast(lpOverlapped.contents.hEvent, ctypes.uint16_t.ptr).contents;
+	console.log('signalid:', signalid);
+
+	// get watcher_entry and path_entry
+	var watcher_entry;
+	var path_entry;
+	var path;
+	var watcherid;
+	get_entries: {
+		for (var a_watcherid in path_mon_id_collection) {
+			var a_watcher_entry = path_mon_id_collection[a_watcherid].paths;
+			for (var a_path in a_watcher_entry) {
+				var a_path_entry = a_watcher_entry[a_path];
+				if (a_path_entry.signalid === signalid) {
+					path_entry = a_path_entry;
+					path = a_path;
+					watcher_entry = a_watcher_entry;
+					watcherid = a_watcherid;
+					break get_entries;
+				}
+			}
+		}
+	}
+	// console.log('path:', path, 'watcherid:', watcherid, 'path_entry:', path_entry, 'watcher_entry:', watcher_entry);
+
+	if (cutils.jscEqual(dwErrorCode, 0)) {
+		// ok no error, so a file change happened
+
+		// get notif_buf
+		var notif_buf = path_entry.notif_buf;
+
+		// inform mainworker oshandler
+		callInMainworker('DirectoryWatcherCallOsHandlerById', {
+			watcherid,
+			handler_args: [dwNumberOfBytesTransfered, cutils.strOfPtr(notif_buf.address()), path]
+		});
+
+		// retrigger ReadDirectoryChanges on this hdir, otherwise WaitForMultipleObjectsEx will return immediately with index of this hdir in LP_HANDLES
+		var rez_rdc = ostypes.API('ReadDirectoryChanges')(path_entry.hdir, path_entry.notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, path_entry.o.address(), winHandler_c);
+		console.log('rez_rdc:', rez_rdc);
+
+		if (!rez_rdc) {
+			// failed to re-watch
+			console.error('ABORTING DUE TO UNEXPECTED ERROR!! failed to re-watch due to error:', ctypes.winLastError);
+		} else {
+			setTimeout(poll, 0); // no reason for setTimeout, i was just thinking no need to recurse, as it might not GC stuff
+		}
+	} else if (cutils.jscEqual(dwErrorCode, ostypes.CONST.ERROR_OPERATION_ABORTED)) {
+		// this one was canceled via CancelIoEx so lets release the handle
+	} else {
+		console.error('UNKNOWN ERROR!!!! ABORTING!! dwErrorCode:', dwErrorCode);
+	}
 }

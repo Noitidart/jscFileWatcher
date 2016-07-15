@@ -61,15 +61,15 @@ function importImportsIfMissing() {
 }
 
 function DirectoryWatcherCallOsHandlerById(aArg) {
-	var { id, handler_args } = aArg;
-	// id is undefined if gtk
-	if (id === undefined) {
-		// id is in user_data
+	var { watcherid, handler_args } = aArg;
+	// watcherid is undefined if gtk
+	if (watcherid === undefined) {
+		// watcherid is in user_data
 		var user_data = parseInt(cutils.jscGetDeepest(ctypes.uint16_t.ptr(ctypes.UInt64(handler_args[4]))));
-		id = handler_args[4] = user_data;
-		console.log('user_data:', user_data, 'id:', id, 'handler_args[4]:', handler_args[4]);
+		watcherid = handler_args[4] = user_data;
+		console.log('user_data:', user_data, 'watcherid:', watcherid, 'handler_args[4]:', handler_args[4]);
 	}
-	DirectoryWatcherById[id].oshandler(...handler_args);
+	DirectoryWatcherById[watcherid].oshandler(...handler_args);
 }
 
 var DirectoryWatcherPollerIniter = function(aPollerId) {
@@ -151,8 +151,11 @@ class DirectoryWatcher {
 				this.oshandler = this.gtkHandler;
 		}
 	}
-	winHandler() {
+	winHandler(dwNumberOfBytesTransfered, notif_buf, aPath) {
+		console.log('in mainworker winHandler:', dwNumberOfBytesTransfered, notif_buf, aPath);
+		// aPath is the path of the directory that was watched
 
+		// TODO: inform devhandler
 	}
 	gtkHandler(monitor, file, other_file, event_type, user_data) {
 		if (this.closed) {
@@ -164,6 +167,8 @@ class DirectoryWatcher {
 		file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(file));
 		// other_file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(other_file));
 		event_type = parseInt(cutils.jscGetDeepest(event_type));
+
+		// TODO: inform devhandler
 	}
 	macHandler() {
 
