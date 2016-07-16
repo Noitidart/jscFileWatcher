@@ -156,7 +156,7 @@ function removePath(aArg) {
 		// undefined - error
 	var { aPath } = aArg;
 
-	console.log('in poll worker removePath, aPath:', aPath);
+	console.log('poll worker - removePath, aPath:', aPath);
 
 	var path_info = dwGetActiveInfo(aPath);
 
@@ -193,9 +193,24 @@ function removePath(aArg) {
 			startPoll();
 			return undefined;
 		} else {
-			startPoll();
-			path_entry.deferred_cancel = new Deferred();
-			return path_entry.deferred_cancel.promise;
+			path_entry.removed = undefined; // will be set by winRoutine in ERROR_OPERATION_ABORTED
+			var rez_sleep = ostypes.API('SleepEx')(ostypes.CONST.INFINITE, true);
+			// the winRoutine for ERROR_OPERATION_ABORTED will trigger first, then the next line for console logging `rez_sleep` will happen
+			console.log('rez_sleep:', rez_sleep);
+
+			if (!cutils.jscEqual(rez_sleep, ostypes.CONST.WAIT_IO_COMPLETION)) {
+				console.error('rez_sleep is not WAIT_IO_COMPLETION! it is:', rez_sleep);
+			}
+
+			if (Object.keys(gDWActive).length) {
+				startPoll();
+			} else {
+				console.log('poller worker - after cancel - not resuming poll as there are no pathts to watch');
+				clearTimeout(gStartPollTimeout); // in case there is a left over from back to back `removePath`'s and the 2nd to last triggered a `startPoll()`
+			}
+
+			console.log('poll worker - removePath result:', path_entry.removed);
+			return path_entry.removed;
 		}
 	}
 }
@@ -265,7 +280,7 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 		// this one was canceled via CancelIo so lets release the handle
 		console.log('in callback - CANCELLED via CancelIo');
 
-		var { hdir, deferred_cancel } = path_entry;
+		var { hdir } = path_entry;
 
 		// close handle
 		var rez_closehandle = ostypes.API('CloseHandle')(hdir);
@@ -277,18 +292,13 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 		if (!rez_closehandle) {
 			// if fail here, it should be ok, its just bad for memory
 			console.error('failed to closehandle on path:', aPath, 'due to error:', ctypes.winLastError);
-			deferred_cancel.resolve(true);
+			path_entry.removed = true;
 		} else {
-			// succesfully remvoed path
-			deferred_cancel.resolve(true);
+			// succesfully removed path
+			path_entry.removed = true;
 		}
-
-		if (Object.keys(gDWActive).length) {
-			startPoll();
-		}
-		else { console.log('poller worker - after cancel - not resuming poll as there are no pathts to watch'); }
 	} else {
-		console.error('UNKNOWN ERROR!!!! ABORTING!! dwErrorCode:', dwErrorCode);
+		console.error('UNKNOWN ERROR!!!! dwErrorCode:', dwErrorCode);
 	}
 }
 
