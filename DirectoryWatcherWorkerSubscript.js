@@ -118,9 +118,16 @@ function dwShutdown() {
 	var promiseAll_close = Promise.all(promiseAllArr_close);
 	promiseAll_close.then(function(rez_close_arr) {
 
+		// actually yes this is neeeded, because remotePath sets a timer for 10sec to see if the poller is still empty before terminating so disregard this comment --> // no need for this, as removePath takes care of terminating them
 		// if any pollers, terminate them
-		for (var a_poller of gDWPollers) {
-			a_poller.worker.unregister();
+		if (gDWPollers) {
+			if (['winnt', 'wince', 'winmo'].includes(gDWOSName)) {
+				setTimeoutSync(1000); // in my tests if i terminate pollers soon after the last APC is cancelled (deferred_cancel resolves) in winRoutine it crashes, so thats why i do a 1sec wait here
+			}
+			for (var a_poller of gDWPollers) {
+				console.log('unregistering poller with pollerid:', a_poller.pollerid);
+				a_poller.worker.unregister();
+			}
 		}
 
 		if (rez_close_arr.includes(undefined)) {
@@ -337,7 +344,7 @@ class DirectoryWatcher {
 					deferredmain_removepath.resolve(undefined);
 				} else {
 					path_entry.watcherids.splice(ix_watcherid, 1);
-					console.log('ok splaced from watcherids:', path_entry.watcherids);
+					console.log('ok spliced from watcherids:', path_entry.watcherids);
 				}
 
 				if (!path_entry.watcherids.length) {
@@ -353,37 +360,7 @@ class DirectoryWatcher {
 							// if poller, then test if should destroy it
 							if (path_entry.pollerid !== undefined) { // as pollerid might be 0
 								// this platform uses a poller worker
-								console.log('active cnt for this poller:', dwGetActiveCntByPollerId(path_entry.pollerid));
-								if (!dwGetActiveCntByPollerId(path_entry.pollerid)) {
-									// this poller is not watching anything anymore, so destroy it
-									console.log('destroying this poller');
-									// no need for a ostypes.API('PulseEvent')() because if there ano more paths then the `poll` in the worker would not have been restarted by the `removePath` method in the worker
-
-									var poller_entry = dwGetPollerEntryById(path_entry.pollerid)
-
-									// release the pipe
-									switch (gDWOSName) {
-										case 'winnt':
-										case 'winmo':
-										case 'wince':
-												var rez_pipeclosed = ostypes.API('CloseHandle')(poller_entry.pipe);
-												console.log('rez_pipeclosed:', rez_pipeclosed);
-											break;
-										case 'darwin':
-												//
-											break;
-										case 'android':
-												//
-											break;
-										default:
-											// assume gtk based system
-									}
-
-									// destroy it
-									poller_entry.worker.unregister();
-									dwRemovePollerEntryById(path_entry.pollerid);
-									console.log('destroyed poller');
-								}
+								setTimeout(dwTerminatePollerIfEmpty.bind(null, path_entry.pollerid), 10000); // if no paths added back within 10sec, then terminate it
 							}
 						}
 						deferredmain_removepath.resolve(removed);
@@ -448,6 +425,44 @@ class DirectoryWatcher {
 }
 if (OS && OS.File) {
 	OS.File.DirectoryWatcher = DirectoryWatcher;
+}
+
+function dwTerminatePollerIfEmpty(aPollerId) {
+	var poller_entry = dwGetPollerEntryById(aPollerId);
+
+	if (!poller_entry) {
+		// no longer exists. probably gets here when i terminate all pollers on dwShutdown after 1sec. but wait no, on dwShutdown i terminate this whole MainWorker after dwShutdown. so it may never get here. so this is just a precaution.
+		return;
+	}
+
+	if (!dwGetActiveCntByPollerId(aPollerId)) {
+		// this poller is not watching anything anymore, so destroy it
+		console.log('destroying poller with pollerid:', aPollerId);
+		// no need for a ostypes.API('PulseEvent')() because if there ano more paths then the `poll` in the worker would not have been restarted by the `removePath` method in the worker
+
+		// release the pipe
+		switch (gDWOSName) {
+			case 'winnt':
+			case 'winmo':
+			case 'wince':
+					var rez_pipeclosed = ostypes.API('CloseHandle')(poller_entry.pipe);
+					console.log('rez_pipeclosed:', rez_pipeclosed);
+				break;
+			case 'darwin':
+					//
+				break;
+			case 'android':
+					//
+				break;
+			default:
+				// assume gtk based system
+		}
+
+		// destroy it
+		poller_entry.worker.unregister();
+		dwRemovePollerEntryById(aPollerId);
+		console.log('destroyed poller with pollerid:', aPollerId);
+	}
 }
 
 function dwGetActiveInfo(aBy) {
@@ -610,5 +625,9 @@ function genericCatch(aPromiseName, aPromiseToReject, aCaught) {
 	if (aPromiseToReject) {
 		aPromiseToReject.reject(rejObj);
 	}
+}
+function setTimeoutSync(aMilliseconds) {
+	var breakDate = Date.now() + aMilliseconds;
+	while (Date.now() < breakDate) {}
 }
 // end - common helper functions

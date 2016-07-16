@@ -250,7 +250,7 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 
 		var new_notif_buf = ostypes.TYPE.DWORD.array(NOTIFICATION_DWORD_BUFFER_LENGTH)(); // must use new notif_buf to avoid race conditions per - "However, you have to make sure that you use a different buffer than your current call or you will end up with a race condition." - https://qualapps.blogspot.com/2010/05/understanding-readdirectorychangesw_19.html
 		path_entry.notif_buf = new_notif_buf;
-		
+
 		// retrigger ReadDirectoryChanges on this hdir, otherwise WaitForMultipleObjectsEx will return immediately with index of this hdir in gLpHandles
 		var rez_rdc = ostypes.API('ReadDirectoryChanges')(path_entry.hdir, path_entry.notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, path_entry.o.address(), winHandler_c);
 		console.log('rez_rdc:', rez_rdc);
@@ -277,20 +277,14 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 		if (!rez_closehandle) {
 			// if fail here, it should be ok, its just bad for memory
 			console.error('failed to closehandle on path:', aPath, 'due to error:', ctypes.winLastError);
-			setTimeout(function() {
-				// allow rez_wait in poll to trgger first - because if this is last path then MainWorker will terminate this PollWorker. If it terminates it before rez_wait returns then it will crash
-				deferred_cancel.resolve(true);
-			}, 1000);
+			deferred_cancel.resolve(true);
 		} else {
 			// succesfully remvoed path
-			setTimeout(function() {
-				// allow rez_wait in poll to trgger first - because if this is last path then MainWorker will terminate this PollWorker. If it terminates it before rez_wait returns then it will crash
-				deferred_cancel.resolve(true);
-			}, 1000);
+			deferred_cancel.resolve(true);
 		}
 
 		if (Object.keys(gDWActive).length) {
-			setTimeout(poll, 0); // resume poll after return
+			setTimeout(poll, 0); // setTimeout is just my thoughts, as i want it to trigger after this winRoutine is done
 		}
 		else { console.log('poller worker - after cancel - not resuming poll as there are no pathts to watch'); }
 	} else {
