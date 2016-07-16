@@ -120,7 +120,7 @@ function dwShutdown() {
 
 		// actually yes this is neeeded, because remotePath sets a timer for 10sec to see if the poller is still empty before terminating so disregard this comment --> // no need for this, as removePath takes care of terminating them
 		// if any pollers, terminate them
-		if (gDWPollers) {
+		if (gDWPollers.length) {
 			if (['winnt', 'wince', 'winmo'].includes(gDWOSName)) {
 				setTimeoutSync(1000); // in my tests if i terminate pollers soon after the last APC is cancelled (deferred_cancel resolves) in winRoutine it crashes, so thats why i do a 1sec wait here
 			}
