@@ -15,6 +15,7 @@ var gDWPollers = [];
 	// {
 	// 	worker: instance of comm server
 	// 	callInPoller
+	//	pipe
 	// }
 
 var gDWActive = {};
@@ -104,6 +105,35 @@ function dwPollerIniter(aPollerId) {
 	return { pipe_ptrstr };
 }
 
+function dwShutdown() {
+	var deferredmain_dwshutdown = new Deferred();
+
+	var promiseAllArr_close = [];
+
+	for (var watcherid in gDWInstancesById) {
+		var dwinst = gDWInstancesById[watcherid];
+		promiseAllArr_close.push(dwinst.close());
+	}
+
+	var promiseAll_close = Promise.all(promiseAllArr_close);
+	promiseAll_close.then(function(rez_close_arr) {
+
+		// if any pollers, terminate them
+		for (var a_poller of gDWPollers) {
+			a_poller.worker.unregister();
+		}
+
+		if (rez_close_arr.includes(undefined)) {
+			// closed but not all paths removed
+			deferredmain_dwshutdown.resolve(undefined);
+		} else {
+			deferredmain_dwshutdown.resolve(true);
+		}
+	});
+
+	return deferredmain_dwshutdown.promise;
+}
+
 class DirectoryWatcher {
 	constructor(aCallback) {
 		/*
@@ -143,9 +173,9 @@ class DirectoryWatcher {
 				this.oshandler = this.gtkHandler;
 		}
 	}
-	winHandler(aPath, dwNumberOfBytesTransfered, changes) {
-		console.log('in mainworker winHandler:', 'aPath:', aPath, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'changes:', changes);
+	winHandler(path, dwNumberOfBytesTransfered, changes) {
 		// path is the path of the directory that was watched
+		console.log('in mainworker winHandler:', 'path:', path, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'changes:', changes);
 
 		if (this.closed) {
 			console.warn('this watcher was closed so oshandler exiting');
@@ -204,7 +234,8 @@ class DirectoryWatcher {
 
 		var path_info = dwGetActiveInfo(aPath);
 		if (path_info) {
-			var path_entry = path_entry.entry;
+			console.log('path_info:', path_info);
+			var path_entry = path_info.entry;
 			if (path_entry.watcherids.includes(this.watcherid)) {
 				console.warn('THIS WATCHER is already watching aPath:', aPath);
 				return false;
@@ -278,63 +309,141 @@ class DirectoryWatcher {
 	removePath(aPath, aClosing) {
 		// aClosing is programtic value, devuser should never set this
 
-		// returns
-			// actually not yet - due to async nature // true - successfully removed
+		// returns promise that resolves to
+			// true - successfully removed
 			// false - wasnt watching
 			// undefined - error
 
+		var deferredmain_removepath = new Deferred();
+
+		console.log('in removePath, aPath:', aPath);
+
 		if (!aClosing && this.closed) {
-			console.warn('this watcher was cleaned up');
-			return;
-		}
-
-		var path_info = dwGetActiveInfo(aPath);
-		if (!path_info) {
-			console.warn('cannot remove as NO WATCHER was ever watching aPath:', aPath);
-			return false;
-		}
-		var path_entry = path_entry.entry;
-
-		var ix_watcherid = path_entry.watcherids.indexOf(this.watcherid);
-		if (ix_watcherid == -1) {
-			console.warn('cannot remove as THIS WATCHER was never watching aPath:', aPath);
-			return false;
+			console.warn('error: this watcher was cleaned up');
+			deferredmain_removepath.resolve(undefined);
 		} else {
-			path_entry.watcherids.splice(ix_watcherid, 1);
-		}
 
-		if (path_entry.watcherids.length) {
-			switch (gDWOSName) {
-				case 'winnt':
-				case 'winmo':
-				case 'wince':
-						//
-					break;
-				case 'darwin':
-						//
-					break;
-				case 'android':
-						//
-					break;
-				default:
-					// assume gtk based system
-					callInBootstrap('dwRemovePath', { aPath }, function(removed) {
+			var path_info = dwGetActiveInfo(aPath);
+			if (!path_info) {
+				console.warn('error: cannot remove as not even ANY WATCHER is watching aPath:', aPath);
+				deferredmain_removepath.resolve(undefined);
+			} else {
+				console.log('path_info:', path_info);
+				var path_entry = path_info.entry;
+
+				var ix_watcherid = path_entry.watcherids.indexOf(this.watcherid);
+				if (ix_watcherid == -1) {
+					console.warn('error: cannot remove as THIS WATCHER is not watching aPath:', aPath);
+					deferredmain_removepath.resolve(undefined);
+				} else {
+					path_entry.watcherids.splice(ix_watcherid, 1);
+					console.log('ok splaced from watcherids:', path_entry.watcherids);
+				}
+
+				if (!path_entry.watcherids.length) {
+					// no watcherid is watching this path so remove it
+					console.log('no watcherid is watching this path so remove it');
+
+					var removed_callback = function(removed) {
+						console.log('result of removePath in caller, removed:', removed);
 						if (removed) {
+							// no longer watching so remove from gDWActive
 							delete gDWActive[aPath];
+
+							// if poller, then test if should destroy it
+							if (path_entry.pollerid !== undefined) { // as pollerid might be 0
+								// this platform uses a poller worker
+								console.log('active cnt for this poller:', dwGetActiveCntByPollerId(path_entry.pollerid));
+								if (!dwGetActiveCntByPollerId(path_entry.pollerid)) {
+									// this poller is not watching anything anymore, so destroy it
+									console.log('destroying this poller');
+									// no need for a ostypes.API('PulseEvent')() because if there ano more paths then the `poll` in the worker would not have been restarted by the `removePath` method in the worker
+
+									var poller_entry = dwGetPollerEntryById(path_entry.pollerid)
+
+									// release the pipe
+									switch (gDWOSName) {
+										case 'winnt':
+										case 'winmo':
+										case 'wince':
+												var rez_pipeclosed = ostypes.API('CloseHandle')(poller_entry.pipe);
+												console.log('rez_pipeclosed:', rez_pipeclosed);
+											break;
+										case 'darwin':
+												//
+											break;
+										case 'android':
+												//
+											break;
+										default:
+											// assume gtk based system
+									}
+
+									// destroy it
+									poller_entry.worker.unregister();
+									dwRemovePollerEntryById(path_entry.pollerid);
+									console.log('destroyed poller');
+								}
+							}
 						}
-					});
+						deferredmain_removepath.resolve(removed);
+					};
+
+					switch (gDWOSName) {
+						case 'winnt':
+						case 'winmo':
+						case 'wince':
+								var poller_entry = dwGetPollerEntryById(path_entry.pollerid);
+								ostypes.API('PulseEvent')(poller_entry.pipe);
+								console.log('calling removePath in poller')
+								poller_entry.callInPoller('removePath', { aPath }, removed_callback);
+							break;
+						case 'darwin':
+								//
+							break;
+						case 'android':
+								//
+							break;
+						default:
+							// assume gtk based system
+							callInBootstrap('dwRemovePath', { aPath }, removed_callback);
+					}
+				}
 			}
 		}
+		return deferredmain_removepath.promise;
 	}
 	close() {
+		// returns promise which resolve with
+			// true - when all paths removed
+			// undefiend - if all paths not removed
+		var deferredmain_close = new Deferred();
 		this.closed = true;
+		var watcherid = this.watcherid;
 
-		var path_infos = dwGetPathInfos(this.watcherid);
+		var promiseAllArr_remove = [];
+		var path_infos = dwGetPathInfos(watcherid);
 		if (path_infos) {
 			for (var path_info of path_infos) {
-				this.removePath(path, true); // set aClosing to true, so removePath works even though this.closed was set
+				promiseAllArr_remove.push(this.removePath(path_info.path, true)); // set aClosing to true, so removePath works even though this.closed was set
 			}
 		}
+
+		var promiseAll_remove = Promise.all(promiseAllArr_remove);
+		promiseAll_remove.then(function(rez_remove_arr) {
+
+			delete gDWInstancesById[watcherid];
+
+			if (rez_remove_arr.includes(false) || rez_remove_arr.includes(undefined)) {
+				// not all of them succesfully removed
+				deferredmain_close.resolve(undefined);
+			} else {
+				console.log('ok succesfully closed watcher with watcherid:', watcherid);
+				deferredmain_close.resolve(true);
+			}
+
+		});
+		return deferredmain_close.promise;
 	}
 }
 if (OS && OS.File) {
@@ -351,7 +460,11 @@ function dwGetActiveInfo(aBy) {
 		// `{path, entry}` where `entry` in `gDWActive` by reference
 
 	if (typeof(aBy) == 'string') {
-		return gDWActive[aBy];
+		if (!gDWActive[aBy]) {
+			return undefined;
+		} else {
+			return { path:aBy, entry:gDWActive[aBy] };
+		}
 	} else {
 		for (var path in gDWActive) {
 			var path_entry = gDWActive[path];
@@ -362,6 +475,29 @@ function dwGetActiveInfo(aBy) {
 	}
 }
 
+
+function dwRemovePollerEntryById(aPollerId) {
+	// returns
+		// true - when it was found and removed
+		// false - not found
+
+	var l = gDWPollers.length;
+	for (var i=0; i<l; i++) {
+		var poller_entry = gDWPollers[i];
+		if (poller_entry.pollerid === aPollerId) {
+			gDWPollers.splice(i, 1);
+			return true;
+		}
+	}
+	return false;
+}
+function dwGetPollerEntryById(aPollerId) {
+	for (var poller of gDWPollers) {
+		if (poller.pollerid === aPollerId) {
+			return poller;
+		}
+	}
+}
 function dwGetPathInfos(aWatcherId) {
 	// returns
 		// array if paths found that include aWatcherId

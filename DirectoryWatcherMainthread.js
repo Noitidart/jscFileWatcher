@@ -102,6 +102,15 @@ function dwAddPath(aArg) {
 	return true;
 }
 
+function dwShutdownMT() {
+	var deferredmain_dwshutdownmt = new Deferred();
+	callInDWWorker('dwShutdown', undefined, function() {
+		console.log('worker dwShutdown completed, so mainthread dwShutdownMT resolving');
+		deferredmain_dwshutdownmt.resolve();
+	});
+	return deferredmain_dwshutdownmt.promise;
+}
+
 function dwRemovePath(aArg) {
 	// gio only
 
@@ -208,7 +217,11 @@ function dwGetActiveInfo(aBy) {
 		// `{path, entry}` where `entry` in `gDWActive` by reference
 
 	if (typeof(aBy) == 'string') {
-		return gDWActive[aBy];
+		if (!gDWActive[aBy]) {
+			return undefined;
+		} else {
+			return { path:aBy, entry:gDWActive[aBy] };
+		}
 	} else {
 		for (var path in gDWActive) {
 			var path_entry = gDWActive[path];
@@ -216,5 +229,36 @@ function dwGetActiveInfo(aBy) {
 				return { path, entry:path_entry };
 			}
 		}
+	}
+}
+
+// start - common helper functions
+function Deferred() {
+	this.resolve = null;
+	this.reject = null;
+	this.promise = new Promise(function(resolve, reject) {
+		this.resolve = resolve;
+		this.reject = reject;
+	}.bind(this));
+	Object.freeze(this);
+}
+function genericReject(aPromiseName, aPromiseToReject, aReason) {
+	var rejObj = {
+		name: aPromiseName,
+		aReason: aReason
+	};
+	console.error('Rejected - ' + aPromiseName + ' - ', rejObj);
+	if (aPromiseToReject) {
+		aPromiseToReject.reject(rejObj);
+	}
+}
+function genericCatch(aPromiseName, aPromiseToReject, aCaught) {
+	var rejObj = {
+		name: aPromiseName,
+		aCaught: aCaught
+	};
+	console.error('Caught - ' + aPromiseName + ' - ', rejObj);
+	if (aPromiseToReject) {
+		aPromiseToReject.reject(rejObj);
 	}
 }

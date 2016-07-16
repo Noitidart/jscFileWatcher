@@ -129,9 +129,9 @@ function addPath(aArg) {
 	// hEvent is equivalent of user_data in Gio/Gtk
 	o.hEvent = ctypes.cast(signalid_c.address(), ctypes.voidptr_t);
 
-	var lp_index = gLpHandles.length;
-	gLpHandles.push(hdir);
-	gLpHandles_c = ostypes.TYPE.HANDLE.array()(gLpHandles);
+	// var lp_index = gLpHandles.length;
+	// gLpHandles.push(hdir);
+	// gLpHandles_c = ostypes.TYPE.HANDLE.array()(gLpHandles);
 
 	var rez_rdc = ostypes.API('ReadDirectoryChanges')(hdir, notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, o.address(), winHandler_c);
 	console.log('rez_rdc:', rez_rdc);
@@ -142,9 +142,61 @@ function addPath(aArg) {
 		setTimeout(poll, 0); // resume poll after return
 		return undefined;
 	} else {
-		gDWActive[aPath] = { hdir, o, lp_index, notif_buf, signalid, signalid_c };
+		// gDWActive[aPath] = { hdir, o, lp_index, notif_buf, signalid, signalid_c };
+		gDWActive[aPath] = { hdir, o, notif_buf, signalid, signalid_c };
 		setTimeout(poll, 0); // resume poll after return
 		return true;
+	}
+}
+
+function removePath(aArg) {
+	// returns
+		// true - successfully removed
+		// false - wasnt there
+		// undefined - error
+	var { aPath } = aArg;
+
+	console.log('in poll worker removePath, aPath:', aPath);
+
+	var path_info = dwGetActiveInfo(aPath);
+
+	if (!path_info) {
+		console.warn('was not watching aPath:', aPath);
+		setTimeout(poll, 0); // resume poll after return
+		return false;
+	} else {
+		var path_entry = path_info.entry;
+
+		var { hdir } = path_entry;
+
+		// // stop watching this by removing it from gLpHandles/gLpHandles_c
+		// // remove from gLpHandles
+		// gLpHandles.splice(lp_index, 1);
+		// gLpHandles_c = ostypes.TYPE.HANDLE.array()(gLpHandles);
+		//
+		// // decrement lp_index of all other paths that were above lp_index
+		// for (var a_path in gDWActive) {
+		// 	var a_path_entry = gDWActive[a_path];
+		// 	if (a_path_entry.lp_index > lp_index) {
+		// 		a_path_entry.lp_index--;
+		// 	}
+		// }
+
+		// cancel apc
+		var rez_cancelio = ostypes.API('CancelIo')(hdir); // dont need CancelIoEx as im in the same thread
+		console.log('rez_cancelio:', rez_cancelio);
+
+		if (!rez_cancelio) {
+			// if fail here, its just bad for memory
+			console.error('failed to cancelio on path:', aPath, 'due to error:', ctypes.winLastError);
+			// it is still being watched
+			setTimeout(poll, 0); // resume poll after return
+			return undefined;
+		} else {
+			setTimeout(poll, 0); // resume poll, as the winRoutine will trigger with dwErrorCode of ERROR_OPERATION_ABORTED, i shoul then close the hdir handle there
+			path_entry.deferred_cancel = new Deferred();
+			return path_entry.deferred_cancel.promise;
+		}
 	}
 }
 
@@ -196,6 +248,9 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 			rest_args: [dwNumberOfBytesTransfered, cutils.strOfPtr(notif_buf.address())]
 		});
 
+		var new_notif_buf = ostypes.TYPE.DWORD.array(NOTIFICATION_DWORD_BUFFER_LENGTH)(); // must use new notif_buf to avoid race conditions per - "However, you have to make sure that you use a different buffer than your current call or you will end up with a race condition." - https://qualapps.blogspot.com/2010/05/understanding-readdirectorychangesw_19.html
+		path_entry.notif_buf = new_notif_buf;
+		
 		// retrigger ReadDirectoryChanges on this hdir, otherwise WaitForMultipleObjectsEx will return immediately with index of this hdir in gLpHandles
 		var rez_rdc = ostypes.API('ReadDirectoryChanges')(path_entry.hdir, path_entry.notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, path_entry.o.address(), winHandler_c);
 		console.log('rez_rdc:', rez_rdc);
@@ -207,7 +262,37 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 			setTimeout(poll, 0); // no reason for setTimeout, i was just thinking no need to recurse, as it might not GC stuff
 		}
 	} else if (cutils.jscEqual(dwErrorCode, ostypes.CONST.ERROR_OPERATION_ABORTED)) {
-		// this one was canceled via CancelIoEx so lets release the handle
+		// this one was canceled via CancelIo so lets release the handle
+		console.log('in callback - CANCELLED via CancelIo');
+
+		var { hdir, deferred_cancel } = path_entry;
+
+		// close handle
+		var rez_closehandle = ostypes.API('CloseHandle')(hdir);
+		console.log('rez_closehandle:', rez_closehandle);
+
+		// remove from active paths as it was succesully unwatched
+		delete gDWActive[path];
+
+		if (!rez_closehandle) {
+			// if fail here, it should be ok, its just bad for memory
+			console.error('failed to closehandle on path:', aPath, 'due to error:', ctypes.winLastError);
+			setTimeout(function() {
+				// allow rez_wait in poll to trgger first - because if this is last path then MainWorker will terminate this PollWorker. If it terminates it before rez_wait returns then it will crash
+				deferred_cancel.resolve(true);
+			}, 1000);
+		} else {
+			// succesfully remvoed path
+			setTimeout(function() {
+				// allow rez_wait in poll to trgger first - because if this is last path then MainWorker will terminate this PollWorker. If it terminates it before rez_wait returns then it will crash
+				deferred_cancel.resolve(true);
+			}, 1000);
+		}
+
+		if (Object.keys(gDWActive).length) {
+			setTimeout(poll, 0); // resume poll after return
+		}
+		else { console.log('poller worker - after cancel - not resuming poll as there are no pathts to watch'); }
 	} else {
 		console.error('UNKNOWN ERROR!!!! ABORTING!! dwErrorCode:', dwErrorCode);
 	}
@@ -223,7 +308,11 @@ function dwGetActiveInfo(aBy) {
 		// `{path, entry}` where `entry` in `gDWActive` by reference
 
 	if (typeof(aBy) == 'string') {
-		return gDWActive[aBy];
+		if (!gDWActive[aBy]) {
+			return undefined;
+		} else {
+			return { path:aBy, entry:gDWActive[aBy] };
+		}
 	} else {
 		for (var path in gDWActive) {
 			var path_entry = gDWActive[path];
