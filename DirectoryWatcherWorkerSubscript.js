@@ -257,37 +257,37 @@ class DirectoryWatcher {
 				case 'wince':
 
 						// find available poller
-						var poller;
+						var poller_entry;
 						for (var a_poller of gDWPollers) {
 							if (dwGetActiveCntByPollerId(a_poller.pollerid) < DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD) {
-								poller = a_poller;
+								poller_entry = a_poller;
 								break;
 							}
 						}
 
-						if (!poller) {
+						if (!poller_entry) {
 							// none available so lets crate one
-							poller = {
+							poller_entry = {
 								pollerid: gDWPollerNextId++
 							};
-							poller.worker = new Comm.server.worker(directorywatcher_paths.watcher_dir + 'DirectoryWatcherPollWorker.js', dwPollerIniter.bind(null, poller.pollerid));
-							poller.callInPoller = Comm.callInX.bind(null, poller.worker, null);
-							gDWPollers.push(poller);
+							poller_entry.worker = new Comm.server.worker(directorywatcher_paths.watcher_dir + 'DirectoryWatcherPollWorker.js', dwPollerIniter.bind(null, poller_entry.pollerid));
+							poller_entry.callInPoller = Comm.callInX.bind(null, poller_entry.worker, null);
+							gDWPollers.push(poller_entry);
 						}
 
-						if (poller.pipe) {
+						if (poller_entry.pipe) {
 							// trip it so it breaks the poll in worker
-							ostypes.API('PulseEvent')(poller.pipe);
+							ostypes.API('PulseEvent')(poller_entry.pipe);
 						}
 
 						// if the worker is not yet started, this call to addPath will start it (and call the init)
 						var watcherid = this.watcherid;
-						poller.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, function(added) {
+						poller_entry.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, function(added) {
 							// TODO: due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this
 							if (added) {
 								gDWActive[aPath] = {
 									watcherids: [watcherid],
-									pollerid: poller.pollerid
+									pollerid: poller_entry.pollerid
 								};
 							}
 						});

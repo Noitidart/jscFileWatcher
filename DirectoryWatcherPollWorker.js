@@ -119,7 +119,7 @@ function addPath(aArg) {
 	console.info('notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD BE same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES);
 	if (notif_buf.constructor.size != NOTIFICATION_BUFFER_SIZE_IN_BYTES) {
 		console.error('please email noitidart@gmail.com about this error. notif_buf is of a size i dont expect', 'notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD HAVE BEEN same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES)
-		setTimeout(poll, 0); // resume poll after return
+		startPoll();
 		return undefined;
 	}
 
@@ -139,12 +139,12 @@ function addPath(aArg) {
 	if (!rez_rdc) {
 		// failed to add due to error
 		console.error('failed to add watcher due to error:', ctypes.winLastError);
-		setTimeout(poll, 0); // resume poll after return
+		startPoll();
 		return undefined;
 	} else {
 		// gDWActive[aPath] = { hdir, o, lp_index, notif_buf, signalid, signalid_c };
 		gDWActive[aPath] = { hdir, o, notif_buf, signalid, signalid_c };
-		setTimeout(poll, 0); // resume poll after return
+		startPoll();
 		return true;
 	}
 }
@@ -162,7 +162,7 @@ function removePath(aArg) {
 
 	if (!path_info) {
 		console.warn('was not watching aPath:', aPath);
-		setTimeout(poll, 0); // resume poll after return
+		startPoll();
 		return false;
 	} else {
 		var path_entry = path_info.entry;
@@ -190,10 +190,10 @@ function removePath(aArg) {
 			// if fail here, its just bad for memory
 			console.error('failed to cancelio on path:', aPath, 'due to error:', ctypes.winLastError);
 			// it is still being watched
-			setTimeout(poll, 0); // resume poll after return
+			startPoll();
 			return undefined;
 		} else {
-			setTimeout(poll, 0); // resume poll, as the winRoutine will trigger with dwErrorCode of ERROR_OPERATION_ABORTED, i shoul then close the hdir handle there
+			startPoll();
 			path_entry.deferred_cancel = new Deferred();
 			return path_entry.deferred_cancel.promise;
 		}
@@ -259,7 +259,7 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 			// failed to re-watch
 			console.error('ABORTING DUE TO UNEXPECTED ERROR!! failed to re-watch due to error:', ctypes.winLastError);
 		} else {
-			setTimeout(poll, 0); // no reason for setTimeout, i was just thinking no need to recurse, as it might not GC stuff
+			startPoll();
 		}
 	} else if (cutils.jscEqual(dwErrorCode, ostypes.CONST.ERROR_OPERATION_ABORTED)) {
 		// this one was canceled via CancelIo so lets release the handle
@@ -284,12 +284,18 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 		}
 
 		if (Object.keys(gDWActive).length) {
-			setTimeout(poll, 0); // setTimeout is just my thoughts, as i want it to trigger after this winRoutine is done
+			startPoll();
 		}
 		else { console.log('poller worker - after cancel - not resuming poll as there are no pathts to watch'); }
 	} else {
 		console.error('UNKNOWN ERROR!!!! ABORTING!! dwErrorCode:', dwErrorCode);
 	}
+}
+
+var gStartPollTimeout;
+function startPoll() {
+	clearTimeout(gStartPollTimeout);
+	gStartPollTimeout = setTimeout(poll, 0);
 }
 
 function dwGetActiveInfo(aBy) {
