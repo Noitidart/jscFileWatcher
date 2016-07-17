@@ -173,59 +173,25 @@ function addPath(aArg) {
 
 				var cfstr = ostypes.HELPER.makeCFStr(aPath);
 
-				// re-set up gCfHandles
-				gCfHandles = [];
-				if (gCfHandles_c) {
-					// on init, it is null
-					// clean up the old handles
-					gCfHandles_c = null;
-					ostypes.API('CFRelease')(gCfHandles_cf);
-					gCfHandles_cf = null;
+				var new_cfhandles = [];
+				for (var a_path in gDWActive) {
+					var a_path_entry = gDWActive[a_path];
+					new_cfhandles.push(a_path_entry.cfstr);
 				}
+				new_cfhandles.push(cfstr);
 
-				for (var path of gDWActive) {
-					var path_entry = gDWActive[path];
-					gCfHandles.push(path_entry.cfstr);
-				}
+				var rez_reset = macResetStream(new_cfhandles);
+				console.log('rez_reset:', rez_reset);
 
-				gCfHandles_c = ostypes.TYPE.void.ptr.array()(gCfHandles);
-				gCfHandles_cf = ostypes.API('CFArrayCreate')(null, gCfHandles_c, gCfHandles.length, ostypes.CONST.kCFTypeArrayCallBacks.address());
-
-				// create the new stream
-				if (gStream) {
-					// clean up the old stream
-					ostypes.API('FSEventStreamStop')(gStream);
-					ostypes.API('FSEventStreamInvalidate')(gStream);
-					// just doing the above two will make runLoopRun break but we want to totally clean up the stream as we dont want it anymore as we are making a new one
-					ostypes.API('FSEventStreamRelease')(gStream);
-					gStream = null;
-				}
-
-				gStream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macRoutine_c, null, gCfHandles_cf, ostypes.TYPE.UInt64(ostypes.CONST.kFSEventStreamEventIdSinceNow), 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
-				console.info('gStream:', gStream);
-				if (gStream.isNull()) { // i have seen this null when gCfHandles_cf had no paths added to it, so was an empty gCfHandles/gCfHandles_c
-					console.error('Failed FSEventStreamCreate!! Aborting as in not re-starting poll');
+				if (rez_reset) {
+					// ok succesfully added
+					gDWActive[aPath] = { cfstr };
+					startPoll();
+					return true;
+				} else {
 					ostypes.API('CFRelease')(cfstr);
-					return undefined;
+					return rez;
 				}
-
-				// schedule it on gRunLoop in default mode for CFrunLoopRun
-				ostypes.API('FSEventStreamScheduleWithRunLoop')(gStream, gRunLoop, ostypes.CONST.kCFRunLoopDefaultMode); // returns void
-
-				// start the stream
-				var rez_startstream = ostypes.API('FSEventStreamStart')(gStream);
-				console.log('rez_startstream:', rez_startstream);
-				if (!rez_startstream) {
-					console.error('Failed FSEventStreamStart! Aborting - as in will not restart poll');
-					ostypes.API('CFRelease')(cfstr);
-					return undefined;
-				}
-
-				// ok succesfully added
-				gDWActive[aPath] = { cfstr };
-				startPoll();
-
-				return true;
 
 			break;
 	}
@@ -241,61 +207,97 @@ function removePath(aArg) {
 	console.log('poll worker - removePath, aPath:', aPath);
 
 	var path_info = dwGetActiveInfo(aPath);
-
 	if (!path_info) {
 		console.warn('was not watching aPath:', aPath);
 		startPoll();
 		return false;
-	} else {
-		var path_entry = path_info.entry;
+	}
+	var path_entry = path_info.entry;
 
-		var { hdir } = path_entry;
+	switch (core.os.name) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
 
-		// // stop watching this by removing it from gLpHandles/gLpHandles_c
-		// // remove from gLpHandles
-		// gLpHandles.splice(lp_index, 1);
-		// gLpHandles_c = ostypes.TYPE.HANDLE.array()(gLpHandles);
-		//
-		// // decrement lp_index of all other paths that were above lp_index
-		// for (var a_path in gDWActive) {
-		// 	var a_path_entry = gDWActive[a_path];
-		// 	if (a_path_entry.lp_index > lp_index) {
-		// 		a_path_entry.lp_index--;
-		// 	}
-		// }
+				var { hdir } = path_entry;
 
-		// cancel apc
-		var rez_cancelio = ostypes.API('CancelIo')(hdir); // dont need CancelIoEx as im in the same thread
-		console.log('rez_cancelio:', rez_cancelio);
+				// // stop watching this by removing it from gLpHandles/gLpHandles_c
+				// // remove from gLpHandles
+				// gLpHandles.splice(lp_index, 1);
+				// gLpHandles_c = ostypes.TYPE.HANDLE.array()(gLpHandles);
+				//
+				// // decrement lp_index of all other paths that were above lp_index
+				// for (var a_path in gDWActive) {
+				// 	var a_path_entry = gDWActive[a_path];
+				// 	if (a_path_entry.lp_index > lp_index) {
+				// 		a_path_entry.lp_index--;
+				// 	}
+				// }
 
-		if (!rez_cancelio) {
-			// if fail here, its just bad for memory
-			console.error('failed to cancelio on path:', aPath, 'due to error:', ctypes.winLastError);
-			// it is still being watched
-			startPoll();
-			return undefined;
-		} else {
-			path_entry.removed = 'notyet'; // will be set by winRoutine in ERROR_OPERATION_ABORTED
-			while (path_entry.removed == 'notyet') {
-				var rez_sleep = ostypes.API('SleepEx')(ostypes.CONST.INFINITE, true);
-				// the winRoutine for ERROR_OPERATION_ABORTED will trigger first, then the next line for console logging `rez_sleep` will happen
-				console.log('rez_sleep:', rez_sleep);
-			}
+				// cancel apc
+				var rez_cancelio = ostypes.API('CancelIo')(hdir); // dont need CancelIoEx as im in the same thread
+				console.log('rez_cancelio:', rez_cancelio);
 
-			if (!cutils.jscEqual(rez_sleep, ostypes.CONST.WAIT_IO_COMPLETION)) {
-				console.error('rez_sleep is not WAIT_IO_COMPLETION! it is:', rez_sleep);
-			}
+				if (!rez_cancelio) {
+					// if fail here, its just bad for memory
+					console.error('failed to cancelio on path:', aPath, 'due to error:', ctypes.winLastError);
+					// it is still being watched
+					startPoll();
+					return undefined;
+				} else {
+					path_entry.removed = 'notyet'; // will be set by winRoutine in ERROR_OPERATION_ABORTED
+					while (path_entry.removed == 'notyet') {
+						var rez_sleep = ostypes.API('SleepEx')(ostypes.CONST.INFINITE, true);
+						// the winRoutine for ERROR_OPERATION_ABORTED will trigger first, then the next line for console logging `rez_sleep` will happen
+						console.log('rez_sleep:', rez_sleep);
+					}
 
-			if (Object.keys(gDWActive).length) {
-				startPoll();
-			} else {
-				console.log('poller worker - after cancel - not resuming poll as there are no pathts to watch');
-				clearTimeout(gStartPollTimeout); // in case there is a left over from back to back `removePath`'s and the 2nd to last triggered a `startPoll()`
-			}
+					if (!cutils.jscEqual(rez_sleep, ostypes.CONST.WAIT_IO_COMPLETION)) {
+						console.error('rez_sleep is not WAIT_IO_COMPLETION! it is:', rez_sleep);
+					}
 
-			console.log('poll worker - removePath result:', path_entry.removed);
-			return path_entry.removed;
-		}
+					if (Object.keys(gDWActive).length) {
+						startPoll();
+					} else {
+						console.log('poller worker - after cancel - not resuming poll as there are no pathts to watch');
+						clearTimeout(gStartPollTimeout); // in case there is a left over from back to back `removePath`'s and the 2nd to last triggered a `startPoll()`
+					}
+
+					console.log('poll worker - removePath result:', path_entry.removed);
+					return path_entry.removed;
+				}
+			break;
+		case 'darwin':
+
+				// create new array with all EXCEPT aPath entry
+				var new_cfhandles = [];
+				for (var a_path in gDWActive) {
+					if (a_path != aPath) {
+						var a_path_entry = gDWActive[a_path];
+						new_cfhandles.push(a_path_entry.cfstr);
+					}
+				}
+
+				if (new_cfhandles.length) {
+					var rez_reset = macResetStream(new_cfhandles);
+
+					if (rez_reset) {
+						delete gDWActive[aPath];
+						ostypes.API('CFRelease')(path_entry.cfstr);
+					}
+
+					startPoll();
+					return rez_reset;
+				} else {
+					macReleaseGlobals();
+					gCfHandles = [];
+
+					console.log('not watching anymore paths so will not restart poll');
+
+					return true;
+				}
+
+			break;
 	}
 }
 
@@ -325,8 +327,110 @@ function poll() {
 	}
 }
 
-function macRoutine(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
+function macReleaseGlobals() {
+	// release globals
+	if (gCfHandles_c) { // on init or when 0 paths watched, gCfHandles_c and gCfHandles_cf is null
+		// clean up the old handles
+		ostypes.API('CFRelease')(gCfHandles_cf);
+		gCfHandles_cf = null;
+		gCfHandles_c = null;
+	}
+	if (gStream) {
+		macReleaseStream(gStream, false);
+		gStream = null;
+	}
+}
 
+function macReleaseStream(aStream, aNotStarted) {
+
+	ostypes.API('FSEventStreamUnscheduleFromRunLoop')(aStream, gRunLoop, ostypes.CONST.kCFRunLoopDefaultMode);
+
+	if (!aNotStarted) {
+		ostypes.API('FSEventStreamStop')(aStream);
+	}
+
+	ostypes.API('FSEventStreamInvalidate')(aStream);
+	// just doing FSEventStreamStop and FSEventStreamInvalidate will make runLoopRun break but we want to totally clean up the stream as we dont want it anymore as we are making a new one
+	ostypes.API('FSEventStreamRelease')(aStream);
+}
+
+function macResetStream(aNewCfHandles) {
+	// aNewCfHandles is what you want gCfHandles on success
+	// on success the globals are updated (gCfHandles, gCfHandles_c, gCfHandles_cf, gStream)
+
+	// returns
+		// true - success
+		// false -
+		// undefined - if error
+
+	var rez;
+
+	var new_cfhandles_c = ostypes.TYPE.void.ptr.array()(aNewCfHandles);
+	var new_cfhandles_cf = ostypes.API('CFArrayCreate')(null, new_cfhandles_c, aNewCfHandles.length, ostypes.CONST.kCFTypeArrayCallBacks.address());
+	if (new_cfhandles_cf.isNull()) {
+		console.error('failed to create cf arr!');
+
+		// clean up new_'s
+		new_cfhandles_c = null;
+
+		// return
+		rez = undefined;
+	} else {
+		// create the new stream
+		var new_stream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macRoutine_c, null, new_cfhandles_cf, ostypes.TYPE.UInt64(ostypes.CONST.kFSEventStreamEventIdSinceNow), 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
+		console.log('new_stream:', new_stream);
+		if (new_stream.isNull()) { // i have seen this null when new_cfhandles_cf had no paths added to it, so was an empty aNewCfHandles/new_cfhandles_c
+			console.error('Failed FSEventStreamCreate!! Aborting as in not re-starting poll');
+
+			// clean up new_'s
+			ostypes.API('CFRelease')(new_cfhandles_cf);
+			new_cfhandles_cf = null;
+			new_cfhandles_c = null;
+
+			// return
+			rez = undefined;
+		} else {
+
+			// schedule it on gRunLoop in default mode for CFrunLoopRun
+			ostypes.API('FSEventStreamScheduleWithRunLoop')(new_stream, gRunLoop, ostypes.CONST.kCFRunLoopDefaultMode); // returns void
+
+			// start the stream
+			var rez_startstream = ostypes.API('FSEventStreamStart')(new_stream);
+			console.log('rez_startstream:', rez_startstream);
+			if (!rez_startstream) {
+				console.error('Failed FSEventStreamStart! Aborting - as in will not restart poll');
+
+				// clean up new_'s
+				macReleaseStream(new_stream, true);
+				ostypes.API('CFRelease')(new_cfhandles_cf);
+				new_cfhandles_cf = null;
+				new_cfhandles_c = null;
+
+				// return
+				rez = undefined;
+			} else {
+				// return
+				rez = true;
+			}
+		}
+	}
+
+
+	if (rez) {
+		macReleaseGlobals();
+
+		// update globals
+		gCfHandles = aNewCfHandles;
+		gCfHandles_c = new_cfhandles_c;
+		gCfHandles_cf = new_cfhandles_cf;
+		gStream = new_stream;
+	};
+
+	return rez;
+}
+
+function macRoutine(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
+	console.log('in macRoutine:', 'streamRef:', streamRef, 'clientCallBackInfo:', clientCallBackInfo, 'numEvents:', numEvents, 'eventPaths:', eventPaths, 'eventFlags:', eventFlags, 'eventIds:', eventIds);
 }
 
 function winRoutine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {

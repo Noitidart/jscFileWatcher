@@ -106,7 +106,7 @@ function dwPollAfterInit(aPollerId, aArg) {
 		case 'darwin':
 
 				var { runloop_ptrstr } = aArg;
-				poller_entry.runloop = ostypes.CONST.CFRunLoopRef(ctypes.UInt64(runloop_ptrstr));
+				poller_entry.runloop = ostypes.TYPE.CFRunLoopRef(ctypes.UInt64(runloop_ptrstr));
 
 			break;
 	}
@@ -404,13 +404,20 @@ class DirectoryWatcher {
 						case 'winnt':
 						case 'winmo':
 						case 'wince':
+
 								var poller_entry = dwGetPollerEntryById(path_entry.pollerid);
 								ostypes.API('PulseEvent')(poller_entry.pipe);
-								console.log('calling removePath in poller')
+								console.log('calling removePath in poller');
 								poller_entry.callInPoller('removePath', { aPath }, removed_callback);
+
 							break;
 						case 'darwin':
-								//
+
+								var poller_entry = dwGetPollerEntryById(path_entry.pollerid);
+								ostypes.API('CFRunLoopStop')(poller_entry.runloop);
+								console.log('calling removePath in poller');
+								poller_entry.callInPoller('removePath', { aPath }, removed_callback);
+
 							break;
 						case 'android':
 								//
