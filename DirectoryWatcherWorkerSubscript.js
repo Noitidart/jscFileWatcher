@@ -81,28 +81,35 @@ function dwPollerIniter(aPollerId) {
 		case 'wince':
 
 				// get poller by id
-				var poller;
-				for (var a_poller of gDWPollers) {
-					if (a_poller.pollerid === aPollerId) {
-						poller = a_poller;
-						break;
-					}
+				var poller_entry = dwGetPollerEntryById(aPollerId);
+
+				if (!poller_entry) {
+					console.error('could not get poller_entry! this is horrible should never ever happen!');
+					throw new Error('could not get poller_entry! this is horrible should never ever happen!');
 				}
 
-				if (!poller) {
-					console.error('could not get poller! this is horrible should never ever happen!');
-					throw new Error('could not get poller! this is horrible should never ever happen!');
-				}
-
-				poller.pipe = ostypes.API('CreateEvent')(null, false, false, 'dirwatcher_event_' + gDWSessionId + poller.pollerid);
-				console.log('poller.pipe:', poller.pipe);
-				pipe_ptrstr = cutils.strOfPtr(poller.pipe);
+				poller_entry.pipe = ostypes.API('CreateEvent')(null, false, false, 'dirwatcher_event_' + gDWSessionId + poller_entry.pollerid);
+				console.log('poller_entry.pipe:', poller_entry.pipe);
+				pipe_ptrstr = cutils.strOfPtr(poller_entry.pipe);
 				console.log('pipe_ptrstr:', pipe_ptrstr);
 
 			break;
 	}
 
 	return { pipe_ptrstr };
+}
+
+function dwPollAfterInit(aPollerId, aArg) {
+	var poller_entry = dwGetPollerEntryById(aPollerId);
+
+	switch (gDWOSName) {
+		case 'darwin':
+
+				var { runloop_ptrstr } = aArg;
+				poller_entry.runloop = ostypes.CONST.CFRunLoopRef(ctypes.UInt64(runloop_ptrstr));
+
+			break;
+	}
 }
 
 function dwShutdown() {
@@ -251,13 +258,16 @@ class DirectoryWatcher {
 				return true;
 			}
 		} else {
+
+			// if this platform need a poller worker, then find/make available poller
+			var poller_entry;
 			switch (gDWOSName) {
 				case 'winnt':
 				case 'winmo':
 				case 'wince':
+				case 'darwin':
 
 						// find available poller
-						var poller_entry;
 						for (var a_poller of gDWPollers) {
 							if (dwGetActiveCntByPollerId(a_poller.pollerid) < DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD) {
 								poller_entry = a_poller;
@@ -270,10 +280,20 @@ class DirectoryWatcher {
 							poller_entry = {
 								pollerid: gDWPollerNextId++
 							};
-							poller_entry.worker = new Comm.server.worker(directorywatcher_paths.watcher_dir + 'DirectoryWatcherPollWorker.js', dwPollerIniter.bind(null, poller_entry.pollerid));
+							poller_entry.worker = new Comm.server.worker(directorywatcher_paths.watcher_dir + 'DirectoryWatcherPollWorker.js', dwPollerIniter.bind(null, poller_entry.pollerid), dwPollAfterInit.bind(null, poller_entry.pollerid));
 							poller_entry.callInPoller = Comm.callInX.bind(null, poller_entry.worker, null);
 							gDWPollers.push(poller_entry);
 						}
+
+					break;
+			}
+
+			// platform specific add of path
+			var watcherid = this.watcherid;
+			switch (gDWOSName) {
+				case 'winnt':
+				case 'winmo':
+				case 'wince':
 
 						if (poller_entry.pipe) {
 							// trip it so it breaks the poll in worker
@@ -281,7 +301,6 @@ class DirectoryWatcher {
 						}
 
 						// if the worker is not yet started, this call to addPath will start it (and call the init)
-						var watcherid = this.watcherid;
 						poller_entry.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, function(added) {
 							// TODO: due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this
 							if (added) {
@@ -294,7 +313,22 @@ class DirectoryWatcher {
 
 					break;
 				case 'darwin':
-						//
+
+						if (poller_entry.runloop) {
+							// trip it so it breaks the poll in worker
+							ostypes.API('CFRunLoopStop')(poller_entry.runloop);
+						}
+
+						poller_entry.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, function(added) {
+							// TODO: due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this
+							if (added) {
+								gDWActive[aPath] = {
+									watcherids: [watcherid],
+									pollerid: poller_entry.pollerid
+								};
+							}
+						});
+
 					break;
 				case 'android':
 						//

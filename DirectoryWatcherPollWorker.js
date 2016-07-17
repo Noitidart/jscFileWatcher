@@ -51,7 +51,8 @@ var gDWActive = {};
 			signalid
 			signalid_c
 		mac
-			...
+			cfstr - CFString of the path
+
 		gio
 			...
 		inotify
@@ -88,8 +89,24 @@ function init(aArg) {
 				console.log('post dword sized NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES, 'NOTIFICATION_DWORD_BUFFER_LENGTH:', NOTIFICATION_DWORD_BUFFER_LENGTH);
 
 				DW_NOTIFY_FILTER = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; // this is what @Dexter used
-				winHandler_c = ostypes.TYPE.FileIOCompletionRoutine.ptr(winHandler);
+				winRoutine_c = ostypes.TYPE.FileIOCompletionRoutine.ptr(winRoutine);
 
+			break;
+		case 'darwin':
+
+				gRunLoop = ostypes.API('CFRunLoopGetCurrent')();
+
+				gCfHandles = []; // each element is the cfstr in gDWActive
+				gCfHandles_c = null; // ostypes.TYPE.void.ptr.array()(gCfHandles);
+				gCfHandles_cf = null; // ostypes.API('CFArrayCreate')(null, gCfHandles_c, gCfHandles.length, ostypes.CONST.kCFTypeArrayCallBacks.address());
+
+				gStream = null;
+
+				macRoutine_c = ostypes.TYPE.FSEventStreamCallback(macRoutine);
+
+				return {
+					runloop_ptrstr: cutils.strOfPtr(gRunLoop)
+				};
 
 			break;
 		default:
@@ -112,40 +129,105 @@ function addPath(aArg) {
 		return false;
 	}
 
-	var hdir = ostypes.API('CreateFile')(aPath, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, ostypes.CONST.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
-	var o = ostypes.TYPE.OVERLAPPED();
+	switch (core.os.name) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+				var hdir = ostypes.API('CreateFile')(aPath, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, ostypes.CONST.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
+				var o = ostypes.TYPE.OVERLAPPED();
 
-	var notif_buf = ostypes.TYPE.DWORD.array(NOTIFICATION_DWORD_BUFFER_LENGTH)(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE_IN_BYTES)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
-	console.info('notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD BE same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES);
-	if (notif_buf.constructor.size != NOTIFICATION_BUFFER_SIZE_IN_BYTES) {
-		console.error('please email noitidart@gmail.com about this error. notif_buf is of a size i dont expect', 'notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD HAVE BEEN same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES)
-		startPoll();
-		return undefined;
-	}
+				var notif_buf = ostypes.TYPE.DWORD.array(NOTIFICATION_DWORD_BUFFER_LENGTH)(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE_IN_BYTES)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
+				console.info('notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD BE same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES);
+				if (notif_buf.constructor.size != NOTIFICATION_BUFFER_SIZE_IN_BYTES) {
+					console.error('please email noitidart@gmail.com about this error. notif_buf is of a size i dont expect', 'notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD HAVE BEEN same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES)
+					startPoll();
+					return undefined;
+				}
 
-	var signalid = gNextSignalId++;
-	var signalid_c = ctypes.uint16_t(signalid);
+				var signalid = gNextSignalId++;
+				var signalid_c = ctypes.uint16_t(signalid);
 
-	// hEvent is equivalent of user_data in Gio/Gtk
-	o.hEvent = ctypes.cast(signalid_c.address(), ctypes.voidptr_t);
+				// hEvent is equivalent of user_data in Gio/Gtk
+				o.hEvent = ctypes.cast(signalid_c.address(), ctypes.voidptr_t);
 
-	// var lp_index = gLpHandles.length;
-	// gLpHandles.push(hdir);
-	// gLpHandles_c = ostypes.TYPE.HANDLE.array()(gLpHandles);
+				// var lp_index = gLpHandles.length;
+				// gLpHandles.push(hdir);
+				// gLpHandles_c = ostypes.TYPE.HANDLE.array()(gLpHandles);
 
-	var rez_rdc = ostypes.API('ReadDirectoryChanges')(hdir, notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, o.address(), winHandler_c);
-	console.log('rez_rdc:', rez_rdc);
+				var rez_rdc = ostypes.API('ReadDirectoryChanges')(hdir, notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, o.address(), winRoutine_c);
+				console.log('rez_rdc:', rez_rdc);
 
-	if (!rez_rdc) {
-		// failed to add due to error
-		console.error('failed to add watcher due to error:', ctypes.winLastError);
-		startPoll();
-		return undefined;
-	} else {
-		// gDWActive[aPath] = { hdir, o, lp_index, notif_buf, signalid, signalid_c };
-		gDWActive[aPath] = { hdir, o, notif_buf, signalid, signalid_c };
-		startPoll();
-		return true;
+				if (!rez_rdc) {
+					// failed to add due to error
+					console.error('failed to add watcher due to error:', ctypes.winLastError);
+					startPoll();
+					return undefined;
+				} else {
+					// gDWActive[aPath] = { hdir, o, lp_index, notif_buf, signalid, signalid_c };
+					gDWActive[aPath] = { hdir, o, notif_buf, signalid, signalid_c };
+					startPoll();
+					return true;
+				}
+			break;
+		case 'darwin':
+
+				var cfstr = ostypes.HELPER.makeCFStr(aPath);
+
+				// re-set up gCfHandles
+				gCfHandles = [];
+				if (gCfHandles_c) {
+					// on init, it is null
+					// clean up the old handles
+					gCfHandles_c = null;
+					ostypes.API('CFRelease')(gCfHandles_cf);
+					gCfHandles_cf = null;
+				}
+
+				for (var path of gDWActive) {
+					var path_entry = gDWActive[path];
+					gCfHandles.push(path_entry.cfstr);
+				}
+
+				gCfHandles_c = ostypes.TYPE.void.ptr.array()(gCfHandles);
+				gCfHandles_cf = ostypes.API('CFArrayCreate')(null, gCfHandles_c, gCfHandles.length, ostypes.CONST.kCFTypeArrayCallBacks.address());
+
+				// create the new stream
+				if (gStream) {
+					// clean up the old stream
+					ostypes.API('FSEventStreamStop')(gStream);
+					ostypes.API('FSEventStreamInvalidate')(gStream);
+					// just doing the above two will make runLoopRun break but we want to totally clean up the stream as we dont want it anymore as we are making a new one
+					ostypes.API('FSEventStreamRelease')(gStream);
+					gStream = null;
+				}
+
+				gStream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macRoutine_c, null, gCfHandles_cf, ostypes.TYPE.UInt64(ostypes.CONST.kFSEventStreamEventIdSinceNow), 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
+				console.info('gStream:', gStream);
+				if (gStream.isNull()) { // i have seen this null when gCfHandles_cf had no paths added to it, so was an empty gCfHandles/gCfHandles_c
+					console.error('Failed FSEventStreamCreate!! Aborting as in not re-starting poll');
+					ostypes.API('CFRelease')(cfstr);
+					return undefined;
+				}
+
+				// schedule it on gRunLoop in default mode for CFrunLoopRun
+				ostypes.API('FSEventStreamScheduleWithRunLoop')(gStream, gRunLoop, ostypes.CONST.kCFRunLoopDefaultMode); // returns void
+
+				// start the stream
+				var rez_startstream = ostypes.API('FSEventStreamStart')(gStream);
+				console.log('rez_startstream:', rez_startstream);
+				if (!rez_startstream) {
+					console.error('Failed FSEventStreamStart! Aborting - as in will not restart poll');
+					ostypes.API('CFRelease')(cfstr);
+					return undefined;
+				}
+
+				// ok succesfully added
+				gDWActive[aPath] = { cfstr };
+				startPoll();
+
+				return true;
+
+			break;
 	}
 }
 
@@ -193,10 +275,12 @@ function removePath(aArg) {
 			startPoll();
 			return undefined;
 		} else {
-			path_entry.removed = undefined; // will be set by winRoutine in ERROR_OPERATION_ABORTED
-			var rez_sleep = ostypes.API('SleepEx')(ostypes.CONST.INFINITE, true);
-			// the winRoutine for ERROR_OPERATION_ABORTED will trigger first, then the next line for console logging `rez_sleep` will happen
-			console.log('rez_sleep:', rez_sleep);
+			path_entry.removed = 'notyet'; // will be set by winRoutine in ERROR_OPERATION_ABORTED
+			while (path_entry.removed == 'notyet') {
+				var rez_sleep = ostypes.API('SleepEx')(ostypes.CONST.INFINITE, true);
+				// the winRoutine for ERROR_OPERATION_ABORTED will trigger first, then the next line for console logging `rez_sleep` will happen
+				console.log('rez_sleep:', rez_sleep);
+			}
 
 			if (!cutils.jscEqual(rez_sleep, ostypes.CONST.WAIT_IO_COMPLETION)) {
 				console.error('rez_sleep is not WAIT_IO_COMPLETION! it is:', rez_sleep);
@@ -231,10 +315,21 @@ function poll() {
 				// 	// i get 192 when my file watcher triggers, dont restart poll here as it will keep returning with `1` or the index of the one that triggered, i have to reset the signal by calling ReadDirectoryChanges again
 				// }
 			break;
+		case 'darwin':
+
+				console.log('starting wait');
+				ostypes.API('CFRunLoopRun')();
+				console.log('wait done');
+
+			break;
 	}
 }
 
-function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
+function macRoutine(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
+
+}
+
+function winRoutine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 	console.log('in winRoutine:', 'dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped:', lpOverlapped);
 
 	// get signalid
@@ -267,7 +362,7 @@ function winHandler(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 		path_entry.notif_buf = new_notif_buf;
 
 		// retrigger ReadDirectoryChanges on this hdir, otherwise WaitForMultipleObjectsEx will return immediately with index of this hdir in gLpHandles
-		var rez_rdc = ostypes.API('ReadDirectoryChanges')(path_entry.hdir, path_entry.notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, path_entry.o.address(), winHandler_c);
+		var rez_rdc = ostypes.API('ReadDirectoryChanges')(path_entry.hdir, path_entry.notif_buf.address(), NOTIFICATION_BUFFER_SIZE_IN_BYTES, false, DW_NOTIFY_FILTER, null, path_entry.o.address(), winRoutine_c);
 		console.log('rez_rdc:', rez_rdc);
 
 		if (!rez_rdc) {

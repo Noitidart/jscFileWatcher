@@ -185,7 +185,20 @@ function dwImportImportsIfMissing() {
 		}
 	}
 	console.log('imports done');
-	dwGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(dwGtkHandler);
+
+	// Setup globals
+	switch (osname) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+		case 'darwin':
+		case 'android':
+				// nothing
+			break;
+		default:
+			// assume gtk
+			dwGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(dwGtkHandler);
+	}
 }
 
 function importServicesJsm() {
