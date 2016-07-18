@@ -431,6 +431,29 @@ function macResetStream(aNewCfHandles) {
 
 function macRoutine(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
 	console.log('in macRoutine:', 'streamRef:', streamRef, 'clientCallBackInfo:', clientCallBackInfo, 'numEvents:', numEvents, 'eventPaths:', eventPaths, 'eventFlags:', eventFlags, 'eventIds:', eventIds);
+
+	// i need to read the args within this callback, the docs say that at the end of this callback the args are released, so if i had sent this to the mainworker `oshandler` it would read released memory and probably crash
+	// the other reason i need to read here is because i dont have a signalid for mac, so i have to figure out the `path` by checking the parent dir of the events
+	// TODO: think about how to deal with subdirs, here are some notes:
+		// also mac seems to read subdirs, so i want to not alert on subdirs to match behavior of inotify. windows also does read subdirs. but my plan is, if user later adds a subdir, rather then creating a new watch, just dont discard those subdirs
+		// IMPORTANT: DO NOT discard subdirs here, send it to mainworker and `oshandler` will determine if should discard subdir
+
+	// js version
+	var _numevents = parseInt(cutils.jscGetDeepest(numEvents));
+
+	// these arguments are pointers, lets get the c contents
+	var _eventpaths_c = ctypes.cast(eventPaths, ostypes.TYPE.char.ptr.array(_numevents).ptr).contents;
+	var _eventflags_c = ctypes.cast(eventFlags, ostypes.TYPE.FSEventStreamEventFlags.array(_numevents).ptr).contents;
+	var _eventids_c = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(_numevents).ptr).contents;
+
+	// lets turn all the c contents, into js arrays with js values
+	// var cutilsIter = (arr_c, actor) => { var arr = new Array(arr_c.length); arr.forEach( (_, i) => arr[i]=actor(arr_c[i]) ); return arr; } // wont work due to bug https://bugzilla.mozilla.org/show_bug.cgi?id=1287357
+	var cutilsIter = (arr_c, actor) => { var l=arr_c.length; var arr=new Array(l); for(var i=0; i<l; i++) { arr[i]=actor(arr_c[i]) }; return arr; }
+	var _eventpaths = cutilsIter( _eventpaths_c, el=>el.readString() );
+	var _eventflags = cutilsIter( _eventflags_c, el=>parseInt(cutils.jscGetDeepest(el)) );
+	var _eventids = cutilsIter( _eventids_c, el=>parseInt(cutils.jscGetDeepest(el)) );
+
+	console.log('macRoutine args as js:', '_numevents:', _numevents, '_eventids:', _eventids, '_eventflags:', _eventflags, '_eventpaths:', _eventpaths);
 }
 
 function winRoutine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
