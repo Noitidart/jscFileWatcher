@@ -56,19 +56,34 @@ var gDWActive = {};
 		gio
 			...
 		inotify
-			...
+			signalid
 	}
 */
 
+var SYSTEM_HAS_INOTIFY;
+
 function init(aArg) {
-	var { pipe_ptrstr } = aArg;
-	console.log('pipe_ptrstr:', pipe_ptrstr);
+	// var { pipe_ptrstr } = aArg;
+
+	// test if system has inotify
+	try {
+		ostypes.API('inotify_init');
+		SYSTEM_HAS_INOTIFY = true;
+		if (!['winnt', 'wince', 'winmo', 'darwin', 'android'].includes(core.os.name)) {
+			core.os.name = 'android'; // force inotify as gtk will never get here unless DirectoryWatcherWorkerSubscript found that inotify was supported
+		}
+	} catch (ex) {
+		SYSTEM_HAS_INOTIFY = false;
+	}
 
 	// OS Specific Init
 	switch (core.os.name) {
 		case 'winnt':
 		case 'winmo':
 		case 'wince':
+
+				var { pipe_ptrstr } = aArg;
+				console.log('pipe_ptrstr:', pipe_ptrstr);
 
 				// Globals
 				gPipe = ostypes.TYPE.HANDLE(ctypes.UInt64(pipe_ptrstr));
@@ -109,8 +124,40 @@ function init(aArg) {
 				};
 
 			break;
+		case 'android':
+
+				// inotify
+				var { pipe_read } = aArg;
+
+				console.log('pipe_read:', pipe_read);
+				gPipe = pipe_read;
+
+				gFd = ostypes.API('inotify_init')(0);
+				if (cutils.jscEqual(gFd, -1)) {
+					console.error('Failed to create inotify instance, errno:', ctypes.errno);
+					throw new Error('Failed to create inotify instance, errno: ' + ctypes.errno);
+				}
+				console.log('gFd:', gFd);
+
+				INOTIFY_MASKS = ostypes.CONST.IN_ALL_EVENTS;
+
+				self.addEventListener('close', function() {
+					 var rez_close = ostypes.API('close')(gFd);
+					 gFd = null;
+					 if (cutils.jscEqual(rez_close, 0)) {
+						 // succesfully closed
+						 console.error('succesfully closed inotify fd, gFd');
+					 } else {
+						 // its -1
+						console.error('Failed to close inotify instance, errno:', ctypes.errno);
+						throw new Error('Failed to close inotify instance, errno: ' + ctypes.errno);
+					 }
+				}, false);
+
+			break;
 		default:
 			// do nothing special
+
 	}
 }
 
@@ -192,6 +239,23 @@ function addPath(aArg) {
 					ostypes.API('CFRelease')(cfstr);
 					return rez;
 				}
+
+			break;
+		case 'android':
+
+				var signalid = ostypes.API('inotify_add_watch')(gFd, aPath, INOTIFY_MASKS);
+				if (cutils.jscEqual(signalid, -1)) {
+					console.error('Failed to add path to inotify instance, errno:', ctypes.errno);
+					startPoll();
+					return undefined;
+				}
+
+				signalid = parseInt(cutils.jscGetDeepest(signalid));
+
+				gDWActive[aPath] = { signalid };
+
+				startPoll();
+				return true;
 
 			break;
 	}
@@ -298,6 +362,18 @@ function removePath(aArg) {
 				}
 
 			break;
+		case 'android':
+
+				var { signalid } = path_entry;
+				var rez_rm = ostypes.API('inotify_rm_watch')(gFd, signalid);
+				if (cutils.jscEqual(signalid, -1)) {
+					console.error('Failed to remove path from inotify instance, errno:', ctypes.errno);
+					throw new Error('Failed to remove path from inotify instance, errno: ' + ctypes.errno);
+				}
+
+				delete gDWActive[aPath];
+
+			break;
 	}
 }
 
@@ -322,6 +398,58 @@ function poll() {
 				console.log('starting wait');
 				ostypes.API('CFRunLoopRun')();
 				console.log('wait done');
+
+			break;
+		case 'android':
+
+				// we need to create poll_fdset fresh every time as after select, it is modified depending on what all triggered
+				var poll_fdset = new Uint8Array(128); // TODO: calc proper size of Uint8Array needed
+				ostypes.HELPER.fd_set_set(poll_fdset, gPipe);
+				ostypes.HELPER.fd_set_set(poll_fdset, gFd);
+
+				var nfds = Math.max(gPipe, gFd) + 1; // "nfds is the highest-numbered file descriptor in any of the three sets, plus 1." per docs at http://linux.die.net/man/2/select
+				console.log('nfds:', nfds);
+
+				console.log('starting wait');
+				var rez_wait = ostypes.API('select')(nfds, poll_fdset, null, null, null); // null for `timeout`, last arg, meaning block infinitely
+				console.log('rez_wait:', rez_wait);
+
+				// should restart poll with startPoll() or nothing to abort poll
+				
+				if (cutils.jscEqual(rez_wait, -1)) {
+					console.error('error occured while trying to wait, errno:', ctypes.errno);
+					// do nothing, aborts poll
+				} else {
+					// its possible that both could have triggered it, so i dont have if-else statement here, but two if isset statements
+
+					if (ostypes.HELPER.fd_set_isset(poll_fdset, gFd)) {
+
+					}
+
+					if (ostypes.HELPER.fd_set_isset(poll_fdset, gPipe)) {
+						// pipe was tripped, clear the pipe so future `select` call with it will not return immediately
+
+						var buf = ostypes.TYPE.char.array(20)();
+						var rez_read = buf.constructor.size;
+						while (rez_read === buf.constructor.size) {
+							rez_read = ostypes.API('read')(gPipe, buf, buf.constructor.size);
+							rez_read = parseInt(cutils.jscGetDeepest(rez_read));
+							if (rez_read === -1) {
+								console.error('failed to clear pipe!! all future selects will return immediately so aborting! errno:', ctypes.errno);
+								throw new Error('failed to clear pipe!! all future selects will return immediately so aborting!!');
+							}
+						}
+
+						// do not restart poll
+
+					} else {
+
+						// restart poll
+						// startPoll();
+
+					}
+
+				}
 
 			break;
 	}
@@ -447,14 +575,17 @@ function macRoutine(streamRef, clientCallBackInfo, numEvents, eventPaths, eventF
 	var _eventids_c = ctypes.cast(eventIds, ostypes.TYPE.FSEventStreamEventId.array(_numevents).ptr).contents;
 
 	// lets turn all the c contents, into js arrays with js values
-	// var cutilsIter = (arr_c, actor) => { var arr = new Array(arr_c.length); arr.forEach( (_, i) => arr[i]=actor(arr_c[i]) ); return arr; } // wont work due to bug https://bugzilla.mozilla.org/show_bug.cgi?id=1287357
-	var cutilsIter = (arr_c, actor) => { var l=arr_c.length; var arr=new Array(l); for(var i=0; i<l; i++) { arr[i]=actor(arr_c[i]) }; return arr; }
-	var _eventpaths = cutilsIter( _eventpaths_c, el=>el.readString() );
-	var _eventflags = cutilsIter( _eventflags_c, el=>parseInt(cutils.jscGetDeepest(el)) );
-	var _eventids = cutilsIter( _eventids_c, el=>parseInt(cutils.jscGetDeepest(el)) );
+	var _eventpaths = cutils.map( _eventpaths_c, mappers.readString );
+	var _eventflags = cutils.map( _eventflags_c, mappers.deepestParseInt );
+	var _eventids = cutils.map( _eventids_c, mappers.deepestParseInt );
 
 	console.log('macRoutine args as js:', '_numevents:', _numevents, '_eventids:', _eventids, '_eventflags:', _eventflags, '_eventpaths:', _eventpaths);
 }
+
+var mappers = { // for use with cutils.map
+	readString: el => el.readString(),
+	deepestParseInt: el => parseInt(cutils.jscGetDeepest(el))
+};
 
 function winRoutine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 	console.log('in winRoutine:', 'dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped:', lpOverlapped);
@@ -527,6 +658,7 @@ function winRoutine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 var gStartPollTimeout;
 function startPoll() {
 	clearTimeout(gStartPollTimeout);
+	// TODO: dont start if there are no paths being watched?
 	gStartPollTimeout = setTimeout(poll, 0);
 }
 

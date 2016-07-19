@@ -45,6 +45,8 @@ switch (gDWOSName) {
 		DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD = 50; // guess, as i dont know the os
 }
 
+var SYSTEM_HAS_INOTIFY; // set to true on gtk systems if inotify is available. else sets to false
+
 function dwCallOsHandlerById(aArg) {
 	// returns
 		// true if anything triggered
@@ -73,12 +75,14 @@ function dwCallOsHandlerById(aArg) {
 
 function dwPollerIniter(aPollerId) {
 	console.log('initier, aPollerId:', aPollerId);
-	var pipe_ptrstr = '0x0';
 
+	var init_data;
 	switch (gDWOSName) {
 		case 'winnt':
 		case 'winmo':
 		case 'wince':
+
+				init_data = {};
 
 				// get poller by id
 				var poller_entry = dwGetPollerEntryById(aPollerId);
@@ -90,13 +94,43 @@ function dwPollerIniter(aPollerId) {
 
 				poller_entry.pipe = ostypes.API('CreateEvent')(null, false, false, 'dirwatcher_event_' + gDWSessionId + poller_entry.pollerid);
 				console.log('poller_entry.pipe:', poller_entry.pipe);
-				pipe_ptrstr = cutils.strOfPtr(poller_entry.pipe);
+				var pipe_ptrstr = cutils.strOfPtr(poller_entry.pipe);
 				console.log('pipe_ptrstr:', pipe_ptrstr);
 
+				init_data.pipe_ptrstr = pipe_ptrstr;
+
 			break;
+		case 'darwin':
+				// do nothing
+			break;
+		case 'android':
+		default:
+			// android and gtk systems
+
+			init_data = {};
+
+			var poller_entry = dwGetPollerEntryById(aPollerId);
+			if (!poller_entry) {
+				console.error('could not get poller_entry! this is horrible should never ever happen!');
+				throw new Error('could not get poller_entry! this is horrible should never ever happen!');
+			}
+
+			var pipefd = ostypes.TYPE.int.array(2)();
+			var rez_pipe = ostypes.API('pipe')(pipefd);
+			console.log('rez_pipe:', rez_pipe);
+			if (cutils.jscEqual(rez_pipe, -1)) {
+				console.error('failed to create pipem, errno:', ctypes.errno);
+				throw new Error('failed to create pipem, errno: ' + ctypes.errno);
+			}
+
+			poller_entry.pipe_read = parseInt(cutils.jscGetDeepest(pipefd[0]));
+			poller_entry.pipe_write = parseInt(cutils.jscGetDeepest(pipefd[1]));
+
+			init_data.pipe_read = poller_entry.pipe_read;
+
 	}
 
-	return { pipe_ptrstr };
+	return init_data;
 }
 
 function dwPollAfterInit(aPollerId, aArg) {
@@ -259,13 +293,17 @@ class DirectoryWatcher {
 			}
 		} else {
 
+			var watcherid = this.watcherid;
+
 			// if this platform need a poller worker, then find/make available poller
 			var poller_entry;
+			var poller_added_cb;
 			switch (gDWOSName) {
 				case 'winnt':
 				case 'winmo':
 				case 'wince':
 				case 'darwin':
+				case 'android':
 
 						// find available poller
 						for (var a_poller of gDWPollers) {
@@ -285,11 +323,20 @@ class DirectoryWatcher {
 							gDWPollers.push(poller_entry);
 						}
 
+						poller_added_cb = function(added) {
+							// TODO: think about this: POSSIBLY due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this link383899
+							if (added) {
+								gDWActive[aPath] = {
+									watcherids: [watcherid],
+									pollerid: poller_entry.pollerid
+								};
+							}
+						};
+
 					break;
 			}
 
 			// platform specific add of path
-			var watcherid = this.watcherid;
 			switch (gDWOSName) {
 				case 'winnt':
 				case 'winmo':
@@ -301,15 +348,7 @@ class DirectoryWatcher {
 						}
 
 						// if the worker is not yet started, this call to addPath will start it (and call the init)
-						poller_entry.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, function(added) {
-							// TODO: due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this
-							if (added) {
-								gDWActive[aPath] = {
-									watcherids: [watcherid],
-									pollerid: poller_entry.pollerid
-								};
-							}
-						});
+						poller_entry.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, poller_added_cb);
 
 					break;
 				case 'darwin':
@@ -319,25 +358,24 @@ class DirectoryWatcher {
 							ostypes.API('CFRunLoopStop')(poller_entry.runloop);
 						}
 
-						poller_entry.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, function(added) {
-							// TODO: due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this
-							if (added) {
-								gDWActive[aPath] = {
-									watcherids: [watcherid],
-									pollerid: poller_entry.pollerid
-								};
-							}
-						});
+						poller_entry.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, poller_added_cb);
 
 					break;
 				case 'android':
-						//
+
+						if (poller_entry.pipe_write) {
+							// trip it so it breaks the poll in worker
+							ostypes.API('write')(poller_entry.pipe_write, ctypes.char(3).address(), 1);
+						}
+
+						poller_entry.callInPoller('addPath', { aPath, aWatcherId:this.watcherid }, poller_added_cb);
+
 					break;
 				default:
 					// assume gtk based system
 					var watcherid = this.watcherid;
 					callInBootstrap('dwAddPath', { aPath }, function(added) {
-						// TODO: due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this
+						// TODO: think about this: POSSIBLY due to async, if something tries to add this path while this is running, it can cause issues. so i should handle this link383899
 						if (added) {
 							gDWActive[aPath] = {
 								watcherids: [watcherid]
@@ -493,7 +531,16 @@ function dwTerminatePollerIfEmpty(aPollerId) {
 					//
 				break;
 			case 'android':
-					//
+					var rez_piperead_closed = ostypes.API('close')(poller_entry.pipe_read);
+					if (cutils.jscEqual(rez_piperead_closed, -1)) {
+						console.error('failed to rez_piperead_closed, errno:', ctypes.errno);
+					}
+
+					var rez_pipewrite_closed = ostypes.API('close')(poller_entry.pipe_write);
+					if (cutils.jscEqual(rez_pipewrite_closed, -1)) {
+						console.error('failed to rez_pipewrite_closed, errno:', ctypes.errno);
+					}
+
 				break;
 			default:
 				// assume gtk based system
@@ -635,6 +682,17 @@ function dwImportImportsIfMissing() {
 				importer(directorywatcher_paths.ostypes_dir + 'ostypes_x11.jsm');
 		}
 	}
+
+	// test if system has inotify
+	try {
+		ostypes.API('inotify_init');
+		SYSTEM_HAS_INOTIFY = true;
+		gDWOSName = 'android'; // froce inotify on gtk systems that have it
+	} catch (ex) {
+		SYSTEM_HAS_INOTIFY = false;
+		console.error('does not have inotify, ex:', ex);
+	}
+
 }
 
 // start - common helper functions
