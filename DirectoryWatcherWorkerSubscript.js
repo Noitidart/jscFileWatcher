@@ -365,6 +365,7 @@ class DirectoryWatcher {
 
 						if (poller_entry.pipe_write) {
 							// trip it so it breaks the poll in worker
+							console.error('tripping pipe now');
 							ostypes.API('write')(poller_entry.pipe_write, ctypes.char(3).address(), 1);
 						}
 

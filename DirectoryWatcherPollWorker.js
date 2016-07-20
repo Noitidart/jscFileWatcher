@@ -132,7 +132,7 @@ function init(aArg) {
 				console.log('pipe_read:', pipe_read);
 				gPipe = pipe_read;
 
-				gFd = ostypes.API('inotify_init')(0);
+				gFd = ostypes.API('inotify_init')();
 				if (cutils.jscEqual(gFd, -1)) {
 					console.error('Failed to create inotify instance, errno:', ctypes.errno);
 					throw new Error('Failed to create inotify instance, errno: ' + ctypes.errno);
@@ -141,6 +141,7 @@ function init(aArg) {
 
 				INOTIFY_MASKS = ostypes.CONST.IN_ALL_EVENTS;
 
+				gEINTRCnt = 0;
 				self.addEventListener('close', function() {
 					 var rez_close = ostypes.API('close')(gFd);
 					 gFd = null;
@@ -251,6 +252,7 @@ function addPath(aArg) {
 				}
 
 				signalid = parseInt(cutils.jscGetDeepest(signalid));
+				console.log('inotify added watch for path:', aPath, 'signalid:', signalid);
 
 				gDWActive[aPath] = { signalid };
 
@@ -402,54 +404,127 @@ function poll() {
 			break;
 		case 'android':
 
-				// we need to create poll_fdset fresh every time as after select, it is modified depending on what all triggered
-				var poll_fdset = new Uint8Array(128); // TODO: calc proper size of Uint8Array needed
-				ostypes.HELPER.fd_set_set(poll_fdset, gPipe);
-				ostypes.HELPER.fd_set_set(poll_fdset, gFd);
+				console.log('starting read');
+				var buf = ostypes.TYPE.char.array(10 * ostypes.TYPE.inotify_event.size)(); // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
+				var len = ostypes.API('read')(gPipe, buf, buf.constructor.size);
 
-				var nfds = Math.max(gPipe, gFd) + 1; // "nfds is the highest-numbered file descriptor in any of the three sets, plus 1." per docs at http://linux.die.net/man/2/select
-				console.log('nfds:', nfds);
-
-				console.log('starting wait');
-				var rez_wait = ostypes.API('select')(nfds, poll_fdset, null, null, null); // null for `timeout`, last arg, meaning block infinitely
-				console.log('rez_wait:', rez_wait);
-
-				// should restart poll with startPoll() or nothing to abort poll
-				
-				if (cutils.jscEqual(rez_wait, -1)) {
-					console.error('error occured while trying to wait, errno:', ctypes.errno);
-					// do nothing, aborts poll
-				} else {
-					// its possible that both could have triggered it, so i dont have if-else statement here, but two if isset statements
-
-					if (ostypes.HELPER.fd_set_isset(poll_fdset, gFd)) {
-
-					}
-
-					if (ostypes.HELPER.fd_set_isset(poll_fdset, gPipe)) {
-						// pipe was tripped, clear the pipe so future `select` call with it will not return immediately
-
-						var buf = ostypes.TYPE.char.array(20)();
-						var rez_read = buf.constructor.size;
-						while (rez_read === buf.constructor.size) {
-							rez_read = ostypes.API('read')(gPipe, buf, buf.constructor.size);
-							rez_read = parseInt(cutils.jscGetDeepest(rez_read));
-							if (rez_read === -1) {
-								console.error('failed to clear pipe!! all future selects will return immediately so aborting! errno:', ctypes.errno);
-								throw new Error('failed to clear pipe!! all future selects will return immediately so aborting!!');
-							}
+				if (cutils.jscEqual(len, -1)) {
+					if (ctypes.errno === 4) {
+						const eintr_retry_maxcnt = 100;
+						const eintr_retry_inms = 500;
+						// got EINTR - reloop till i dont get it - per http://stackoverflow.com/questions/28463350/why-does-select-keep-failing-with-eintr-errno?noredirect=1#comment64342712_28463350
+						gEINTRCnt++;
+						console.warn('got EINTR, will wait and try again, gEINTRCnt:', gEINTRCnt);
+						if (gEINTRCnt === eintr_retry_maxcnt) {
+							console.error('max retries for EINTR reached', eintr_retry_maxcnt, 'aborting');
+							gEINTRCnt = 0;
+						} else {
+							startPoll(eintr_retry_inms);
 						}
-
-						// do not restart poll
-
 					} else {
-
-						// restart poll
-						// startPoll();
-
+						console.error('ABORTING, failed to read inotify buf, errno:', ctypes.errno);
 					}
-
+				} else {
+					if (gEINTRCnt > 0) { console.error('took', gEINTRCnt, 'times to get over a EINTR'); }
+					gEINTRCnt = 0;
+					len = parseInt(cutils.jscGetDeepest(len));
+					console.log('read length:', len, 'and buf size:', buf.constructor.size, 'and inotify_event size:', ostypes.TYPE.inotify_event.size);
 				}
+
+				// const poll_interval_sec = 100;
+				// var timeout = ostypes.TYPE.timeval(Math.floor(poll_interval_sec), Math.floor((poll_interval_sec % 1) * 1000000));
+				//
+				// var poll_fdset = new Uint8Array(128);
+				// ostypes.HELPER.fd_set_set(poll_fdset, gFd);
+				//
+				// console.log('starting wait');
+				// var rez_wait = ostypes.API('select')(gFd + 1, poll_fdset, null, null, timeout.address());
+				// console.log('rez_wait:', rez_wait);
+				//
+				// if (cutils.jscEqual(rez_wait, -1)) {
+				// 	console.error('error occured on wait, errno:', ctypes.errno);
+				// } else if (cutils.jscEqual(rez_wait, 0)) {
+				// 	console.warn('select reached timeout');
+				// } else {
+				// 	var buf = ostypes.TYPE.char.array(10 * ostypes.TYPE.inotify_event.size)(); // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
+				// 	var len = ostypes.API('read')(gFd, buf, buf.constructor.size);
+				//
+				// 	if (cutils.jscEqual(length, -1)) {
+				// 		console.error('faield to read inotify buf, errno:', ctypes.errno);
+				// 	} else {
+				// 		len = parseInt(cutils.jscGetDeepest(len));
+ 			// 			console.log('read length:', len, 'and buf size:', buf.constructor.size, 'and inotify_event size:', ostypes.TYPE.inotify_event.size);
+				// 	}
+				// }
+
+				// var fds = ostypes.TYPE.pollfd.array(2)();
+				// fds[0].fd = gPipe;
+				// fds[0].events = ostypes.CONST.POLLIN;
+				// fds[1].fd = gFd;
+				// fds[1].events = ostypes.CONST.POLLIN;
+				//
+				// console.log('starting wait, fds:', fds);
+				// var rez_wait = ostypes.API('poll')(fds, 2, -1); // -1 means block infinitely
+				// console.log('rez_wait:', rez_wait);
+				//
+				// // should restart poll with startPoll() or nothing to abort poll
+				//
+				// console.log('fds:', fds);
+				// if (cutils.jscEqual(rez_wait, -1)) {
+				// 	if (ctypes.errno === 4) {
+				// 		const eintr_retry_maxcnt = 100;
+				// 		const eintr_retry_inms = 500;
+				// 		// got EINTR - reloop till i dont get it - per http://stackoverflow.com/questions/28463350/why-does-select-keep-failing-with-eintr-errno?noredirect=1#comment64342712_28463350
+				// 		gEINTRCnt++;
+				// 		console.warn('got EINTR, will wait and try again, gEINTRCnt:', gEINTRCnt);
+				// 		if (gEINTRCnt === eintr_retry_maxcnt) {
+				// 			console.error('max retries for EINTR reached', eintr_retry_maxcnt, 'aborting');
+				// 			gEINTRCnt = 0;
+				// 		} else {
+				// 			startPoll(eintr_retry_inms);
+				// 		}
+				// 	} else {
+				// 		gEINTRCnt = 0;
+				// 		console.error('error occured while trying to wait, errno:', ctypes.errno);
+				// 	}
+				// 	// do nothing, aborts poll
+				// } else {
+				// 	if (gEINTRCnt > 0) { console.error('took', gEINTRCnt, 'times to get over a EINTR'); }
+				// 	gEINTRCnt = 0;
+				// }
+
+				// if (cutils.jscEqual(rez_wait, -1)) {
+				// 	console.error('error occured while trying to wait, errno:', ctypes.errno);
+				// 	// do nothing, aborts poll
+				// } else {
+				// 	// its possible that both could have triggered it, so i dont have if-else statement here, but two if isset statements
+				//
+				// 	if (ostypes.HELPER.fd_set_isset(poll_fdset, gFd)) {
+				//
+				// 	}
+				//
+				// 	if (ostypes.HELPER.fd_set_isset(poll_fdset, gPipe)) {
+				// 		// pipe was tripped, clear the pipe so future `select` call with it will not return immediately
+				//
+				// 		var buf = ostypes.TYPE.char.array(20)();
+				// 		var rez_read = buf.constructor.size;
+				// 		while (rez_read === buf.constructor.size) {
+				// 			rez_read = ostypes.API('read')(gPipe, buf, buf.constructor.size);
+				// 			rez_read = parseInt(cutils.jscGetDeepest(rez_read));
+				// 			if (rez_read === -1) {
+				// 				console.error('failed to clear pipe!! all future selects will return immediately so aborting! errno:', ctypes.errno);
+				// 				throw new Error('failed to clear pipe!! all future selects will return immediately so aborting!!');
+				// 			}
+				// 		}
+				//
+				// 		// do not restart poll
+				//
+				// 	} else {
+				//
+				// 		// restart poll
+				// 		// startPoll();
+				//
+				// 	}
 
 			break;
 	}
@@ -656,10 +731,11 @@ function winRoutine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 }
 
 var gStartPollTimeout;
-function startPoll() {
+function startPoll(aMilliseconds=0) {
 	clearTimeout(gStartPollTimeout);
-	// TODO: dont start if there are no paths being watched?
-	gStartPollTimeout = setTimeout(poll, 0);
+	if (Object.keys(gDWActive).length) {
+		gStartPollTimeout = setTimeout(poll, aMilliseconds);
+	}
 }
 
 function dwGetActiveInfo(aBy) {
