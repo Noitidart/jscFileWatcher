@@ -182,94 +182,90 @@ function dwShutdown() {
 	return deferredmain_dwshutdown.promise;
 }
 
-class DirectoryWatcher {
-	constructor(aCallback) {
-		/*
-		aCallback called with these argumnets:
-			aFilePath - i dont give just file name, because multiple directories can be being watched, so i give full os path
-			aEventType - enum[ADDED, REMOVED, RENAMED, CONTENTS_MODIFIED]
-			aExtra
-				aExtra depends on aEventType
-		*/
-		this.watcherid = gDWNextId++;
-		gDWInstancesById[this.watcherid] = this;
+function DirectoryWatcher(aCallback) {
+	/*
+	aCallback called with these argumnets:
+		aFilePath - i dont give just file name, because multiple directories can be being watched, so i give full os path
+		aEventType - enum[ADDED, REMOVED, RENAMED, CONTENTS_MODIFIED]
+		aExtra
+			aExtra depends on aEventType
+	*/
+	this.watcherid = gDWNextId++;
+	gDWInstancesById[this.watcherid] = this;
 
-		dwImportImportsIfMissing();
-		this.devhandler = aCallback;
+	dwImportImportsIfMissing();
+	this.devhandler = aCallback;
 
-		// set MAX_WATCHING_CNT for pollers (windows, mac, inotify/android) - Gio on mainthread has no limit but i manually limit it
-		this.MAX_WATCHING_CNT = 64; // https://bugzilla.mozilla.org/show_bug.cgi?id=958280#c42
+	// set MAX_WATCHING_CNT for pollers (windows, mac, inotify/android) - Gio on mainthread has no limit but i manually limit it
+	this.MAX_WATCHING_CNT = 64; // https://bugzilla.mozilla.org/show_bug.cgi?id=958280#c42
 
-		// watching collection
-		this.watching_paths = {}; // key is path, value is object holding whatever info i need
+	// watching collection
+	this.watching_paths = {}; // key is path, value is object holding whatever info i need
 
-		// set oshandler - oshandler is responsible for triggering aCallback (this.devhandler)
-		switch (gDWOSName) {
-			case 'winnt':
-			case 'winmo':
-			case 'wince':
-					this.oshandler = this.winHandler;
-				break;
-			case 'darwin':
-					this.oshandler = this.macHandler;
-				break;
-			case 'android':
-					this.oshandler = this.andHandler;
-				break;
-			default:
-				// assume gtk based system
-				this.oshandler = this.gtkHandler;
-		}
+	// set oshandler - oshandler is responsible for triggering aCallback (this.devhandler)
+	switch (gDWOSName) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+				this.oshandler = function(path, dwNumberOfBytesTransfered, changes) {
+					// path is the path of the directory that was watched
+					console.log('in mainworker winHandler:', 'path:', path, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'changes:', changes);
+
+					if (this.closed) {
+						console.warn('this watcher was closed so oshandler exiting');
+						return;
+					}
+
+					// TODO: inform devhandler
+				};
+			break;
+		case 'darwin':
+				this.oshandler = function(path) {
+					// path is the path of the directory that was watched
+					console.log('in macHandler', 'path:', path);
+
+					if (this.closed) {
+						console.warn('this watcher was closed so oshandler exiting');
+						return;
+					}
+
+					// TODO: inform devhandler
+				}
+			break;
+		case 'android':
+				this.oshandler = function(path) {
+					// path is the path of the directory that was watched
+					console.log('in andHandler', 'path:', path);
+
+					if (this.closed) {
+						console.warn('this watcher was closed so oshandler exiting');
+						return;
+					}
+
+					// TODO: inform devhandler
+				}
+			break;
+		default:
+			// assume gtk based system
+			this.oshandler = function(path, file, other_file, event_type) {
+				// path is the path of the directory that was watched
+				console.log('in gtkHandler', 'path:', path, 'file:', file, 'other_file:', other_file, 'event_type:', event_type);
+
+				if (this.closed) {
+					console.warn('this watcher was closed so oshandler exiting');
+					return;
+				}
+
+				file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(file));
+				// other_file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(other_file));
+				event_type = parseInt(cutils.jscGetDeepest(event_type));
+
+				// TODO: inform devhandler
+			}
 	}
-	winHandler(path, dwNumberOfBytesTransfered, changes) {
-		// path is the path of the directory that was watched
-		console.log('in mainworker winHandler:', 'path:', path, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'changes:', changes);
 
-		if (this.closed) {
-			console.warn('this watcher was closed so oshandler exiting');
-			return;
-		}
-
-		// TODO: inform devhandler
-	}
-	gtkHandler(path, file, other_file, event_type) {
-		// path is the path of the directory that was watched
-		console.log('in gtkHandler', 'path:', path, 'file:', file, 'other_file:', other_file, 'event_type:', event_type);
-
-		if (this.closed) {
-			console.warn('this watcher was closed so oshandler exiting');
-			return;
-		}
-
-		file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(file));
-		// other_file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(other_file));
-		event_type = parseInt(cutils.jscGetDeepest(event_type));
-
-		// TODO: inform devhandler
-	}
-	macHandler(path) {
-		// path is the path of the directory that was watched
-		console.log('in macHandler', 'path:', path);
-
-		if (this.closed) {
-			console.warn('this watcher was closed so oshandler exiting');
-			return;
-		}
-
-		// TODO: inform devhandler
-	}
-	andHandler(path) {
-		// path is the path of the directory that was watched
-		console.log('in andHandler', 'path:', path);
-
-		if (this.closed) {
-			console.warn('this watcher was closed so oshandler exiting');
-			return;
-		}
-
-		// TODO: inform devhandler
-	}
-	addPath(aPath) {
+	// this.addPath, removePath, close
+	this.addPath = function(aPath) {
 		// returns
 			// actually not yet - due to async nature // true - successfully removed
 			// false - wasnt watching
@@ -386,7 +382,7 @@ class DirectoryWatcher {
 			}
 		}
 	}
-	removePath(aPath, aClosing) {
+	this.removePath = function(aPath, aClosing) {
 		// aClosing is programtic value, devuser should never set this
 
 		// returns promise that resolves to
@@ -470,7 +466,7 @@ class DirectoryWatcher {
 		}
 		return deferredmain_removepath.promise;
 	}
-	close() {
+	this.close = function() {
 		// returns promise which resolve with
 			// true - when all paths removed
 			// undefiend - if all paths not removed
@@ -502,6 +498,7 @@ class DirectoryWatcher {
 		});
 		return deferredmain_close.promise;
 	}
+
 }
 if (OS && OS.File) {
 	OS.File.DirectoryWatcher = DirectoryWatcher;
