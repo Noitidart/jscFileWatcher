@@ -405,8 +405,8 @@ function poll() {
 		case 'android':
 
 				console.log('starting read');
-				// var buf = ostypes.TYPE.char.array(10 * ostypes.TYPE.inotify_event.size)(); // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
 				// // method: `read`
+				// var buf = ostypes.TYPE.char.array(10 * ostypes.TYPE.inotify_event.size)(); // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
 				// var rez_wait = ostypes.API('read')(gPipe, buf, buf.constructor.size);
 
 				// method: `poll`
@@ -443,9 +443,34 @@ function poll() {
 				} else {
 					if (gEINTRCnt > 0) { console.error('took', gEINTRCnt, 'times to get over a EINTR'); }
 					gEINTRCnt = 0;
-					// for read
+					// method: read
 					// var len = parseInt(cutils.jscGetDeepest(rez_wait));
 					// console.log('read length:', len, 'and buf size:', buf.constructor.size, 'and inotify_event size:', ostypes.TYPE.inotify_event.size);
+
+					// method: poll
+					if (cutils.jscEqual(rez_wait, 0)) {
+						// timed out, i should never get here, as i didnt implement timeout
+					} else {
+						if (!cutils.jscEqual(fds[1].revents, 0)) {
+							// file change notification exists
+							andRoutine();
+						}
+
+						if (!cutils.jscEqual(fds[0].revents, 0)) {
+							// pipe was tripped, clear the pipe so future `select`/`poll` call with it will not return immediately
+							var buf = ostypes.TYPE.char.array(20)(); // should only need 1 byte, but might have miltiple due to multi triggers
+							var rez_read = buf.constructor.size;
+							while (cutils.jscEqual(rez_read, buf.constructor.size)) {
+								rez_read = ostypes.API('read')(gPipe, buf, buf.constructor.size);
+								if (cutils.jscEqual(rez_read, -1)) {
+									console.error('failed to clear pipe!! all future selects will return immediately so aborting! errno:', ctypes.errno);
+									throw new Error('failed to clear pipe!! all future selects will return immediately so aborting!!');
+								}
+							}
+						} else {
+							// startPoll();
+						}
+					}
 				}
 
 			break;
@@ -578,6 +603,69 @@ function macRoutine(streamRef, clientCallBackInfo, numEvents, eventPaths, eventF
 
 	console.log('macRoutine args as js:', '_numevents:', _numevents, '_eventids:', _eventids, '_eventflags:', _eventflags, '_eventpaths:', _eventpaths);
 }
+
+function andRoutine() {
+
+	// itreate through buf and collect all c events into `_events` as js
+	var _events;
+
+	// explanation on the buf size i picked
+		// a single `read` can return an array of multiple elements, depending on how many file changes took place
+		// i have set up a loop, so it will do `read` until it reads whole buffer
+		// SO i can set it to size of 1 struct, however i want to minimize the times called to `read`, so i set max to 10 elements
+		// AND I minus `10 * 8` because 8 is the size of `ostypes.TYPE.char.ptr`, which is what is the `inotify_event.name` field size as it is a pointer
+		// AND I add `10 * (1 * (NAME_MAX + 1))` because
+			// max length of filename is NAME_MAX but the `name` field is null terminated so `+ 1` per the docs here - http://linux.die.net/man/7/inotify
+			// 1 * because this is the size of `inotify.name.targetType`
+	var buf = ostypes.TYPE.char.array( (10 * ostypes.TYPE.inotify_event.size) - (10 * cutils.typeOfField(ostypes.TYPE.inotify_event, 'name').size) + (10 * (cutils.typeOfField(ostypes.TYPE.inotify_event, 'name').targetType * (ostypes.CONST.NAME_MAX + 1))) )();
+	var len = buf.constructor.size;
+	while (len === buf.constructor.size) {
+		len = ostypes.API('read')(gFd, buf, buf.constructor.size);
+		len = parseInt(cutils.jscGetDeepest(len));
+		if (len) {
+			// make array of the byte array (`buf`) by means of iteration - cannot use `cutils.map` as i need to increment `bytepos_inbuf`
+			var events_inbuf = ctypes.cast(buf, ostypes.TYPE.inotify_event.array(eventcnt_inbuf).ptr).contents;
+			var bytepos_inbuf = 0;
+			while (bytepos_inbuf < len) {
+				var _event = {};
+				for (var field of ostypes.TYPE.inotify_event.fields) {
+					var field_name = Object.keys(field)[0]; // there is only one element
+					var field_ctype = field[field_name];
+
+					// set `_event[field_name]`, and in some cases, like for `name` do special `bytepos_inbuf` math
+					switch (field_name) {
+						case 'wd':
+						case 'mask':
+						case 'cookie':
+						case 'len':
+								_event[field_name] = ctypes.cast(buf.addressOfElement(bytepos_inbuf), field_ctype.ptr).contents;
+								_event[field_name] = parseInt(cutils.jscGetDeepest(_event[field_name]));
+							break;
+						case 'name':
+								_event[field_name] = ctypes.cast(buf.addressOfElement(bytepos_inbuf), field_ctype.targetType.array(_event.len).ptr).contents;
+								_event[field_name] = _event[field_name].readString();
+
+								bytepos_inbuf -= field_ctype.size; // to undo link38377
+								bytepos_inbuf += _event.len; // `_event` will for sure have `len` field because in the struct `inotify_event` the `len` field comes before `name` field
+							break;
+					}
+
+					bytepos_inbuf += field_ctype.size; // link38377
+				}
+
+				_events.push(_event);
+			}
+		}
+	}
+
+	// act on events
+	var event_count = _events.length;
+	console.log('_events:', _events, 'event_count:', event_count);
+	if (event_count) {
+
+	}
+	else { console.error('WARNING! no events, thats weird, why would i call andRoutine without having any events/byte-content in gFd') }
+};
 
 var mappers = { // for use with cutils.map
 	readString: el => el.readString(),
