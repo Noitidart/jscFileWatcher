@@ -92,7 +92,7 @@ function dwPollerIniter(aPollerId) {
 					throw new Error('could not get poller_entry! this is horrible should never ever happen!');
 				}
 
-				poller_entry.pipe = ostypes.API('CreateEvent')(null, false, false, 'dirwatcher_event_' + gDWSessionId + poller_entry.pollerid);
+				poller_entry.pipe = ostypes.API('CreateEvent')(null, true, false, 'dirwatcher_event_' + gDWSessionId + poller_entry.pollerid);
 				console.log('poller_entry.pipe:', poller_entry.pipe);
 				var pipe_ptrstr = cutils.strOfPtr(poller_entry.pipe);
 				console.log('pipe_ptrstr:', pipe_ptrstr);
@@ -340,7 +340,7 @@ function DirectoryWatcher(aCallback) {
 
 						if (poller_entry.pipe) {
 							// trip it so it breaks the poll in worker
-							ostypes.API('PulseEvent')(poller_entry.pipe);
+							ostypes.API('SetEvent')(poller_entry.pipe);
 						}
 
 						// if the worker is not yet started, this call to addPath will start it (and call the init)
@@ -441,7 +441,7 @@ function DirectoryWatcher(aCallback) {
 						case 'wince':
 
 								var poller_entry = dwGetPollerEntryById(path_entry.pollerid);
-								ostypes.API('PulseEvent')(poller_entry.pipe);
+								ostypes.API('SetEvent')(poller_entry.pipe);
 								console.log('calling removePath in poller');
 								poller_entry.callInPoller('removePath', { aPath }, removed_callback);
 

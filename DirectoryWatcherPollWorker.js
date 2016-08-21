@@ -387,13 +387,26 @@ function poll() {
 		case 'wince':
 
 				console.log('starting wait');
-				var rez_wait = ostypes.API('WaitForMultipleObjectsEx')(gLpHandles.length, gLpHandles_c, false, ostypes.CONST.INFINITE, true);
-				console.log('rez_wait:', rez_wait);
-				// if (cutils.jscEqual(rez_wait, 0)) {
-				// 	// its the gPipe interrupt, so dont restart the loop
-				// } else {
-				// 	// i get 192 when my file watcher triggers, dont restart poll here as it will keep returning with `1` or the index of the one that triggered, i have to reset the signal by calling ReadDirectoryChanges again
-				// }
+				// check if the event is in signaled state
+				var signaled = (!cutils.jscEqual(ostypes.API('WaitForSingleObjectEx')(gLpHandles_c, 0, true), ostypes.CONST.WAIT_TIMEOUT));
+				if (signaled) {
+					ostypes.API('ResetEvent')(gLpHandles_c);
+					// create a setTimeout with 0. this is what `startPoll` does. i do this because i always reset the event after `WaitForMultipleObjectsEx` - so if it is in signaled state before the loop starts it means a postMessage happend to the thread, so a setTimeout of 0 will trigger after that postMessage happens
+					// problem with this though is that what if like not one but 2 things set it to signaled. actually this is fine. because those two postMessage would still have come in before the setTimeout I set on the next line, and they will call `startPoll` themsevles which will clear the time out and make another one. IF it is a `removePath` and there are no more paths left, when the timeout (from the line immediatley below this comment) triggers it will do a check on `if (Object.keys(gDWActive).length) {` and if it finds its empty then it wont start the poll. cool.
+					startPoll();
+				} else {
+					var rez_wait = ostypes.API('WaitForMultipleObjectsEx')(gLpHandles.length, gLpHandles_c, false, ostypes.CONST.INFINITE, true);
+					console.log('rez_wait:', rez_wait);
+					if (cutils.jscEqual(rez_wait, 0)) {
+						// its the gPipe interrupt, so dont restart the loop
+						// lets reset the event
+						ostypes.API('ResetEvent')(gLpHandles_c);
+					}
+					//  else {
+					// 	// i get 192 when my file watcher triggers, dont restart poll here as it will keep returning with `1` or the index of the one that triggered, i have to reset the signal by calling ReadDirectoryChanges again
+					// }
+				}
+
 			break;
 		case 'darwin':
 
