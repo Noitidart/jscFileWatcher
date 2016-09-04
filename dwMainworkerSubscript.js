@@ -47,7 +47,8 @@ switch (gDWOSName) {
 	case 'winnt':
 	case 'winmo':
 	case 'wince':
-	case 'darwin'
+	case 'darwin':
+	case 'android':
 			// do nothing
 		break;
 	default:
