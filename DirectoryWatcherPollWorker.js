@@ -441,18 +441,18 @@ function poll() {
 				// var rez_wait = ostypes.API('select')(Math.max(gFd, gPipe) + 1, poll_fdset, null, null, null);
 
 				if (cutils.jscEqual(rez_wait, -1)) {
-					if (ctypes.errno === 4) {
-						const eintr_retry_maxcnt = 100;
-						const eintr_retry_inms = 500;
-						// got EINTR - reloop till i dont get it - per http://stackoverflow.com/questions/28463350/why-does-select-keep-failing-with-eintr-errno?noredirect=1#comment64342712_28463350
-						gEINTRCnt++;
-						console.warn('got EINTR, will wait and try again, gEINTRCnt:', gEINTRCnt);
-						if (gEINTRCnt === eintr_retry_maxcnt) {
-							console.error('max retries for EINTR reached', eintr_retry_maxcnt, 'aborting');
-							gEINTRCnt = 0;
-						} else {
+					if (ctypes.errno === ostypes.CONST.EINTR) {
+						const eintr_retry_maxcnt = -1; // 100;
+						// const eintr_retry_inms = 500;
+						// // got EINTR - reloop till i dont get it - per http://stackoverflow.com/questions/28463350/why-does-select-keep-failing-with-eintr-errno?noredirect=1#comment64342712_28463350
+						// gEINTRCnt++;
+						// console.warn('got EINTR, will wait and try again, gEINTRCnt:', gEINTRCnt);
+						// if (gEINTRCnt === eintr_retry_maxcnt) {
+						// 	console.error('max retries for EINTR reached', eintr_retry_maxcnt, 'aborting');
+						// 	gEINTRCnt = 0;
+						// } else {
 							startPoll(eintr_retry_inms);
-						}
+						// }
 					} else {
 						console.error('ABORTING, failed to read inotify buf, errno:', ctypes.errno);
 					}
@@ -758,9 +758,14 @@ function winRoutine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 
 var gStartPollTimeout;
 function startPoll(aMilliseconds=0) {
+	// set aMilliseconds to -1 for no timeout, so for synchronous
 	clearTimeout(gStartPollTimeout);
 	if (Object.keys(gDWActive).length) {
-		gStartPollTimeout = setTimeout(poll, aMilliseconds);
+		if (aMilliseconds === -1) {
+			poll();
+		} else {
+			gStartPollTimeout = setTimeout(poll, aMilliseconds);
+		}
 	}
 }
 
