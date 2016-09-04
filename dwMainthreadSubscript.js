@@ -1,9 +1,8 @@
 // MUST import this on mainthread with `Services.scriptloader.loadSubScript('xxxxx/xxx/DirectoryWatcherMainthread.js');`
-/* globals ostypes, Services, Comm */
+/* globals ostypes, Services, Comm, callInMainworker */
 
 // Globals
 var gDWImportsDone = false;
-var callInDWWorker;
 var dwGtkHandler_c;
 var gDWActive = {};
 /*
@@ -21,6 +20,20 @@ var gDWActive = {};
 	}
 */
 
+// Setup globals
+switch (Services.appinfo.OS.toLowerCase()) {
+	case 'winnt':
+	case 'winmo':
+	case 'wince':
+	case 'darwin':
+	case 'android':
+			// nothing
+		break;
+	default:
+		// assume gtk
+		dwGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(dwGtkHandler);
+}
+
 function dwShutdown(aCommServer_VarStr) {
 	// aCommServer_VarStr is a var or a str if a instance of new Comm.worker.server. if str, the thing must be global.
 	if (!aCommServer_VarStr) {
@@ -35,21 +48,6 @@ function dwShutdown(aCommServer_VarStr) {
 		throw new Error('You must have imported ostypes before getting here!');
 	}
 
-	// Setup globals
-	switch (Services.appinfo.OS.toLowerCase()) {
-		case 'winnt':
-		case 'winmo':
-		case 'wince':
-		case 'darwin':
-		case 'android':
-				// nothing
-			break;
-		default:
-			// assume gtk
-			dwGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(dwGtkHandler);
-	}
-
-	callInDWWorker = Comm.callInX.bind(null, aCommServer_VarStr, null); // really, it should be callInMainworker
 }
 
 function dwGtkHandler(monitor, file, other_file, event_type, user_data) {
@@ -61,7 +59,7 @@ function dwGtkHandler(monitor, file, other_file, event_type, user_data) {
 		console.error('how can path_info not be found? was it closed but this was a delayed receive?');
 	} else {
 		var path = path_info.path;
-		callInDWWorker('dwCallOsHandlerById', {
+		callInMainworker('dwCallOsHandlerById', {
 			path,
 			rest_args: [cutils.strOfPtr(file), cutils.strOfPtr(other_file), event_type]
 		});
@@ -121,7 +119,7 @@ function dwAddPath(aArg) {
 
 // function dwShutdownMT() {
 	// var deferredmain_dwshutdownmt = new Deferred();
-	// callInDWWorker('dwShutdown', undefined, function() {
+	// callInMainworker('dwShutdown', undefined, function() {
 	// 	console.log('worker dwShutdown completed, so mainthread dwShutdownMT resolving');
 	// 	deferredmain_dwshutdownmt.resolve();
 	// });
