@@ -1,7 +1,8 @@
 // spawned as ChromeWorker by DirectoryWatcherWorkerSubscript.js
 const core = {
 	os: {
-		name: OS.Constants.Sys.Name.toLowerCase()
+		name: OS.Constants.Sys.Name.toLowerCase(),
+		toolkit: null // set by `init`
 	}
 };
 
@@ -127,7 +128,9 @@ function init(aArg) {
 		case 'android':
 
 				// inotify
-				var { pipe_read } = aArg;
+				var { pipe_read, GTK_VERSION } = aArg;
+
+				core.os.toolkit = 'gtk' + GTK_VERSION; // for ostypes
 
 				console.log('pipe_read:', pipe_read);
 				gPipe = pipe_read;

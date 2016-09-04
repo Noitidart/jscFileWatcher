@@ -108,6 +108,7 @@ function dwPollerIniter(aPollerId) {
 			// android and gtk systems
 
 			init_data = {};
+			init_data.GTK_VERSION = GTK_VERSION; // uses the global core.os.toolkit or TOOLKIT or toolkit to calculate this
 
 			var poller_entry = dwGetPollerEntryById(aPollerId);
 			if (!poller_entry) {
