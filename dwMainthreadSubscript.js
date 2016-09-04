@@ -1,4 +1,5 @@
 // MUST import this on mainthread with `Services.scriptloader.loadSubScript('xxxxx/xxx/DirectoryWatcherMainthread.js');`
+/* globals ostypes, Services, Comm */
 
 // Globals
 var gDWImportsDone = false;
@@ -30,6 +31,24 @@ function dwMainthreadInit(aCommServer_VarStr) {
 		throw new Error('How on earth can you provie aCommServer_VarStr without having imported Comm?? You are doing things wrong. Make sure to import Comm and pass correct string to here!');
 	}
 
+	if (typeof(ostypes) == 'undefined') {
+		throw new Error('You must have imported ostypes before getting here!');
+	}
+
+	// Setup globals
+	switch (Services.appinfo.OS.toLowerCase()) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+		case 'darwin':
+		case 'android':
+				// nothing
+			break;
+		default:
+			// assume gtk
+			dwGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(dwGtkHandler);
+	}
+
 	callInDWWorker = Comm.callInX.bind(null, aCommServer_VarStr, null);
 }
 
@@ -59,8 +78,6 @@ function dwAddPath(aArg) {
 		// undefined - error
 
 	var { aPath } = aArg;
-
-	dwImportImportsIfMissing();
 
 	var path_info = dwGetActiveInfo(aPath);
 	if (path_info) {
@@ -137,87 +154,6 @@ function dwRemovePath(aArg) {
 	console.log('stopped watching aPath:', aPath);
 
 	return true;
-}
-
-function dwImportImportsIfMissing() {
-	if (gDWImportsDone) {
-		return;
-	}
-	console.log('in mainthread dwImportImportsIfMissing');
-
-	gDWImportsDone = true;
-
-	// const importer = function(path) { Services.scriptloader.loadSubScript(path) };
-	const importer = Services.scriptloader.loadSubScript;
-
-	// Services.jsm
-	importServicesJsm();
-
-	const osname = Services.appinfo.OS.toLowerCase();
-
-	// Import ostypes for GTK only
-	if (typeof(ostypes) == 'undefined') {
-		switch (osname) {
-			case 'winnt':
-			case 'winmo':
-			case 'wince':
-			case 'darwin':
-			case 'android':
-					// dont import ostypes
-				break;
-			default:
-				// assume gtk
-
-				// Import ctypes
-				if (typeof(ctypes) == 'undefined') {
-					Cu.import('resource://gre/modules/ctypes.jsm');
-				}
-
-				// relative path import doesnt work from bootstrap
-				// // Import devuser defined paths
-				// importer('../DirectoryWatcherPaths.js');
-				// console.log('directorywatcher_paths:', directorywatcher_paths);
-
-				// Import ostypes
-				importer(directorywatcher_paths.ostypes_dir + 'cutils.jsm');
-				// importer(directorywatcher_paths.ostypes_dir + 'ctypes_math.jsm');
-				importer(directorywatcher_paths.ostypes_dir + 'ostypes_x11.jsm');
-		}
-	}
-	console.log('imports done');
-
-	// Setup globals
-	switch (osname) {
-		case 'winnt':
-		case 'winmo':
-		case 'wince':
-		case 'darwin':
-		case 'android':
-				// nothing
-			break;
-		default:
-			// assume gtk
-			dwGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(dwGtkHandler);
-	}
-}
-
-function importServicesJsm() {
-	if (!this.DedicatedWorkerGlobalScope && typeof(Services) == 'undefined') {
-		if (typeof(Cu) == 'undefined') {
-			if (typeof(Components) != 'undefined') {
-				// Bootstrap
-				var { utils:Cu } = Components;
-			} else if (typeof(require) != 'undefined') {
-				// Addon SDK
-				var { Cu } = require('chrome');
-			} else {
-				console.warn('cannot import Services.jsm');
-			}
-		}
-		if (typeof(Cu) != 'undefined') {
-			Cu.import('resource://gre/modules/Services.jsm');
-		}
-	}
 }
 
 function dwGetActiveInfo(aBy) {

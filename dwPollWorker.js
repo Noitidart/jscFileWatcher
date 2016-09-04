@@ -7,8 +7,7 @@ const core = {
 };
 
 // import paths
-importScripts('../DirectoryWatcherPaths.js');
-core.path = directorywatcher_paths;
+core.path = JSON.parse(dwXhrSync('../dwPaths.json').response);
 
 // import Comm
 importScripts(core.path.comm);
@@ -826,5 +825,20 @@ function genericCatch(aPromiseName, aPromiseToReject, aCaught) {
 	if (aPromiseToReject) {
 		aPromiseToReject.reject(rejObj);
 	}
+}
+function dwXhrSync(aUrlOrFileUri, aOptions={}) {
+	var default_options = {
+		method: 'GET',
+		data: undefined
+	};
+	var options = Object.assign({}, default_options, aOptions);
+
+	var request = new XMLHttpRequest();
+
+	request.open(options.method, aUrlOrFileUri, false); // 3rd arg is false for synchronus
+
+	request.send(aOptions.data);
+
+	return request;
 }
 // end - common helper functions

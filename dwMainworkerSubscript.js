@@ -1,10 +1,7 @@
 // DESIGN DECISION: Currently designed to be imported to mainthread AND ChromeWorker ( as GTK needs to be on mainthread - https://github.com/Noitidart/jscFileWatcher/issues/22 )
+/* globals callInBootstrap, ostypes, Comm, dwPathWatcherDir, OS.Constants */
 
 // Globals
-var gDWImportsDone = false;
-if (typeof(gBsComm) == 'undefined') { var gBsComm; }
-if (typeof(callInBootstrap) == 'undefined') { var callInBootstrap; }
-
 var gDWSessionId = Date.now() + '';
 var gDWInstancesById = {};
 var gDWNextId = 0;
@@ -46,6 +43,24 @@ switch (gDWOSName) {
 }
 
 var SYSTEM_HAS_INOTIFY; // set to true on gtk systems if inotify is available. else sets to false
+switch (gDWOSName) {
+	case 'winnt':
+	case 'winmo':
+	case 'wince':
+	case 'darwin'
+			// do nothing
+		break;
+	default:
+		// assume gtk
+		try {
+			ostypes.API('inotify_init');
+			SYSTEM_HAS_INOTIFY = true;
+			gDWOSName = 'android'; // froce inotify on gtk systems that have it // DEBUG
+		} catch (ex) {
+			SYSTEM_HAS_INOTIFY = false;
+			console.error('does not have inotify, ex:', ex);
+		}
+}
 
 function dwCallOsHandlerById(aArg) {
 	// returns
@@ -194,7 +209,6 @@ function DirectoryWatcher(aCallback) {
 	this.watcherid = gDWNextId++;
 	gDWInstancesById[this.watcherid] = this;
 
-	dwImportImportsIfMissing();
 	this.devhandler = aCallback;
 
 	// set MAX_WATCHING_CNT for pollers (windows, mac, inotify/android) - Gio on mainthread has no limit but i manually limit it
@@ -315,7 +329,7 @@ function DirectoryWatcher(aCallback) {
 							poller_entry = {
 								pollerid: gDWPollerNextId++
 							};
-							poller_entry.worker = new Comm.server.worker(directorywatcher_paths.watcher_dir + 'DirectoryWatcherPollWorker.js', dwPollerIniter.bind(null, poller_entry.pollerid), dwPollAfterInit.bind(null, poller_entry.pollerid));
+							poller_entry.worker = new Comm.server.worker(dwPathWatcherDir + 'dwPollWorker.js', dwPollerIniter.bind(null, poller_entry.pollerid), dwPollAfterInit.bind(null, poller_entry.pollerid));
 							poller_entry.callInPoller = Comm.callInX.bind(null, poller_entry.worker, null);
 							gDWPollers.push(poller_entry);
 						}
@@ -627,71 +641,6 @@ function dwGetActiveCntByPollerId(aPollerId) {
 		}
 	}
 	return cnt;
-}
-function dwImportImportsIfMissing() {
-	if (gDWImportsDone) {
-		return;
-	}
-
-	gDWImportsDone = true;
-
-	const importer = importScripts;
-
-
-	// Import OS.File if not present
-	if (typeof(OS) == 'undefined' || !OS.File) {
-		importer('resource://gre/modules/osfile.jsm');
-	}
-
-	// Import devuser defined paths
-	importer('./DirectoryWatcherPaths.js');
-
-	// Import Comm if not present
-	if (typeof(Comm) == 'undefined') {
-		importer(directorywatcher_paths.comm);
-	}
-
-	if (!callInBootstrap) {
-		callInBootstrap = CommHelper.mainworker.callInBootstrap;
-	}
-
-	if (!gBsComm) {
-		gBsComm = new Comm.client.worker();
-	}
-
-	// Import ostypes
-	if (typeof(ostypes) == 'undefined') {
-		importer(directorywatcher_paths.ostypes_dir + 'cutils.jsm');
-		importer(directorywatcher_paths.ostypes_dir + 'ctypes_math.jsm');
-		switch (gDWOSName) {
-			case 'winnt':
-			case 'winmo':
-			case 'wince':
-					importer(directorywatcher_paths.ostypes_dir + 'ostypes_win.jsm');
-				break
-			case 'darwin':
-					importer(directorywatcher_paths.ostypes_dir + 'ostypes_mac.jsm');
-				break;
-			case 'android':
-					importer(directorywatcher_paths.ostypes_dir + 'ostypes_x11.jsm');
-				break;
-			default:
-				// assume gtk
-				// actually i think do need it, so disregard comment --> // // ostypes not needed as it is on the mainthread
-				importer(directorywatcher_paths.ostypes_dir + 'ostypes_x11.jsm');
-		}
-	}
-
-	// test if system has inotify
-	try {
-		ostypes.API('inotify_init');
-		SYSTEM_HAS_INOTIFY = true;
-		gDWOSName = 'android'; // froce inotify on gtk systems that have it
-	} catch (ex) {
-		SYSTEM_HAS_INOTIFY = false;
-		console.error('does not have inotify, ex:', ex);
-	}
-
 }
 
 // start - common helper functions
