@@ -1,6 +1,13 @@
 // DESIGN DECISION: Currently designed to be imported to mainthread AND ChromeWorker ( as GTK needs to be on mainthread - https://github.com/Noitidart/jscFileWatcher/issues/22 )
 /* globals callInBootstrap, ostypes, Comm, dwPathWatcherDir, OS.Constants */
 
+if (typeof(Comm) == 'undefined') throw new Error('You must have imported `Comm` before getting here!');
+if (typeof(ostypes) == 'undefined') throw new Error('You must have imported `ostypes` before getting here!');
+if (typeof(callInBootstrap) == 'undefined') throw new Error('You must have imported `callInBootstrap` from `CommHelper` before getting here!');
+if (typeof(dwPathWatcherDir) == 'undefined') throw new Error('You must have defined `dwPathWatcherDir` to be the path to the directory containing the "watcher" module before getting here!');
+if (typeof(OS) == 'undefined') throw new Error('You must have imported `OS` before getting here!');
+if (typeof(OS.Constants) == 'undefined') throw new Error('You must have imported `OS.Constants` before getting here!');
+
 // Globals
 var gDWSessionId = Date.now() + '';
 var gDWInstancesById = {};
@@ -165,7 +172,6 @@ function dwPollAfterInit(aPollerId, aArg) {
 
 function dwShutdown() {
 	var deferredmain_dwshutdown = new Deferred();
-console.log('in dwShutdown');
 
 	var promiseAllArr_close = [];
 
@@ -457,7 +463,6 @@ function DirectoryWatcher(aCallback) {
 						case 'winmo':
 						case 'wince':
 
-console.log('will call remove path in poller');
 								var poller_entry = dwGetPollerEntryById(path_entry.pollerid);
 								ostypes.API('SetEvent')(poller_entry.pipe);
 								console.log('calling removePath in poller');
@@ -491,7 +496,6 @@ console.log('will call remove path in poller');
 		var deferredmain_close = new Deferred();
 		this.closed = true;
 		var watcherid = this.watcherid;
-		console.log('in close for watcherid:', watcherid);
 
 		var promiseAllArr_remove = [];
 		var path_infos = dwGetPathInfos(watcherid);

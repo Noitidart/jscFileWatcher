@@ -1,8 +1,12 @@
-// MUST import this on mainthread with `Services.scriptloader.loadSubScript('xxxxx/xxx/DirectoryWatcherMainthread.js');`
+// MUST import this on mainthread with `Services.scriptloader.loadSubScript('xxxxx/xxx/dwMainthreadSubscript.js');`
 /* globals ostypes, Services, Comm, callInMainworker */
 
+if (typeof(Comm) == 'undefined') throw new Error('You must have imported `Comm` before getting here!');
+if (typeof(ostypes) == 'undefined') throw new Error('You must have imported `ostypes` before getting here!');
+if (typeof(Services) == 'undefined') throw new Error('You must have imported `Services` before getting here!');
+if (typeof(callInMainworker) == 'undefined') throw new Error('You must have imported `callInMainworker` from `CommHelper` before getting here!');
+
 // Globals
-var gDWImportsDone = false;
 var dwGtkHandler_c;
 var gDWActive = {};
 /*
@@ -32,22 +36,6 @@ switch (Services.appinfo.OS.toLowerCase()) {
 	default:
 		// assume gtk
 		dwGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(dwGtkHandler);
-}
-
-function dwShutdown(aCommServer_VarStr) {
-	// aCommServer_VarStr is a var or a str if a instance of new Comm.worker.server. if str, the thing must be global.
-	if (!aCommServer_VarStr) {
-		throw new Error('MUST provide aCommServer_VarStr!');
-	}
-
-	if (typeof(Comm) == 'undefined') {
-		throw new Error('How on earth can you provie aCommServer_VarStr without having imported Comm?? You are doing things wrong. Make sure to import Comm and pass correct string to here!');
-	}
-
-	if (typeof(ostypes) == 'undefined') {
-		throw new Error('You must have imported ostypes before getting here!');
-	}
-
 }
 
 function dwGtkHandler(monitor, file, other_file, event_type, user_data) {
