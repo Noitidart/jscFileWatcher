@@ -21,7 +21,7 @@ var gDWActive = {};
 	}
 */
 
-function dwMainthreadInit(aCommServer_VarStr) {
+function dwShutdown(aCommServer_VarStr) {
 	// aCommServer_VarStr is a var or a str if a instance of new Comm.worker.server. if str, the thing must be global.
 	if (!aCommServer_VarStr) {
 		throw new Error('MUST provide aCommServer_VarStr!');
@@ -49,7 +49,7 @@ function dwMainthreadInit(aCommServer_VarStr) {
 			dwGtkHandler_c = ostypes.TYPE.GFileMonitor_changed_signal(dwGtkHandler);
 	}
 
-	callInDWWorker = Comm.callInX.bind(null, aCommServer_VarStr, null);
+	callInDWWorker = Comm.callInX.bind(null, aCommServer_VarStr, null); // really, it should be callInMainworker
 }
 
 function dwGtkHandler(monitor, file, other_file, event_type, user_data) {
@@ -119,14 +119,14 @@ function dwAddPath(aArg) {
 	return true;
 }
 
-function dwShutdownMT() {
-	var deferredmain_dwshutdownmt = new Deferred();
-	callInDWWorker('dwShutdown', undefined, function() {
-		console.log('worker dwShutdown completed, so mainthread dwShutdownMT resolving');
-		deferredmain_dwshutdownmt.resolve();
-	});
-	return deferredmain_dwshutdownmt.promise;
-}
+// function dwShutdownMT() {
+	// var deferredmain_dwshutdownmt = new Deferred();
+	// callInDWWorker('dwShutdown', undefined, function() {
+	// 	console.log('worker dwShutdown completed, so mainthread dwShutdownMT resolving');
+	// 	deferredmain_dwshutdownmt.resolve();
+	// });
+	// return deferredmain_dwshutdownmt.promise;
+// }
 
 function dwRemovePath(aArg) {
 	// gio only
