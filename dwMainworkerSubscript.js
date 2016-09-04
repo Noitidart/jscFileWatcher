@@ -165,6 +165,7 @@ function dwPollAfterInit(aPollerId, aArg) {
 
 function dwShutdown() {
 	var deferredmain_dwshutdown = new Deferred();
+console.log('in dwShutdown');
 
 	var promiseAllArr_close = [];
 
@@ -456,6 +457,7 @@ function DirectoryWatcher(aCallback) {
 						case 'winmo':
 						case 'wince':
 
+console.log('will call remove path in poller');
 								var poller_entry = dwGetPollerEntryById(path_entry.pollerid);
 								ostypes.API('SetEvent')(poller_entry.pipe);
 								console.log('calling removePath in poller');
@@ -489,6 +491,7 @@ function DirectoryWatcher(aCallback) {
 		var deferredmain_close = new Deferred();
 		this.closed = true;
 		var watcherid = this.watcherid;
+		console.log('in close for watcherid:', watcherid);
 
 		var promiseAllArr_remove = [];
 		var path_infos = dwGetPathInfos(watcherid);
