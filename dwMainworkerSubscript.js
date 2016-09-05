@@ -131,7 +131,7 @@ function dwPollerIniter(aPollerId) {
 			// android and gtk systems
 
 			init_data = {};
-			init_data.GTK_VERSION = GTK_VERSION; // uses the global core.os.toolkit or TOOLKIT or toolkit to calculate this
+			// init_data.GTK_VERSION = GTK_VERSION; // uses the global core.os.toolkit or TOOLKIT or toolkit to calculate this
 
 			var poller_entry = dwGetPollerEntryById(aPollerId);
 			if (!poller_entry) {
@@ -478,7 +478,11 @@ function DirectoryWatcher(aCallback) {
 
 							break;
 						case 'android':
-								//
+
+								var poller_entry = dwGetPollerEntryById(path_entry.pollerid);
+								ostypes.API('write')(poller_entry.pipe_write, ctypes.char(4).address(), 1);
+								poller_entry.callInPoller('removePath', { aPath }, removed_callback);
+
 							break;
 						default:
 							// assume gtk based system

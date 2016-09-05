@@ -127,9 +127,9 @@ function init(aArg) {
 		case 'android':
 
 				// inotify
-				var { pipe_read, GTK_VERSION } = aArg;
+				var { pipe_read } = aArg;
 
-				core.os.toolkit = 'gtk' + GTK_VERSION; // for ostypes
+				// core.os.toolkit = 'gtk' + GTK_VERSION; // for ostypes // no need for GTK_VERSION as in dwPollWorker i dont use anything from ostypes that needs it
 
 				console.log('pipe_read:', pipe_read);
 				gPipe = pipe_read;
@@ -377,6 +377,15 @@ function removePath(aArg) {
 
 				delete gDWActive[aPath];
 
+				if (Object.keys(gDWActive).length) {
+					startPoll();
+				} else {
+					console.log('poller worker - after cancel - not resuming poll as there are no pathts to watch');
+					clearTimeout(gStartPollTimeout); // i copied this from windows section so i left it here // in case there is a left over from back to back `removePath`'s and the 2nd to last triggered a `startPoll()`
+				}
+
+				return true;
+
 			break;
 	}
 }
@@ -390,7 +399,7 @@ function poll() {
 
 				// check if the event is in signaled state
 				var signaled = (!cutils.jscEqual(ostypes.API('WaitForSingleObjectEx')(gPipe, 0, true), ostypes.CONST.WAIT_TIMEOUT));
-				if (signaled) {
+				if (signaled) { // link1858282
 					console.log('signaled:', signaled);
 					var rez_reset = ostypes.API('ResetEvent')(gPipe);
 					console.log('rez_reset:', rez_reset, 'winLastError:', ctypes.winLastError);
@@ -422,10 +431,30 @@ function poll() {
 			break;
 		case 'android':
 
-				console.log('starting read');
+				// console.log('starting read');
 				// // method: `read`
 				// var buf = ostypes.TYPE.char.array(10 * ostypes.TYPE.inotify_event.size)(); // a single read can return an array of multiple elements, i set max to 10 elements of name with NAME_MAX, but its possible to get more then 10 returned as name may not be NAME_MAX in length for any/all of the returned's
 				// var rez_wait = ostypes.API('read')(gPipe, buf, buf.constructor.size);
+
+
+				// test if gPipe is empty
+				var test_fd = ostypes.TYPE.pollfd.array(1)();
+				test_fd[0].fd = gPipe;
+				test_fd[0].events = ostypes.CONST.POLLIN | ostypes.CONST.POLLERR | ostypes.CONST.POLLHUP;
+				var rez_testwait = ostypes.API('poll')(test_fd, 1, 0); // timeout is 0
+				if (cutils.jscEqual(rez_testwait, 0)) {
+					// it timed out, meaning it is empty
+				} else if (cutils.jscEqual(rez_testwait, -1) && ctypes.errno === ostypes.CONST.EINTR) {
+					// got EINTR, i only get this when im not able to block so assume empty
+				} else if (cutils.jscEqual(rez_testwait, -1)) {
+					// failed for reason other then EINTR
+					console.error('FATAL ERROR failed to do testwait, errno:', ctypes.errno);
+					throw new Error('FATAL ERROR failed to do testwait, errno: ' + ctypes.errno);
+				} else {
+					// it has something in it, so similar to link1858282 lets start poll after a 0ms timeout to allow things to happen JUST IN CASE
+					startPoll();
+					return;
+				}
 
 				// method: `poll`
 				var fds = ostypes.TYPE.pollfd.array(2)();
@@ -434,7 +463,7 @@ function poll() {
 				fds[1].fd = gFd;
 				fds[1].events = ostypes.CONST.POLLIN | ostypes.CONST.POLLERR | ostypes.CONST.POLLHUP;
 				var rez_wait = ostypes.API('poll')(fds, 2, -1); // -1 means block infinitely
-				console.log('rez_wait:', rez_wait);
+				// console.log('rez_wait:', rez_wait);
 
 				// // method: `select`
 				// var poll_fdset = new Uint8Array(128);
@@ -444,10 +473,10 @@ function poll() {
 
 				if (cutils.jscEqual(rez_wait, -1)) {
 					if (ctypes.errno === ostypes.CONST.EINTR) {
-						const eintr_retry_maxcnt = -1; // 100;
-						// const eintr_retry_inms = 500;
+						// const eintr_retry_maxcnt = 100;
+						const eintr_retry_inms = 100; // 500;
 						// // got EINTR - reloop till i dont get it - per http://stackoverflow.com/questions/28463350/why-does-select-keep-failing-with-eintr-errno?noredirect=1#comment64342712_28463350
-						// gEINTRCnt++;
+						gEINTRCnt++;
 						// console.warn('got EINTR, will wait and try again, gEINTRCnt:', gEINTRCnt);
 						// if (gEINTRCnt === eintr_retry_maxcnt) {
 						// 	console.error('max retries for EINTR reached', eintr_retry_maxcnt, 'aborting');
@@ -467,13 +496,8 @@ function poll() {
 
 					// method: poll
 					if (cutils.jscEqual(rez_wait, 0)) {
-						// timed out, i should never get here, as i didnt implement timeout
+						console.error('timed out, i should never get here, as i didnt implement timeout');
 					} else {
-						if (!cutils.jscEqual(fds[1].revents, 0)) {
-							// file change notification exists
-							andRoutine();
-						}
-
 						if (!cutils.jscEqual(fds[0].revents, 0)) {
 							// pipe was tripped, clear the pipe so future `select`/`poll` call with it will not return immediately
 							var buf = ostypes.TYPE.char.array(20)(); // should only need 1 byte, but might have miltiple due to multi triggers
@@ -485,7 +509,13 @@ function poll() {
 									throw new Error('failed to clear pipe!! all future selects will return immediately so aborting!!');
 								}
 							}
+						} else if (!cutils.jscEqual(fds[1].revents, 0)) {
+							// file change notification exists
+							andRoutine();
+							startPoll();
 						} else {
+							console.error('i dont know why it would get here, means revents of BOTH fds[0] and fds[1] were 0, i dont ever expect this! fatal error!');
+							throw new Error('i dont know why it would get here, means revents of BOTH fds[0] and fds[1] were 0, i dont ever expect this! fatal error!');
 							// startPoll();
 						}
 					}
@@ -635,54 +665,96 @@ function andRoutine() {
 		// AND I add `10 * (1 * (NAME_MAX + 1))` because
 			// max length of filename is NAME_MAX but the `name` field is null terminated so `+ 1` per the docs here - http://linux.die.net/man/7/inotify
 			// 1 * because this is the size of `inotify.name.targetType`
-	var buf = ostypes.TYPE.char.array( (10 * ostypes.TYPE.inotify_event.size) - (10 * cutils.typeOfField(ostypes.TYPE.inotify_event, 'name').size) + (10 * (cutils.typeOfField(ostypes.TYPE.inotify_event, 'name').targetType * (ostypes.CONST.NAME_MAX + 1))) )();
-	var len = buf.constructor.size;
-	while (len === buf.constructor.size) {
-		len = ostypes.API('read')(gFd, buf, buf.constructor.size);
-		len = parseInt(cutils.jscGetDeepest(len));
-		if (len) {
-			// make array of the byte array (`buf`) by means of iteration - cannot use `cutils.map` as i need to increment `bytepos_inbuf`
-			var events_inbuf = ctypes.cast(buf, ostypes.TYPE.inotify_event.array(eventcnt_inbuf).ptr).contents;
-			var bytepos_inbuf = 0;
-			while (bytepos_inbuf < len) {
-				var _event = {};
-				for (var field of ostypes.TYPE.inotify_event.fields) {
-					var field_name = Object.keys(field)[0]; // there is only one element
-					var field_ctype = field[field_name];
+	var buf;
+	var minevent_cnt = 0;
 
-					// set `_event[field_name]`, and in some cases, like for `name` do special `bytepos_inbuf` math
-					switch (field_name) {
-						case 'wd':
-						case 'mask':
-						case 'cookie':
-						case 'len':
-								_event[field_name] = ctypes.cast(buf.addressOfElement(bytepos_inbuf), field_ctype.ptr).contents;
-								_event[field_name] = parseInt(cutils.jscGetDeepest(_event[field_name]));
-							break;
-						case 'name':
-								_event[field_name] = ctypes.cast(buf.addressOfElement(bytepos_inbuf), field_ctype.targetType.array(_event.len).ptr).contents;
-								_event[field_name] = _event[field_name].readString();
-
-								bytepos_inbuf -= field_ctype.size; // to undo link38377
-								bytepos_inbuf += _event.len; // `_event` will for sure have `len` field because in the struct `inotify_event` the `len` field comes before `name` field
-							break;
-					}
-
-					bytepos_inbuf += field_ctype.size; // link38377
+	const minevent_intemp_cnt = 10;
+	const size_for_minevent_intemp = minevent_intemp_cnt * ostypes.TYPE.inotify_event.size;
+	var rez_read = size_for_minevent_intemp;
+	while (rez_read === size_for_minevent_intemp) {
+		var buf_temp = ostypes.TYPE.char.array( (size_for_minevent_intemp) )();
+		rez_read = ostypes.API('read')(gFd, buf_temp, buf_temp.constructor.size);
+		// TODO: consider docs - http://linux.die.net/man/7/inotify - "The behavior when the buffer given to read(2) is too small to return information about the next event depends on the kernel version: in kernels before 2.6.21, read(2) returns 0; since kernel 2.6.21, read(2) fails with the error EINVAL. Specifying a buffer of size"
+			// so meaning if i get EINVAL i should probably increase buffer size to more then 10 events
+		rez_read = parseInt(cutils.jscGetDeepest(rez_read));
+		console.log('rez_read:', rez_read);
+		if (rez_read <= 0) {
+			// got -1 or 0
+			break;
+		} else {
+			if (minevent_cnt === 0) {
+				// this is first read so min is 1
+				minevent_cnt = 1;
+			} else {
+				// this is a multiple read, so its got AT LEAST `minevent_intemp_cnt` more
+				if (minevent_cnt === 1) {
+					// because i assumed min was 1, and i read for minevent_intemp_cnt
+					minevent_cnt = minevent_intemp_cnt;
+				} else {
+					minevent_cnt += minevent_intemp_cnt;
 				}
-
-				_events.push(_event);
+			}
+			if (!buf) {
+				buf = buf_temp;
+			} else {
+				buf = joinBufs(buf, buf_temp);
 			}
 		}
 	}
 
-	// act on events
-	var event_count = _events.length;
-	console.log('_events:', _events, 'event_count:', event_count);
-	if (event_count) {
+	var bytei = 0;
+	var bytei_max = buf.constructor.size - 1;
+	var event_cnt = 0;
+	var _event;
+	var _events = [];
+	console.log('started to cast events from buf, bytei:', bytei, 'bytei_max:', bytei_max);
+	while (bytei <= bytei_max) {
 
+		if (cutils.jscEqual(buf[bytei], 0)) {
+			// i am guessing this is how to tell that there are no more events
+			console.log('minevent_cnt:', minevent_cnt, 'actual event_cnt:', event_cnt);
+			break;
+		}
+		event_cnt++;
+		_event = {};
+		for (var field of ostypes.TYPE.inotify_event.fields) {
+			var field_name = Object.keys(field)[0]; // there is only one element
+			var field_ctype = field[field_name];
+
+			// set `_event[field_name]`, and in some cases, like for `name` do special `bytei` math
+			switch (field_name) {
+				case 'wd':
+				case 'mask':
+				case 'cookie':
+				case 'len':
+						_event[field_name] = ctypes.cast(buf.addressOfElement(bytei), field_ctype.ptr).contents;
+						_event[field_name] = parseInt(cutils.jscGetDeepest(_event[field_name]));
+						bytei += field_ctype.size; // link38377
+					break;
+				case 'name':
+						if (_event.len) {
+							_event[field_name] = ctypes.cast(buf.addressOfElement(bytei), field_ctype.elementType.array(_event.len).ptr).contents;
+							_event[field_name] = _event[field_name].readString();
+						} else {
+							_event[field_name] = null;
+						}
+
+						bytei += _event.len; // `_event` will for sure have `len` field because in the struct `inotify_event` the `len` field comes before `name` field
+					break;
+			}
+		}
+
+		_events.push(_event);
 	}
-	else { console.error('WARNING! no events, thats weird, why would i call andRoutine without having any events/byte-content in gFd') }
+
+	console.log('_events:', _events);
+	// // act on events
+	// var event_count = _events.length;
+	// console.log('_events:', _events, 'event_count:', event_count);
+	// if (event_count) {
+	//
+	// }
+	// else { console.error('WARNING! no events, thats weird, why would i call andRoutine without having any events/byte-content in gFd') }
 };
 
 var mappers = { // for use with cutils.map
@@ -842,3 +914,29 @@ function dwXhrSync(aUrlOrFileUri, aOptions={}) {
 	return request;
 }
 // end - common helper functions
+
+function joinBufs(aBuf1, aBuf2, aByteOffset1=0, aByteOffset2=0) {
+	// must be of type char so like ctypes.char.array()('rawr')
+	// aByteOffsetX is byte from which to include
+	if (aByteOffset1 >= aBuf1.constructor.size) { console.error('aByteOffset1 is out of range, max offset is last index of it!'); throw new Error('byte offset error!'); }
+	if (aByteOffset2 >= aBuf2.constructor.size) { console.error('aByteOffset1 is out of range, max offset is last index of it!'); throw new Error('byte offset error!'); }
+
+	var size = 0;
+	size += aBuf1.constructor.size - aByteOffset1;
+	size += aBuf2.constructor.size - aByteOffset2;
+
+	var buf = ctypes.char.array(size)();
+	var i = 0;
+
+	var size1 = aBuf1.constructor.size
+	for (var i1=aByteOffset1; i1<size1; i1++) {
+		buf[i++] = aBuf1[i1];
+	}
+
+	var size2 = aBuf2.constructor.size
+	for (var i2=aByteOffset2; i2<size2; i2++) {
+		buf[i++] = aBuf2[i2];
+	}
+
+	return buf;
+}
