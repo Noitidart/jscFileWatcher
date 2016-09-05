@@ -20,7 +20,7 @@ switch (core.os.name) {
 	case 'winmo':
 	case 'wince':
 		importScripts(core.path.ostypes_dir + 'ostypes_win.jsm');
-		break
+		break;
 	case 'darwin':
 		importScripts(core.path.ostypes_dir + 'ostypes_mac.jsm');
 		break;
@@ -39,6 +39,7 @@ var gPipe;
 var gNextSignalId = 0;
 var path_mon_id_collection = {};
 var gDWActive = {};
+var gEINTRCnt = 0;
 /*
 	path: {
 		all
@@ -61,6 +62,7 @@ var gDWActive = {};
 */
 
 var SYSTEM_HAS_INOTIFY;
+var INOTIFY_MASKS;
 
 function init(aArg) {
 	// var { pipe_ptrstr } = aArg;
@@ -141,9 +143,8 @@ function init(aArg) {
 				}
 				console.log('gFd:', gFd);
 
-				INOTIFY_MASKS = ostypes.CONST.IN_ALL_EVENTS;
+				INOTIFY_MASKS = ostypes.CONST.IN_CLOSE_WRITE | ostypes.CONST.IN_MOVED_FROM | ostypes.CONST.IN_MOVED_TO | ostypes.CONST.IN_CREATE;
 
-				gEINTRCnt = 0;
 				self.addEventListener('close', function() {
 					 var rez_close = ostypes.API('close')(gFd);
 					 gFd = null;
@@ -444,14 +445,28 @@ function poll() {
 				var rez_testwait = ostypes.API('poll')(test_fd, 1, 0); // timeout is 0
 				if (cutils.jscEqual(rez_testwait, 0)) {
 					// it timed out, meaning it is empty
+					console.warn('pipe timed out meaning empty so GOOD carry to poll, rez_testwait:', rez_testwait);
 				} else if (cutils.jscEqual(rez_testwait, -1) && ctypes.errno === ostypes.CONST.EINTR) {
 					// got EINTR, i only get this when im not able to block so assume empty
+					console.warn('pipe got EINTR so GOOD carry to poll, rez_testwait:', rez_testwait, 'errno:', ctypes.errno);
 				} else if (cutils.jscEqual(rez_testwait, -1)) {
 					// failed for reason other then EINTR
 					console.error('FATAL ERROR failed to do testwait, errno:', ctypes.errno);
 					throw new Error('FATAL ERROR failed to do testwait, errno: ' + ctypes.errno);
 				} else {
 					// it has something in it, so similar to link1858282 lets start poll after a 0ms timeout to allow things to happen JUST IN CASE
+					console.error('BAD, something in pipe so lets clear it then restart poll');
+					// copy of block-link5584
+					var buf = ostypes.TYPE.char.array(20)(); // should only need 1 byte, but might have miltiple due to multi triggers
+					var rez_read = buf.constructor.size;
+					while (cutils.jscEqual(rez_read, buf.constructor.size)) {
+						rez_read = ostypes.API('read')(gPipe, buf, buf.constructor.size);
+						if (cutils.jscEqual(rez_read, -1)) {
+							console.error('failed to clear pipe!! all future selects will return immediately so aborting! errno:', ctypes.errno);
+							throw new Error('failed to clear pipe!! all future selects will return immediately so aborting!!');
+						}
+					}
+					// end copy of block-link5584
 					startPoll();
 					return;
 				}
@@ -500,6 +515,7 @@ function poll() {
 					} else {
 						if (!cutils.jscEqual(fds[0].revents, 0)) {
 							// pipe was tripped, clear the pipe so future `select`/`poll` call with it will not return immediately
+							// block-link5584
 							var buf = ostypes.TYPE.char.array(20)(); // should only need 1 byte, but might have miltiple due to multi triggers
 							var rez_read = buf.constructor.size;
 							while (cutils.jscEqual(rez_read, buf.constructor.size)) {
@@ -509,6 +525,7 @@ function poll() {
 									throw new Error('failed to clear pipe!! all future selects will return immediately so aborting!!');
 								}
 							}
+							// end block-link5584
 						} else if (!cutils.jscEqual(fds[1].revents, 0)) {
 							// file change notification exists
 							andRoutine();
