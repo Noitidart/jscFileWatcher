@@ -143,8 +143,10 @@ function init(aArg) {
 				}
 				console.log('gFd:', gFd);
 
-				INOTIFY_MASKS = ostypes.CONST.IN_CLOSE_WRITE | ostypes.CONST.IN_MOVED_FROM | ostypes.CONST.IN_MOVED_TO | ostypes.CONST.IN_CREATE;
-
+				INOTIFY_MASKS = ostypes.CONST.IN_MODIFY | ostypes.CONST.IN_DELETE | ostypes.CONST.IN_MOVED_FROM | ostypes.CONST.IN_MOVED_TO | ostypes.CONST.IN_CREATE;
+				// IN_MODIFY is needed for things like OS.File->write
+				// IN_CREATE captures OS.File.writeAtomic
+				
 				self.addEventListener('close', function() {
 					 var rez_close = ostypes.API('close')(gFd);
 					 gFd = null;
@@ -683,6 +685,7 @@ function andRoutine() {
 			// max length of filename is NAME_MAX but the `name` field is null terminated so `+ 1` per the docs here - http://linux.die.net/man/7/inotify
 			// 1 * because this is the size of `inotify.name.targetType`
 	var buf;
+	var bytei_max = 0;
 	var minevent_cnt = 0;
 
 	const minevent_intemp_cnt = 10;
@@ -699,6 +702,7 @@ function andRoutine() {
 			// got -1 or 0
 			break;
 		} else {
+			bytei_max += rez_read;
 			if (minevent_cnt === 0) {
 				// this is first read so min is 1
 				minevent_cnt = 1;
@@ -720,7 +724,6 @@ function andRoutine() {
 	}
 
 	var bytei = 0;
-	var bytei_max = buf.constructor.size - 1;
 	var event_cnt = 0;
 	var _event;
 	var _events = [];
