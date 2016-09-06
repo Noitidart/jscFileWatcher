@@ -72,9 +72,10 @@ switch (gDWOSName) {
 	default:
 		// assume gtk
 		try {
+			// i want it to use inotify if it has it, and fall back to gio only when it doesnt, because gio needs mainthread which i want to avoid
 			ostypes.API('inotify_init');
-			SYSTEM_HAS_INOTIFY = true;
-			gDWOSName = 'android'; // froce inotify on gtk systems that have it // DEBUG
+			// SYSTEM_HAS_INOTIFY = true;
+			// gDWOSName = 'android'; // froce inotify on gtk systems that have it // DEBUG
 		} catch (ex) {
 			SYSTEM_HAS_INOTIFY = false;
 			console.error('does not have inotify, ex:', ex);
@@ -392,25 +393,47 @@ function DirectoryWatcher(aCallback) {
 			break;
 		default:
 			// assume gtk based system
-			this.oshandler = function(path, file, other_file, event_type) {
+			this.oshandler = function(path, event) {
 				// path is the path of the directory that was watched
-				console.log('in gtkHandler', 'path:', path, 'file:', file, 'other_file:', other_file, 'event_type:', event_type);
+				console.log('in gtkHandler', 'path:', path, 'event:', event);
 
 				if (this.closed) {
 					console.warn('this watcher was closed so oshandler exiting');
 					return;
 				}
 
-				file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(file));
-				// other_file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(other_file));
-				event_type = parseInt(cutils.jscGetDeepest(event_type));
-
 				var myflags = [];
 				for (var flag of gDW_FILE_EVENT_FLAGS.gtk) {
-					if (event_type & ostypes.CONST[flag]) {
+					if (event.event_type === ostypes.CONST[flag]) {
 						myflags.push(flag);
+						break;
 					}
 				}
+				console.log('myflags:', myflags);
+
+				// anything in subdir of watched dir - TODO
+				// moved to trash dir - TODO
+				// created new dir - TODO
+				// moved dir to unwatched dir - TODO
+				// moved dir to watched dir - TODO
+				// created new doc - TODO
+				// renamed doc - TODO
+					// renamed doc - N/A
+				// moved in doc (want to see how to diff when not rename) - N/A
+				// moved out doc (want to see how to diff when not rename) - N/A
+				// write non-atomic to doc - TODO
+				// delete with OS.File.remove doc - TODO
+
+				// var filepath = ostypes.API('g_file_get_path')(file);
+				// console.log('filepath:', filepath);
+				// console.log('filepath.readString:', filepath.readString()); // filepath.readString: /home/noi/Desktop/Untitled Folder 2 // see this does not have any quotes
+
+				// var fileuri = ostypes.API('g_file_get_uri')(file);
+				// console.log('fileuri:', fileuri);
+				// console.log('fileuri.readString:', fileuri.readString()); // fileuri.readString: "file:///home/noi/Desktop/Untitled%20Folder%202" // it seems it includes the quotes
+
+				// var rez_free = ostypes.API('g_free')(filepath);
+				// console.log('rez_free:', rez_free);
 
 				// TODO: inform devhandler
 			}

@@ -8,6 +8,7 @@ if (typeof(callInMainworker) == 'undefined') throw new Error('You must have impo
 
 // Globals
 var dwGtkHandler_c;
+var gDWNextSignalId = 0;
 var gDWActive = {};
 /*
 	path: {
@@ -43,15 +44,36 @@ function dwGtkHandler(monitor, file, other_file, event_type, user_data) {
 
 	console.log('in dwGtkHandler', 'monitor:', monitor, 'file:', file, 'other_file:', other_file, 'event_type:', event_type, 'user_data:', user_data);
 
-	var signalid = ctypes.cast(user_data, ctypes.uint16_t.ptr).contents;
+	var signalid = parseInt(ctypes.cast(user_data, ctypes.uint16_t.ptr).contents);
 	var path_info = dwGetActiveInfo(signalid);
 	if (!path_info) {
 		console.error('how can path_info not be found? was it closed but this was a delayed receive?');
 	} else {
 		var path = path_info.path;
+
+		var filepath = ostypes.API('g_file_get_path')(file);
+		// console.log('filepath:', filepath);
+		// console.log('filepath.readString:', filepath.readString());
+		var _filepath = filepath.readString();
+		ostypes.API('g_free')(filepath);
+
+		var _otherfilepath;
+		if (!other_file.isNull()) {
+			var otherfilepath = ostypes.API('g_file_get_path')(file);
+			// console.log('otherfilepath:', otherfilepath);
+			// console.log('otherfilepath.readString:', otherfilepath.readString());
+			_otherfilepath = otherfilepath.readString();
+			ostypes.API('g_free')(otherfilepath);
+		}
+
+		var _event = {
+			filepath: _filepath,
+			otherfilepath: _otherfilepath,
+			event_type: parseInt(event_type) // im not sure if this is uint32_t but it seems like from my tests
+		};
 		callInMainworker('dwCallOsHandlerById', {
 			path,
-			rest_args: [cutils.strOfPtr(file), cutils.strOfPtr(other_file), event_type]
+			rest_args: [_event]
 		});
 	}
 };
@@ -72,7 +94,6 @@ function dwAddPath(aArg) {
 		console.warn('already watching aPath:', aPath);
 		return false;
 	}
-	var path_entry = path_entry.entry;
 
 	// assume gtk based system
 	var gfile = ostypes.API('g_file_new_for_path')(aPath);
@@ -93,15 +114,22 @@ function dwAddPath(aArg) {
 		return undefined;
 	}
 
-	var signalerid = ostypes.API('g_signal_connect_data')(mon, 'changed', dwGtkHandler_c, ctypes.cast(watcher_entry.data.watcherid_c.address(), ctypes.voidptr_t), null, 0);
-	console.log('signalerid:', signalerid);
-	signalerid = parseInt(cutils.jscGetDeepest(signalerid));
-	if (signalerid === 0) {
+	var signalid = gDWNextSignalId++;
+	var signalid_c = ctypes.uint16_t(signalid);
+	var connectionid = ostypes.API('g_signal_connect_data')(mon, 'changed', dwGtkHandler_c, ctypes.cast(signalid_c.address(), ctypes.voidptr_t), null, 0);
+	console.log('connectionid:', connectionid);
+
+	if (cutils.jscEqual(connectionid, 0)) {
 		console.error('failed to connect dirwatcher to signaler for aPath:', aPath);
 		return undefined;
 	}
 
-	gDWActive[aPath] = { signalerid, mon };
+	gDWActive[aPath] = {
+		connectionid,
+		mon,
+		signalid,
+		signalid_c
+	};
 	console.log('ok watching aPath:', aPath);
 
 	return true;
@@ -133,8 +161,8 @@ function dwRemovePath(aArg) {
 	}
 	var path_entry = path_info.entry;
 
-	var { mon, signalerid } = path_entry;
-	ostypes.API('g_signal_handler_disconnect')(mon, signalerid);
+	var { mon, connectionid } = path_entry;
+	ostypes.API('g_signal_handler_disconnect')(mon, connectionid);
 	ostypes.API('g_object_unref')(mon);
 
 	delete gDWActive[aPath];
