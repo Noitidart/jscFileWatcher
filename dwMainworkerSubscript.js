@@ -44,6 +44,9 @@ const gDW_FILE_EVENT_FLAGS = {
 	mac:  ['kFSEventStreamEventFlagNone', 'kFSEventStreamEventFlagMustScanSubDirs', 'kFSEventStreamEventFlagUserDropped', 'kFSEventStreamEventFlagKernelDropped', 'kFSEventStreamEventFlagEventIdsWrapped', 'kFSEventStreamEventFlagHistoryDone', 'kFSEventStreamEventFlagRootChanged', 'kFSEventStreamEventFlagMount', 'kFSEventStreamEventFlagUnmount', 'kFSEventStreamEventFlagItemCreated', 'kFSEventStreamEventFlagItemRemoved', 'kFSEventStreamEventFlagItemInodeMetaMod', 'kFSEventStreamEventFlagItemRenamed', 'kFSEventStreamEventFlagItemModified', 'kFSEventStreamEventFlagItemFinderInfoMod', 'kFSEventStreamEventFlagItemChangeOwner', 'kFSEventStreamEventFlagItemXattrMod', 'kFSEventStreamEventFlagItemIsFile', 'kFSEventStreamEventFlagItemIsDir', 'kFSEventStreamEventFlagItemIsSymlink'],
 	inotify: ['IN_ACCESS', 'IN_MODIFY', 'IN_ATTRIB', 'IN_CLOSE_WRITE', 'IN_CLOSE_NOWRITE', 'IN_OPEN', 'IN_MOVED_FROM', 'IN_MOVED_TO', 'IN_CREATE', 'IN_DELETE', 'IN_DELETE_SELF', 'IN_MOVE_SELF', 'IN_UNMOUNT', 'IN_Q_OVERFLOW', 'IN_IGNORED', 'IN_ONLYDIR', 'IN_DONT_FOLLOW', 'IN_MASK_ADD', 'IN_ISDIR', 'IN_ONESHOT']
 };
+var gDWStuff = {
+	possrename: {} // used by inotify
+};
 
 var DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD;
 switch (gDWOSName) {
@@ -262,9 +265,9 @@ function DirectoryWatcher(aCallback) {
 				}
 			break;
 		case 'android':
-				this.oshandler = function(path, obj) {
+				this.oshandler = function(path, event) {
 					// path is the path of the directory that was watched
-					console.log('in andHandler', 'path:', path, 'obj:', obj);
+					console.log('in andHandler', 'path:', path, 'event:', event);
 
 					if (this.closed) {
 						console.warn('this watcher was closed so oshandler exiting');
@@ -272,16 +275,73 @@ function DirectoryWatcher(aCallback) {
 					}
 
 					var myflags = [];
-					for (var flag of gDW_FILE_EVENT_FLAGS.gtk) {
-						if (obj.event_type & ostypes.CONST[flag]) {
+					for (var flag of gDW_FILE_EVENT_FLAGS.inotify) {
+						if (event.mask & ostypes.CONST[flag]) {
 							myflags.push(flag);
 						}
 					}
 					console.log('myflags:', myflags);
 
+					// anything in subdir of watched dir - NO EVENTS - good
+					// moved to trash dir - [ "IN_MOVED_FROM", "IN_ISDIR" ]
+					// created new dir - [ "IN_CREATE", "IN_ISDIR" ]
+					// moved dir to unwatched dir - Array [ "IN_MOVED_FROM", "IN_ISDIR" ]
+					// moved dir to watched dir - same as moving to unwatched dir line above
+					// created new doc - [ "IN_CREATE" ]
+					// renamed doc - [ "IN_MOVED_FROM" ] - name is old name, cookie is 123
+						// renamed doc - [ "IN_MOVED_TO" ] - name is new name, cookie is 123
+					// moved in doc (want to see how to diff when not rename) - no diff, cookie is not 0 as i was hoping, will have to do back to back technique
+					// moved out doc (want to see how to diff when not rename) - no diff, cookie is not 0 as i was hoping, will have to do back to back technique
+					// write non-atomic to doc - Array [ "IN_MODIFY" ]
+					// delete with OS.File.remove doc - [ "IN_DELETE" ]
 
+					if (!event.name) {
+						console.warn('no name!');
+						return;
+					}
 
-					// TODO: inform devhandler
+					var filepath = OS.Path.join(path, event.name);
+					var eventtype;
+					var oldfilename;
+					if (event.mask & ostypes.CONST.IN_CREATE) {
+						eventtype = 'ADDED';
+					} else if (event.mask & ostypes.CONST.IN_MOVED_TO) {
+						if (gDWStuff.possrename[event.cookie]) {
+							clearTimeout(gDWStuff.possrename[event.cookie].timeout);
+							oldfilename = gDWStuff.possrename[event.cookie].event.name;
+							var time_movedfrom = gDWStuff.possrename[event.cookie].time_movedfrom;
+							var time_torename = Date.now() - time_movedfrom;
+							console.warn('time_torename:', time_torename);
+							delete gDWStuff.possrename[event.cookie];
+							eventtype = 'RENAMED';
+						} else {
+							eventtype = 'ADDED';
+						}
+					} else if (event.mask & ostypes.CONST.IN_MOVED_FROM) {
+						gDWStuff.possrename[event.cookie] = {
+							event,
+							time_movedfrom: Date.now(),
+							triggerRemoved: () => {
+								delete gDWStuff.possrename[event.cookie];
+								eventtype = 'REMOVED';
+								console.log('ok dispatching as REMOVED as no IN_MOVE_FROM came in for 200ms, this.devhandler:', this.devhandler);
+								this.devhandler(filepath, eventtype, oldfilename);
+							},
+							timeout: setTimeout(()=>gDWStuff.possrename[event.cookie].triggerRemoved(), 200) // if another event does not come in for 200ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
+						};
+						return;
+					} else if (event.mask & ostypes.CONST.IN_DELETE) {
+						eventtype = 'REMOVED';
+					} else if (event.mask & ostypes.CONST.IN_MODIFY) {
+						eventtype = 'CONTENTS_MODIFIED';
+					} else {
+						console.error('none of the flags i expected are on this, flags are:', myflags);
+						return;
+					}
+
+					if (eventtype) {
+						this.devhandler(filepath, eventtype, oldfilename);
+					}
 				}
 			break;
 		default:

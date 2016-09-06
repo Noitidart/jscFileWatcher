@@ -506,7 +506,7 @@ function poll() {
 						console.error('ABORTING, failed to read inotify buf, errno:', ctypes.errno);
 					}
 				} else {
-					if (gEINTRCnt > 0) { console.error('took', gEINTRCnt, 'times to get over a EINTR'); }
+					if (gEINTRCnt > 0) { console.warn('took', gEINTRCnt, 'times to get over a EINTR'); }
 					gEINTRCnt = 0;
 					// method: read
 					// var len = parseInt(cutils.jscGetDeepest(rez_wait));
@@ -772,11 +772,13 @@ function andRoutine() {
 
 	console.log('_events:', _events);
 	for (var _event of _events) {
-		var path = dwGetActiveInfo(_event.wd); // path to the watched dir
-		if (!path) { console.error('DEVERROR - should never happen, could not find path for wd:', _event.wd); continue; }
+		var info = dwGetActiveInfo(_event.wd); // path to the watched dir
+
+		if (!info) { console.error('DEVERROR - should never happen, could not find path for wd:', _event.wd); continue; }
+
 		callInMainworker('dwCallOsHandlerById', {
-			path,
-			rest_args: _event
+			path: info.path,
+			rest_args: [_event]
 		});
 	}
 
