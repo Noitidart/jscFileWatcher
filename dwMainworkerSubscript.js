@@ -45,7 +45,7 @@ const gDW_FILE_EVENT_FLAGS = {
 	inotify: ['IN_ACCESS', 'IN_MODIFY', 'IN_ATTRIB', 'IN_CLOSE_WRITE', 'IN_CLOSE_NOWRITE', 'IN_OPEN', 'IN_MOVED_FROM', 'IN_MOVED_TO', 'IN_CREATE', 'IN_DELETE', 'IN_DELETE_SELF', 'IN_MOVE_SELF', 'IN_UNMOUNT', 'IN_Q_OVERFLOW', 'IN_IGNORED', 'IN_ONLYDIR', 'IN_DONT_FOLLOW', 'IN_MASK_ADD', 'IN_ISDIR', 'IN_ONESHOT']
 };
 var gDWStuff = {
-	possrename: {}, // used by inotify
+	possrename: {}, // used by inotify (key is `cookie`) and gtk (key is `fileinode`).
 	winrename: null // use by win
 };
 
@@ -435,7 +435,55 @@ function DirectoryWatcher(aCallback) {
 				// var rez_free = ostypes.API('g_free')(filepath);
 				// console.log('rez_free:', rez_free);
 
-				// TODO: inform devhandler
+				var filepath = event.filepath;
+				var oldfilename;
+				var eventtype;
+				switch (event.event_type) {
+					case ostypes.CONST.G_FILE_MONITOR_EVENT_CHANGED:
+							eventtype = 'CONTENTS_MODIFIED';
+						break;
+					case ostypes.CONST.G_FILE_MONITOR_EVENT_CREATED:
+							if (gDWStuff.possrename[event.fileinode]) {
+								clearTimeout(gDWStuff.possrename[event.fileinode].timeout);
+								oldfilename = OS.Path.basename(gDWStuff.possrename[event.fileinode].event.filepath);
+								var time_movedfrom = gDWStuff.possrename[event.fileinode].time_movedfrom;
+								var time_torename = Date.now() - time_movedfrom;
+								console.warn('time_torename:', time_torename);
+								delete gDWStuff.possrename[event.fileinode];
+								eventtype = 'RENAMED';
+							} else {
+								eventtype = 'ADDED';
+							}
+						break;
+					case ostypes.CONST.G_FILE_MONITOR_EVENT_DELETED:
+							gDWStuff.possrename[event.fileinode] = {
+								event,
+								time_movedfrom: Date.now(),
+								triggerRemoved: () => {
+									delete gDWStuff.possrename[event.fileinode];
+									eventtype = 'REMOVED';
+									console.log('ok dispatching as REMOVED as no IN_MOVE_FROM came in for 200ms, this.devhandler:', this.devhandler);
+									this.devhandler(filepath, eventtype, oldfilename);
+								},
+								timeout: setTimeout(()=>gDWStuff.possrename[event.fileinode].triggerRemoved(), 200) // if another event does not come in for 200ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
+							};
+							return;
+						break;
+					case ostypes.CONST.G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
+							// i ignore this
+							return;
+						break;
+					default:
+						console.error('none of the flags i expected are on this, flags are:', myflags);
+						return;
+				}
+
+				if (eventtype) {
+					this.devhandler(filepath, eventtype, oldfilename);
+				}
+
+
+
 			}
 	}
 

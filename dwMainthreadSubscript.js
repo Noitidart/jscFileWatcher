@@ -58,18 +58,28 @@ function dwGtkHandler(monitor, file, other_file, event_type, user_data) {
 		ostypes.API('g_free')(filepath);
 
 		var _otherfilepath;
-		if (!other_file.isNull()) {
-			var otherfilepath = ostypes.API('g_file_get_path')(file);
-			// console.log('otherfilepath:', otherfilepath);
-			// console.log('otherfilepath.readString:', otherfilepath.readString());
-			_otherfilepath = otherfilepath.readString();
-			ostypes.API('g_free')(otherfilepath);
+		// if (!other_file.isNull()) { // in my tests - always null, so i designed not to rely on this
+		// 	var otherfilepath = ostypes.API('g_file_get_path')(file);
+		// 	// console.log('otherfilepath:', otherfilepath);
+		// 	// console.log('otherfilepath.readString:', otherfilepath.readString());
+		// 	_otherfilepath = otherfilepath.readString();
+		// 	ostypes.API('g_free')(otherfilepath);
+		// }
+
+		var _event_type = parseInt(event_type); // is safe to parse int its a enum
+		var _fileinode;
+		if (_event_type === ostypes.CONST.G_FILE_MONITOR_EVENT_DELETED || _event_type === ostypes.CONST.G_FILE_MONITOR_EVENT_CREATED) {
+			// TODO: maybe add some error handling here? like if `info` null
+			var info = ostypes.API('g_file_query_info')(file, ostypes.CONST.G_FILE_ATTRIBUTE_UNIX_INODE, ostypes.CONST.G_FILE_QUERY_INFO_NONE, null, null);
+			var fileinode = ostypes.API('g_file_info_get_attribute_uint64')(info, ostypes.CONST.G_FILE_ATTRIBUTE_UNIX_INODE);
+			_fileinode = cutils.jscGetDeepest(fileinode); // guint64
 		}
 
 		var _event = {
 			filepath: _filepath,
+			filenode: _fileinode,
 			otherfilepath: _otherfilepath,
-			event_type: parseInt(event_type) // im not sure if this is uint32_t but it seems like from my tests
+			event_type: _event_type
 		};
 		callInMainworker('dwCallOsHandlerById', {
 			path,
