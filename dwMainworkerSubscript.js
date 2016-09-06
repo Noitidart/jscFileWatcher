@@ -74,8 +74,8 @@ switch (gDWOSName) {
 		try {
 			// i want it to use inotify if it has it, and fall back to gio only when it doesnt, because gio needs mainthread which i want to avoid
 			ostypes.API('inotify_init');
-			// SYSTEM_HAS_INOTIFY = true;
-			// gDWOSName = 'android'; // froce inotify on gtk systems that have it // DEBUG
+			SYSTEM_HAS_INOTIFY = true;
+			gDWOSName = 'android'; // froce inotify on gtk systems that have it // DEBUG
 		} catch (ex) {
 			SYSTEM_HAS_INOTIFY = false;
 			console.error('does not have inotify, ex:', ex);
