@@ -45,7 +45,8 @@ const gDW_FILE_EVENT_FLAGS = {
 	inotify: ['IN_ACCESS', 'IN_MODIFY', 'IN_ATTRIB', 'IN_CLOSE_WRITE', 'IN_CLOSE_NOWRITE', 'IN_OPEN', 'IN_MOVED_FROM', 'IN_MOVED_TO', 'IN_CREATE', 'IN_DELETE', 'IN_DELETE_SELF', 'IN_MOVE_SELF', 'IN_UNMOUNT', 'IN_Q_OVERFLOW', 'IN_IGNORED', 'IN_ONLYDIR', 'IN_DONT_FOLLOW', 'IN_MASK_ADD', 'IN_ISDIR', 'IN_ONESHOT']
 };
 var gDWStuff = {
-	possrename: {} // used by inotify
+	possrename: {}, // used by inotify
+	winrename: null // use by win
 };
 
 var DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD;
@@ -239,16 +240,61 @@ function DirectoryWatcher(aCallback) {
 		case 'winnt':
 		case 'winmo':
 		case 'wince':
-				this.oshandler = function(path, dwNumberOfBytesTransfered, changes) {
+				this.oshandler = function(path, event) {
 					// path is the path of the directory that was watched
-					console.log('in mainworker winHandler:', 'path:', path, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'changes:', changes);
+					console.log('in mainworker winHandler:', 'path:', path, 'event:', event);
 
 					if (this.closed) {
 						console.warn('this watcher was closed so oshandler exiting');
 						return;
 					}
 
-					// TODO: inform devhandler
+					var myflags = [];
+					for (var flag of gDW_FILE_EVENT_FLAGS.win) {
+						if (event.Action === ostypes.CONST[flag]) {
+							myflags.push(flag);
+							break;
+						}
+					}
+					console.log('myflags:', myflags);
+
+					// anything in subdir of watched dir - TODO
+					// moved to trash dir - TODO
+					// created new dir - TODO
+					// moved dir to unwatched dir - TODO
+					// moved dir to watched dir - TODO
+					// created new doc - TODO
+					// renamed doc - TODO
+						// renamed doc - N/A
+					// moved in doc (want to see how to diff when not rename) - N/A
+					// moved out doc (want to see how to diff when not rename) - N/A
+					// write non-atomic to doc - TODO
+					// delete with OS.File.remove doc - TODO
+
+					var filepath = OS.Path.join(path, event.FileName);
+					var eventtype;
+					var oldfilename;
+					if (event.Action === ostypes.CONST.FILE_ACTION_ADDED) {
+						eventtype = 'ADDED';
+					} else if (event.Action === ostypes.CONST.FILE_ACTION_REMOVED) {
+						eventtype = 'REMOVED';
+					} else if (event.Action === ostypes.CONST.FILE_ACTION_MODIFIED) {
+						eventtype = 'CONTENTS_MODIFIED';
+						// TODO: consider to match inotify: if `filepath` is a dir, then that means a file was created/removed/renamed inside this so discard
+					} else if (event.Action === ostypes.CONST.FILE_ACTION_RENAMED_OLD_NAME) {
+						gDWStuff.winrename = event;
+						return;
+					} else if (event.Action === ostypes.CONST.FILE_ACTION_RENAMED_NEW_NAME) {
+						eventtype = 'RENAMED';
+						oldfilename = gDWStuff.winrename.FileName;
+					} else {
+						console.error('none of the flags i expected are on this, flags are:', myflags);
+						return;
+					}
+
+					if (eventtype) {
+						this.devhandler(filepath, eventtype, oldfilename);
+					}
 				};
 			break;
 		case 'darwin':

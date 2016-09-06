@@ -97,14 +97,14 @@ function init(aArg) {
 
 				// notification buffer size and length stuff
 				WATCHED_RES_MAXIMUM_NOTIFICATIONS = 100; // 100; Dexter uses 100
-				NOTIFICATION_BUFFER_SIZE_IN_BYTES = ostypes.TYPE.FILE_NOTIFY_INFORMATION.size * WATCHED_RES_MAXIMUM_NOTIFICATIONS;
+				NOTIFICATION_BUFFER_SIZE_IN_BYTES = 16380 * 4; // 4 is DWORD size // ostypes.TYPE.FILE_NOTIFY_INFORMATION.size * WATCHED_RES_MAXIMUM_NOTIFICATIONS; // "I have found that the buffer which is populated needs to be declared as a DWORD array (this gets the alignment right) and then the size needs to be < 16384 DWORDs. It can be larger - but this breaks for network drives. Making it about 16380 DWORDs seems to be the sweet spot for local and network drives." - https://qualapps.blogspot.com/2010/05/understanding-readdirectorychangesw_19.html
 				// we need it DWORD aligned - http://stackoverflow.com/a/29555298/1828637
-				console.log('pre dword sized NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES)
-				while (NOTIFICATION_BUFFER_SIZE_IN_BYTES % ostypes.TYPE.DWORD.size) {
-					NOTIFICATION_BUFFER_SIZE_IN_BYTES++;
-				}
-				NOTIFICATION_DWORD_BUFFER_LENGTH = NOTIFICATION_BUFFER_SIZE_IN_BYTES / ostypes.TYPE.DWORD.size;
-				console.log('post dword sized NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES, 'NOTIFICATION_DWORD_BUFFER_LENGTH:', NOTIFICATION_DWORD_BUFFER_LENGTH);
+				// console.log('pre dword sized NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES)
+				// while (NOTIFICATION_BUFFER_SIZE_IN_BYTES % ostypes.TYPE.DWORD.size) {
+				// 	NOTIFICATION_BUFFER_SIZE_IN_BYTES++;
+				// }
+				// NOTIFICATION_DWORD_BUFFER_LENGTH = NOTIFICATION_BUFFER_SIZE_IN_BYTES / ostypes.TYPE.DWORD.size;
+				// console.log('post dword sized NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES, 'NOTIFICATION_DWORD_BUFFER_LENGTH:', NOTIFICATION_DWORD_BUFFER_LENGTH);
 
 				DW_NOTIFY_FILTER = ostypes.CONST.FILE_NOTIFY_CHANGE_LAST_WRITE | ostypes.CONST.FILE_NOTIFY_CHANGE_FILE_NAME | ostypes.CONST.FILE_NOTIFY_CHANGE_DIR_NAME; // this is what @Dexter used
 				winRoutine_c = ostypes.TYPE.FileIOCompletionRoutine.ptr(winRoutine);
@@ -190,13 +190,13 @@ function addPath(aArg) {
 				var hdir = ostypes.API('CreateFile')(aPath, ostypes.CONST.FILE_LIST_DIRECTORY, ostypes.CONST.FILE_SHARE_READ | ostypes.CONST.FILE_SHARE_WRITE | ostypes.CONST.FILE_SHARE_DELETE, null, ostypes.CONST.OPEN_EXISTING, ostypes.CONST.FILE_FLAG_BACKUP_SEMANTICS | ostypes.CONST.FILE_FLAG_OVERLAPPED, null);
 				var o = ostypes.TYPE.OVERLAPPED();
 
-				var notif_buf = ostypes.TYPE.DWORD.array(NOTIFICATION_DWORD_BUFFER_LENGTH)(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE_IN_BYTES)(); // im not sure about the 4096 ive seen people use that and 2048 im not sure why
-				console.info('notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD BE same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES);
-				if (notif_buf.constructor.size != NOTIFICATION_BUFFER_SIZE_IN_BYTES) {
-					console.error('please email noitidart@gmail.com about this error. notif_buf is of a size i dont expect', 'notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD HAVE BEEN same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES)
-					startPoll();
-					return undefined;
-				}
+				var notif_buf = ostypes.TYPE.BYTE.array(NOTIFICATION_BUFFER_SIZE_IN_BYTES)(); //ostypes.TYPE.DWORD.array(NOTIFICATION_BUFFER_SIZE_IN_BYTES)();
+				// console.info('notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD BE same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES);
+				// if (notif_buf.constructor.size != NOTIFICATION_BUFFER_SIZE_IN_BYTES) {
+				// 	console.error('please email noitidart@gmail.com about this error. notif_buf is of a size i dont expect', 'notif_buf.constructor.size:', notif_buf.constructor.size, 'this SHOULD HAVE BEEN same as NOTIFICATION_BUFFER_SIZE_IN_BYTES:', NOTIFICATION_BUFFER_SIZE_IN_BYTES)
+				// 	startPoll();
+				// 	return undefined;
+				// }
 
 				var signalid = gNextSignalId++;
 				var signalid_c = ctypes.uint16_t(signalid);
@@ -819,14 +819,66 @@ function winRoutine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
 
 		// get notif_buf
 		var notif_buf = path_entry.notif_buf;
+		console.log('notif_buf:', notif_buf);
 
-		// inform mainworker oshandler
-		callInMainworker('dwCallOsHandlerById', {
-			path,
-			rest_args: [dwNumberOfBytesTransfered, cutils.strOfPtr(notif_buf.address())]
-		});
+		var _events = [];
+		var _event;
+		var bytei = 0;
+		while(true) {
+			// var event = ctypes.cast(notif_buf.addressOfElement(bytei), ostypes.TYPE.FILE_NOTIFY_INFORMATION.ptr).contents;
+			// _event = {
+			// 	NextEntryOffset: parseInt(cutils.jscGetDeepest(event.NextEntryOffset)),
+			// 	Action: parseInt(cutils.jscGetDeepest(event.Action)),
+			// 	FileNameLength: parseInt(cutils.jscGetDeepest(event.FileNameLength)),
+			// };
+			// _event.FileName = event.FileName.readString();
+			// console.log('_event should be like:', _event);
 
-		var new_notif_buf = ostypes.TYPE.DWORD.array(NOTIFICATION_DWORD_BUFFER_LENGTH)(); // must use new notif_buf to avoid race conditions per - "However, you have to make sure that you use a different buffer than your current call or you will end up with a race condition." - https://qualapps.blogspot.com/2010/05/understanding-readdirectorychangesw_19.html
+			_event = {};
+			for (var field of ostypes.TYPE.FILE_NOTIFY_INFORMATION.fields) {
+				var field_name = Object.keys(field)[0]; // there is only one element
+				var field_ctype = field[field_name];
+				// console.log('bytei:', bytei, 'name:', field_name, 'size:', field_ctype.size);
+				// set `_event[field_name]`, and in some cases, like for `name` do special `bytei` math
+				switch (field_name) {
+					case 'NextEntryOffset':
+					case 'Action':
+					case 'FileNameLength':
+							_event[field_name] = ctypes.cast(notif_buf.addressOfElement(bytei), field_ctype.ptr).contents;
+							_event[field_name] = parseInt(cutils.jscGetDeepest(_event[field_name]));
+							bytei += field_ctype.size;
+						break;
+					case 'FileName':
+							var filenamelength_bytes = _event.FileNameLength;
+							var filenamelength_fieldtype = Math.ceil(filenamelength_bytes / field_ctype.elementType.size); // it seems ceil is not needed, but i left it in
+							console.log('filenamelength_fieldtype:', filenamelength_fieldtype, 'non-ceil:', (filenamelength_bytes / field_ctype.elementType.size));
+							_event[field_name] = ctypes.cast(notif_buf.addressOfElement(bytei), field_ctype.elementType.array(filenamelength_fieldtype).ptr).contents;
+							_event[field_name] = _event[field_name].readString();
+							bytei += _event.FileNameLength;
+						break;
+				}
+			}
+
+			_events.push(_event);
+
+			console.log('bytei:', bytei, 'NextEntryOffset:', _event.NextEntryOffset);
+			if (!_event.NextEntryOffset) {
+				break;
+			} else {
+				bytei = _event.NextEntryOffset;
+			}
+		}
+
+		console.log('_events:', _events);
+
+		for (var _event of _events) {
+			callInMainworker('dwCallOsHandlerById', {
+				path,
+				rest_args: [_event]
+			});
+		}
+
+		var new_notif_buf = ostypes.TYPE.BYTE.array(NOTIFICATION_BUFFER_SIZE_IN_BYTES)(); // ostypes.TYPE.DWORD.array(NOTIFICATION_DWORD_BUFFER_LENGTH)(); // must use new notif_buf to avoid race conditions per - "However, you have to make sure that you use a different buffer than your current call or you will end up with a race condition." - https://qualapps.blogspot.com/2010/05/understanding-readdirectorychangesw_19.html
 		path_entry.notif_buf = new_notif_buf;
 
 		// retrigger ReadDirectoryChanges on this hdir, otherwise WaitForMultipleObjectsEx will return immediately with index of this hdir in gLpHandles
