@@ -40,6 +40,7 @@ var gNextSignalId = 0;
 var path_mon_id_collection = {};
 var gDWActive = {};
 var gEINTRCnt = 0;
+
 /*
 	path: {
 		all
@@ -146,7 +147,7 @@ function init(aArg) {
 				INOTIFY_MASKS = ostypes.CONST.IN_MODIFY | ostypes.CONST.IN_DELETE | ostypes.CONST.IN_MOVED_FROM | ostypes.CONST.IN_MOVED_TO | ostypes.CONST.IN_CREATE;
 				// IN_MODIFY is needed for things like OS.File->write
 				// IN_CREATE captures OS.File.writeAtomic
-				
+
 				self.addEventListener('close', function() {
 					 var rez_close = ostypes.API('close')(gFd);
 					 gFd = null;
@@ -594,7 +595,7 @@ function macResetStream(aNewCfHandles) {
 		rez = undefined;
 	} else {
 		// create the new stream
-		var new_stream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macRoutine_c, null, new_cfhandles_cf, ostypes.TYPE.UInt64(ostypes.CONST.kFSEventStreamEventIdSinceNow), 0, ostypes.CONST.kFSEventStreamCreateFlagWatchRoot | ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
+		var new_stream = ostypes.API('FSEventStreamCreate')(ostypes.CONST.kCFAllocatorDefault, macRoutine_c, null, new_cfhandles_cf, ostypes.TYPE.UInt64(ostypes.CONST.kFSEventStreamEventIdSinceNow), 0, ostypes.CONST.kFSEventStreamCreateFlagFileEvents | ostypes.CONST.kFSEventStreamCreateFlagNoDefer);
 		console.log('new_stream:', new_stream);
 		if (new_stream.isNull()) { // i have seen this null when new_cfhandles_cf had no paths added to it, so was an empty aNewCfHandles/new_cfhandles_c
 			console.error('Failed FSEventStreamCreate!! Aborting as in not re-starting poll');
@@ -647,6 +648,7 @@ function macResetStream(aNewCfHandles) {
 }
 
 function macRoutine(streamRef, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds) {
+	// https://developer.apple.com/library/mac/documentation/Darwin/Reference/FSEvents_Ref/#//apple_ref/doc/constant_group/FSEventStreamEventFlags
 	console.log('in macRoutine:', 'streamRef:', streamRef, 'clientCallBackInfo:', clientCallBackInfo, 'numEvents:', numEvents, 'eventPaths:', eventPaths, 'eventFlags:', eventFlags, 'eventIds:', eventIds);
 
 	// i need to read the args within this callback, the docs say that at the end of this callback the args are released, so if i had sent this to the mainworker `oshandler` it would read released memory and probably crash
@@ -672,6 +674,7 @@ function macRoutine(streamRef, clientCallBackInfo, numEvents, eventPaths, eventF
 }
 
 function andRoutine() {
+	// http://linux.die.net/man/7/inotify
 
 	// itreate through buf and collect all c events into `_events` as js
 	var _events;
@@ -768,6 +771,15 @@ function andRoutine() {
 	}
 
 	console.log('_events:', _events);
+	for (var _event of _events) {
+		var path = dwGetActiveInfo(_event.wd); // path to the watched dir
+		if (!path) { console.error('DEVERROR - should never happen, could not find path for wd:', _event.wd); continue; }
+		callInMainworker('dwCallOsHandlerById', {
+			path,
+			rest_args: _event
+		});
+	}
+
 	// // act on events
 	// var event_count = _events.length;
 	// console.log('_events:', _events, 'event_count:', event_count);
@@ -783,6 +795,7 @@ var mappers = { // for use with cutils.map
 };
 
 function winRoutine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped) {
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa364391(v=vs.85).aspx
 	console.log('in winRoutine:', 'dwErrorCode:', dwErrorCode, 'dwNumberOfBytesTransfered:', dwNumberOfBytesTransfered, 'lpOverlapped:', lpOverlapped);
 
 	// get signalid

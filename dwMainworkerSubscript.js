@@ -7,6 +7,7 @@ if (typeof(callInBootstrap) == 'undefined') throw new Error('You must have impor
 if (typeof(dwPathWatcherDir) == 'undefined') throw new Error('You must have defined `dwPathWatcherDir` to be the path to the directory containing the "watcher" module before getting here!');
 if (typeof(OS) == 'undefined') throw new Error('You must have imported `OS` before getting here!');
 if (typeof(OS.Constants) == 'undefined') throw new Error('You must have imported `OS.Constants` before getting here!');
+if (typeof(OS.Path) == 'undefined') throw new Error('You must have imported `OS.Path` before getting here!');
 
 // Globals
 var gDWSessionId = Date.now() + '';
@@ -37,6 +38,12 @@ var gDWActive = {};
 			...
 	}
 */
+const gDW_FILE_EVENT_FLAGS = {
+	gtk: ['G_FILE_MONITOR_EVENT_CHANGED', 'G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT', 'G_FILE_MONITOR_EVENT_DELETED', 'G_FILE_MONITOR_EVENT_CREATED', 'G_FILE_MONITOR_EVENT_ATTRIBUTE_CHANGED', 'G_FILE_MONITOR_EVENT_PRE_UNMOUNT', 'G_FILE_MONITOR_EVENT_UNMOUNTED', 'G_FILE_MONITOR_EVENT_MOVED', 'G_FILE_MONITOR_EVENT_RENAMED', 'G_FILE_MONITOR_EVENT_MOVED_IN', 'G_FILE_MONITOR_EVENT_MOVED_OUT'],
+	win: ['FILE_ACTION_ADDED', 'FILE_ACTION_REMOVED', 'FILE_ACTION_MODIFIED', 'FILE_ACTION_RENAMED_OLD_NAME', 'FILE_ACTION_RENAMED_NEW_NAME'],
+	mac:  ['kFSEventStreamEventFlagNone', 'kFSEventStreamEventFlagMustScanSubDirs', 'kFSEventStreamEventFlagUserDropped', 'kFSEventStreamEventFlagKernelDropped', 'kFSEventStreamEventFlagEventIdsWrapped', 'kFSEventStreamEventFlagHistoryDone', 'kFSEventStreamEventFlagRootChanged', 'kFSEventStreamEventFlagMount', 'kFSEventStreamEventFlagUnmount', 'kFSEventStreamEventFlagItemCreated', 'kFSEventStreamEventFlagItemRemoved', 'kFSEventStreamEventFlagItemInodeMetaMod', 'kFSEventStreamEventFlagItemRenamed', 'kFSEventStreamEventFlagItemModified', 'kFSEventStreamEventFlagItemFinderInfoMod', 'kFSEventStreamEventFlagItemChangeOwner', 'kFSEventStreamEventFlagItemXattrMod', 'kFSEventStreamEventFlagItemIsFile', 'kFSEventStreamEventFlagItemIsDir', 'kFSEventStreamEventFlagItemIsSymlink'],
+	inotify: ['IN_ACCESS', 'IN_MODIFY', 'IN_ATTRIB', 'IN_CLOSE_WRITE', 'IN_CLOSE_NOWRITE', 'IN_OPEN', 'IN_MOVED_FROM', 'IN_MOVED_TO', 'IN_CREATE', 'IN_DELETE', 'IN_DELETE_SELF', 'IN_MOVE_SELF', 'IN_UNMOUNT', 'IN_Q_OVERFLOW', 'IN_IGNORED', 'IN_ONLYDIR', 'IN_DONT_FOLLOW', 'IN_MASK_ADD', 'IN_ISDIR', 'IN_ONESHOT']
+};
 
 var DIRECTORYWATCHER_MAX_ACTIVE_PER_THREAD;
 switch (gDWOSName) {
@@ -209,10 +216,9 @@ function dwShutdown() {
 function DirectoryWatcher(aCallback) {
 	/*
 	aCallback called with these argumnets:
-		aFilePath - i dont give just file name, because multiple directories can be being watched, so i give full os path
+		aFilePath - i dont give just file name, because multiple directories can be being watched, so i give full os path. so it is OS.Path.join(path to dir being watched, filename that was affected)
 		aEventType - enum[ADDED, REMOVED, RENAMED, CONTENTS_MODIFIED]
-		aExtra
-			aExtra depends on aEventType
+		aOldFileName - only set if aEventType was "RENAMED"
 	*/
 	this.watcherid = gDWNextId++;
 	gDWInstancesById[this.watcherid] = this;
@@ -256,14 +262,24 @@ function DirectoryWatcher(aCallback) {
 				}
 			break;
 		case 'android':
-				this.oshandler = function(path) {
+				this.oshandler = function(path, obj) {
 					// path is the path of the directory that was watched
-					console.log('in andHandler', 'path:', path);
+					console.log('in andHandler', 'path:', path, 'obj:', obj);
 
 					if (this.closed) {
 						console.warn('this watcher was closed so oshandler exiting');
 						return;
 					}
+
+					var myflags = [];
+					for (var flag of gDW_FILE_EVENT_FLAGS.gtk) {
+						if (obj.event_type & ostypes.CONST[flag]) {
+							myflags.push(flag);
+						}
+					}
+					console.log('myflags:', myflags);
+
+
 
 					// TODO: inform devhandler
 				}
@@ -282,6 +298,13 @@ function DirectoryWatcher(aCallback) {
 				file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(file));
 				// other_file = ostypes.TYPE.GFile.ptr(ctypes.UInt64(other_file));
 				event_type = parseInt(cutils.jscGetDeepest(event_type));
+
+				var myflags = [];
+				for (var flag of gDW_FILE_EVENT_FLAGS.gtk) {
+					if (event_type & ostypes.CONST[flag]) {
+						myflags.push(flag);
+					}
+				}
 
 				// TODO: inform devhandler
 			}

@@ -39,6 +39,8 @@ switch (Services.appinfo.OS.toLowerCase()) {
 }
 
 function dwGtkHandler(monitor, file, other_file, event_type, user_data) {
+	// https://developer.gnome.org/gio/stable/GFileMonitor.html#GFileMonitorEvent
+
 	console.log('in dwGtkHandler', 'monitor:', monitor, 'file:', file, 'other_file:', other_file, 'event_type:', event_type, 'user_data:', user_data);
 
 	var signalid = ctypes.cast(user_data, ctypes.uint16_t.ptr).contents;
