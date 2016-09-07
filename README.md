@@ -92,6 +92,15 @@ Reminder: This is how to do a pre termination call with `Comm`:
     gWkComm = new Comm.server.worker('YOUR/PATH/TO/MainWorker.js', undefined, undefined, onBeforeTerminate )
 
 ### Step 4 - ChromeWorker Subscript
-Make sure to first `importScripts` the `Comm` and `ostypes` submodule then import `dwMainworkerSubscript.js`
+Make sure to first `importScripts` `OS.File` `Comm` and `ostypes` submodule then import `dwMainworkerSubscript.js`
 
-    importScripts('YOUR/PATH/TO/JSCFILEWATCHER/dwMainworkerSubscript.js');
+	importScripts('resource://gre/modules/osfile.jsm');
+	importScripts('YOUR/PATH/TO/JSCFILEWATCHER/dwMainworkerSubscript.js');
+
+	// you can now use it
+	var watcher = new OS.File.DirectoryWatcher(function(aPath, aEventType, aOldName) {
+		console.log(aEventType, aPath, aOldName);
+	});
+	watcher.addPath('C:\\bin');
+
+You do not have to remove all the paths or `watcher.close()` before shutdown, `dwShutdown` procedure will handle clean up of anything that is running.
