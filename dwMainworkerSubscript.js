@@ -343,7 +343,10 @@ function macOsHandler(path, event) {
 	var filepath = path;
 	var eventtype;
 	var oldfilename;
-	if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemCreated) {
+	if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemModified) {
+		// important that `kFSEventStreamEventFlagItemModified` goes first, because when it happens, it also gets the `kFSEventStreamEventFlagItemRenamed` flag
+	   eventtype = 'CONTENTS_MODIFIED';
+   } else if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemCreated) {
 		eventtype = 'ADDED';
 	} else if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemRenamed) {
 		// check if this is renamed-to
@@ -378,8 +381,6 @@ function macOsHandler(path, event) {
 		}
 	} else if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemRemoved) {
 		eventtype = 'REMOVED';
-	} else if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemModified) {
-		eventtype = 'CONTENTS_MODIFIED';
 	} else {
 		console.error('none of the flags i expected are on this, flags are:', myflags);
 		deferredmain.resolve(null);
@@ -981,7 +982,38 @@ function genericCatch(aPromiseName, aPromiseToReject, aCaught) {
 	}
 }
 function setTimeoutSync(aMilliseconds) {
-	var breakDate = Date.now() + aMilliseconds;
-	while (Date.now() < breakDate) {}
+	var sleptstart = Date.now();
+	var sleptfor = 0;
+	switch (gDWOSName) {
+		case 'winnt':
+		case 'winmo':
+		case 'wince':
+				ostypes.API('SleepEx')(aMilliseconds, false);
+				sleptfor = Date.now() - sleptstart;
+			break;
+		case 'darwin':
+				ostypes.API('objc_msgSend')(ostypes.HELPER.class('NSThread'), ostypes.HELPER.sel('sleepForTimeInterval:'), ostypes.TYPE.NSTimeInterval(aMilliseconds / 1000));
+				sleptfor = Date.now() - sleptstart;
+			break;
+		default:
+			// assume unix/mac
+			while (true) {
+				var sleepfor = aMilliseconds - sleptfor;
+				var rez_sleep = ostypes.API('usleep')(sleepfor * 1000);
+				sleptfor = Date.now() - sleptstart;
+				if (cutils.jscEqual(rez_sleep, -1)) {
+					if (ctypes.errno === ostypes.CONST.EINTR) {
+						// its EINTR so try again
+						console.error('WARN: got EINTR during usleep, so pick up where left off');
+						continue;
+					} else {
+						console.error('FATAL ERROR: got error during usleep, errno:', ctypes.errno);
+					}
+				}
+				break;
+			}
+	}
+
+	console.error('slept for:', sleptfor);
 }
 // end - common helper functions
