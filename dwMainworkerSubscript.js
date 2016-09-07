@@ -89,7 +89,14 @@ function dwCallOsHandlerById(aArg) {
 
 	var { path, rest_args } = aArg;
 
-	var path_entry = gDWActive[path];
+	var path_entry;
+	switch (gDWOSName) {
+		case 'darwin':
+				path_entry = gDWActive[OS.Path.dirname(path)];
+			break;
+		default:
+			path_entry = gDWActive[path];
+	}
 	if (!path_entry) {
 		console.error('how can path_info not be found? was it closed but this was a delayed receive?');
 		throw new Error('how can path_info not be found? was it closed but this was a delayed receive?');
@@ -299,8 +306,8 @@ function DirectoryWatcher(aCallback) {
 				};
 			break;
 		case 'darwin':
-				this.oshandler = function(path) {
-					// path is the path of the directory that was watched
+				this.oshandler = function(path, event) {
+					// path is the path to the file that was affected (not the watched directory like in inotify, gtk, and windows)
 					console.log('in macHandler', 'path:', path);
 
 					if (this.closed) {
@@ -308,7 +315,75 @@ function DirectoryWatcher(aCallback) {
 						return;
 					}
 
-					// TODO: inform devhandler
+					var myflags = [];
+					for (var flag of gDW_FILE_EVENT_FLAGS.mac) {
+						if (event.flags & ostypes.CONST[flag]) {
+							myflags.push(flag);
+						}
+					}
+					console.log('myflags:', myflags);
+
+					// anything in subdir of watched dir - TODO
+					// moved to trash dir - TODO
+					// created new dir - TODO
+					// moved dir to unwatched dir - TODO
+					// moved dir to watched dir - TODO
+					// created new doc - TODO
+					// renamed doc - TODO
+						// renamed doc - N/A
+					// moved in doc (want to see how to diff when not rename) - N/A
+					// moved out doc (want to see how to diff when not rename) - N/A
+					// write non-atomic to doc - TODO
+					// delete with OS.File.remove doc - TODO
+
+					var filepath = path;
+					var eventtype;
+					var oldfilename;
+					if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemCreated) {
+						eventtype = 'ADDED';
+					} else if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemRenamed) {
+						// check if this is renamed-to
+						var idof_renamedfrom = event.id - 1;
+						if (gDWStuff.possrename[idof_renamedfrom]) {
+							clearTimeout(gDWStuff.possrename[idof_renamedfrom].timeout);
+							oldfilename = OS.Path.basename(gDWStuff.possrename[idof_renamedfrom].eventfilepath);
+							var time_movedfrom = gDWStuff.possrename[idof_renamedfrom].time_movedfrom;
+							var time_torename = Date.now() - time_movedfrom;
+							console.warn('time_torename:', time_torename);
+							delete gDWStuff.possrename[idof_renamedfrom];
+							eventtype = 'RENAMED';
+						} else {
+							// possible that it was "moved out"/"moved in" to/from another folder (like "trash" folder)
+							gDWStuff.possrename[event.id] = {
+								event,
+								eventfilepath: filepath,
+								time_movedfrom: Date.now(),
+								triggerRemovedOrAdded: () => {
+									delete gDWStuff.possrename[event.id];
+									if (OS.File.exists(filepath)) {
+										eventtype = 'ADDED';
+									} else {
+										eventtype = 'REMOVED';
+									}
+									console.log('ok dispatching as ' + eventtype + ' as no IN_MOVE_FROM came in for 200ms, this.devhandler:', this.devhandler);
+									this.devhandler(filepath, eventtype, oldfilename);
+								},
+								timeout: setTimeout(()=>gDWStuff.possrename[event.id].triggerRemovedOrAdded(), 200) // if another event does not come in for 200ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
+							};
+							return;
+						}
+					} else if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemRemoved) {
+						eventtype = 'REMOVED';
+					} else if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemModified) {
+						eventtype = 'CONTENTS_MODIFIED';
+					} else {
+						console.error('none of the flags i expected are on this, flags are:', myflags);
+						return;
+					}
+
+					if (eventtype) {
+						this.devhandler(filepath, eventtype, oldfilename);
+					}
 				}
 			break;
 		case 'android':

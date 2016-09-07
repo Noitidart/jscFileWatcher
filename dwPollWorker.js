@@ -670,7 +670,16 @@ function macRoutine(streamRef, clientCallBackInfo, numEvents, eventPaths, eventF
 	var _eventflags = cutils.map( _eventflags_c, mappers.deepestParseInt );
 	var _eventids = cutils.map( _eventids_c, mappers.deepestParseInt );
 
-	console.log('macRoutine args as js:', '_numevents:', _numevents, '_eventids:', _eventids, '_eventflags:', _eventflags, '_eventpaths:', _eventpaths);
+	// console.log('macRoutine args as js:', '_numevents:', _numevents, '_eventids:', _eventids, '_eventflags:', _eventflags, '_eventpaths:', _eventpaths);
+	for (var i=0; i<_numevents; i++) {
+		callInMainworker('dwCallOsHandlerById', {
+			path: _eventpaths[i],
+			rest_args: [{
+				flags: _eventflags[i],
+				id: _eventids[i]
+			}]
+		});
+	}
 }
 
 function andRoutine() {
