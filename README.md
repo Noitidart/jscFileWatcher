@@ -1,0 +1,2 @@
+## Announcements
+###### ***September 7, 2016*** - Finally, in working order. Just note: (1) FSEvents differs for Mac on version <10.7 - I do not have any means to test there so I could not address this yet. (2) Multiple events if you watch a subdir that has a parent-directory already being watched [Issue #25](https://github.com/Noitidart/jscFileWatcher/issues/25) (3) Order of events is not perfect on mac/*nix due to [Issue #24](https://github.com/Noitidart/jscFileWatcher/issues/24)
