@@ -40,7 +40,7 @@ You can remove all paths and destroy the watcher with `close`:
 
 ## How to implement in your code
 ### Step 1 - Import Submodules
-Import "ostypes", "Comm", and "jscSystemHotkey" submodules. This is how you import submodules:
+Import "ostypes", "Comm", and "jscFileWatcher" submodules. This is how you import submodules:
 
     git submodule add git@github.com:Noitidart/jscFileWatcher OPTIONAL/CUSTOM/FOLDER/PATH/HERE
 
@@ -54,4 +54,44 @@ In the directory containing the "jscFileWatcher" submodule directory, place a fi
 	}
 
 ### Step 3 - Main Thread Subscript
-...
+In `bootstrap.js` or `main.js` or whatever you are using for your main thread, after you have imported `Comm` and `ostypes` import `dwMainthreadSubscript.js`. From `Comm`, `callInMainworker` also needs to be declared.
+
+	var callInMainworker = CommHelper.bootstrap.callInMainworker;
+    Services.scriptloader.loadSubScript('YOUR/PATH/TO/JSCFILEWATCHER/shtkMainthreadSubscript.js');
+
+#### Handle termination
+To the worker you spawned with `Comm`, you will need to call `dwShutdown` and include it as a promise so `Comm` will wait for that to finish before terminating the worker.
+
+If you don't have any other work done in the termination use this:
+
+    function onBeforeTerminate() {
+        return new Promise(resolve =>
+            callInMainworker( 'dwShutdown', null, ()=>resolve() )
+        );
+    }
+
+Reminder: With `Comm` if you want to wait for multiple things before termination do it like this:
+
+function onBeforeTerminate() {
+	return Promise.all([
+		new Promise(resolve =>
+			callInMainworker( 'dwShutdown', null, ()=>resolve() )
+		),
+		new Promise(resolve =>
+			// some other stuff
+			resolve();
+		),
+		function() {
+			// you can have synchronus functions within `Promise.all` that do not return a promise, it is totally fine
+		}
+	]);
+}
+
+Reminder: This is how to do a pre termination call with `Comm`:
+
+    gWkComm = new Comm.server.worker('YOUR/PATH/TO/MainWorker.js', undefined, undefined, onBeforeTerminate )
+
+### Step 4 - ChromeWorker Subscript
+Make sure to first `importScripts` the `Comm` and `ostypes` submodule then import `dwMainworkerSubscript.js`
+
+    importScripts('YOUR/PATH/TO/JSCFILEWATCHER/dwMainworkerSubscript.js');
