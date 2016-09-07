@@ -455,7 +455,6 @@ function andOsHandler(path, event) {
 			},
 			timeout: setTimeout(()=>gDWStuff.possrename[event.cookie].triggerRemoved(), gDWRenamedLatency) // if another event does not come in for gDWRenamedLatency ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
 		};
-		deferredmain.resolve(null);
 		return deferredmain.promise;
 	} else if (event.mask & ostypes.CONST.IN_DELETE) {
 		eventtype = 'REMOVED';
@@ -544,7 +543,6 @@ function gtkOsHandler(path, event) {
 					},
 					timeout: setTimeout(()=>gDWStuff.possrename[event.fileinode].triggerRemoved(), gDWRenamedLatency) // if another event does not come in for gDWRenamedLatency ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
 				};
-				deferredmain.resolve(null);
 				return deferredmain.promise;
 			break;
 		case ostypes.CONST.G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
