@@ -374,7 +374,7 @@ function macOsHandler(path, event) {
 				},
 				timeout: setTimeout(()=>gDWStuff.possrename[event.id].triggerRemovedOrAdded(), gDWRenamedLatency) // if another event does not come in for gDWRenamedLatency ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
 			};
-			return;
+			return deferredmain.promise;
 		}
 	} else if (event.flags & ostypes.CONST.kFSEventStreamEventFlagItemRemoved) {
 		eventtype = 'REMOVED';
@@ -382,7 +382,8 @@ function macOsHandler(path, event) {
 		eventtype = 'CONTENTS_MODIFIED';
 	} else {
 		console.error('none of the flags i expected are on this, flags are:', myflags);
-		return;
+		deferredmain.resolve(null);
+		return deferredmain.promise;
 	}
 
 	if (eventtype) {
