@@ -37,3 +37,21 @@ You can remove paths with
 You can remove all paths and destroy the watcher with `close`:
 
 	myFirstWatcher.close();
+
+## How to implement in your code
+### Step 1 - Import Submodules
+Import "ostypes", "Comm", and "jscSystemHotkey" submodules. This is how you import submodules:
+
+    git submodule add git@github.com:Noitidart/jscFileWatcher OPTIONAL/CUSTOM/FOLDER/PATH/HERE
+
+### Step 2 - Create Paths JSON File
+In the directory containing the "jscFileWatcher" submodule directory, place a file called `dwPaths.json` and populate the paths to the submodule directories like this:
+
+	{
+		"comm": "chrome://jscfilewatcher-demo/content/resources/scripts/Comm/Comm.js",
+		"ostypes_dir": "chrome://jscfilewatcher-demo/content/resources/scripts/ostypes/",
+		"watcher_dir": "chrome://jscfilewatcher-demo/content/resources/scripts/watcher/"
+	}
+
+### Step 3 - Main Thread Subscript
+...
