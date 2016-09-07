@@ -996,7 +996,7 @@ function setTimeoutSync(aMilliseconds) {
 				sleptfor = Date.now() - sleptstart;
 			break;
 		default:
-			// assume unix/mac
+			// assume unix/mac - works on mac as well - but the `NSThread` method above doesnt get interrupted by `EINTR`
 			while (true) {
 				var sleepfor = aMilliseconds - sleptfor;
 				var rez_sleep = ostypes.API('usleep')(sleepfor * 1000);
