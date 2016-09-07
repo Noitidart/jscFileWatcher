@@ -262,14 +262,14 @@ function winOsHandler(path, event) {
 	// path is the path of the directory that was watched
 	console.log('in mainworker winHandler:', 'path:', path, 'event:', event);
 
-	var myflags = [];
-	for (var flag of gDW_FILE_EVENT_FLAGS.win) {
-		if (event.Action === ostypes.CONST[flag]) {
-			myflags.push(flag);
-			break;
-		}
-	}
-	console.log('myflags:', myflags);
+	var myflags = []; // console.log('remove on prod')
+	for (var flag of gDW_FILE_EVENT_FLAGS.win) { // console.log('remove on prod')
+		if (event.Action === ostypes.CONST[flag]) { // console.log('remove on prod')
+			myflags.push(flag); // console.log('remove on prod')
+			break; // console.log('remove on prod')
+		} // console.log('remove on prod')
+	} // console.log('remove on prod')
+	console.log('myflags:', myflags); // console.log('remove on prod')
 
 	// anything in subdir of watched dir - TODO
 	// moved to trash dir - TODO
@@ -319,13 +319,13 @@ function macOsHandler(path, event) {
 	// path is the path to the file that was affected (not the watched directory like in inotify, gtk, and windows)
 	console.log('in macHandler', 'path:', path);
 
-	var myflags = [];
-	for (var flag of gDW_FILE_EVENT_FLAGS.mac) {
-		if (event.flags & ostypes.CONST[flag]) {
-			myflags.push(flag);
-		}
-	}
-	console.log('myflags:', myflags);
+	var myflags = []; // console.log('remove on prod')
+	for (var flag of gDW_FILE_EVENT_FLAGS.mac) { // console.log('remove on prod')
+		if (event.flags & ostypes.CONST[flag]) { // console.log('remove on prod')
+			myflags.push(flag); // console.log('remove on prod')
+		} // console.log('remove on prod')
+	} // console.log('remove on prod')
+	console.log('myflags:', myflags); // console.log('remove on prod')
 
 	// anything in subdir of watched dir - TODO
 	// moved to trash dir - TODO
@@ -397,13 +397,13 @@ function andOsHandler(path, event) {
 	// path is the path of the directory that was watched
 	console.log('in andHandler', 'path:', path, 'event:', event);
 
-	var myflags = [];
-	for (var flag of gDW_FILE_EVENT_FLAGS.inotify) {
-		if (event.mask & ostypes.CONST[flag]) {
-			myflags.push(flag);
-		}
-	}
-	console.log('myflags:', myflags);
+	var myflags = []; // console.log('remove on prod')
+	for (var flag of gDW_FILE_EVENT_FLAGS.inotify) { // console.log('remove on prod')
+		if (event.mask & ostypes.CONST[flag]) { // console.log('remove on prod')
+			myflags.push(flag); // console.log('remove on prod')
+		} // console.log('remove on prod')
+	} // console.log('remove on prod')
+	console.log('myflags:', myflags); // console.log('remove on prod')
 
 	// anything in subdir of watched dir - NO EVENTS - good
 	// moved to trash dir - [ "IN_MOVED_FROM", "IN_ISDIR" ]
@@ -477,14 +477,14 @@ function gtkOsHandler(path, event) {
 	// path is the path of the directory that was watched
 	console.log('in gtkHandler', 'path:', path, 'event:', event);
 
-	var myflags = [];
-	for (var flag of gDW_FILE_EVENT_FLAGS.gtk) {
-		if (event.event_type === ostypes.CONST[flag]) {
-			myflags.push(flag);
-			break;
-		}
-	}
-	console.log('myflags:', myflags);
+	var myflags = []; // console.log('remove on prod')
+	for (var flag of gDW_FILE_EVENT_FLAGS.gtk) { // console.log('remove on prod')
+		if (event.event_type === ostypes.CONST[flag]) { // console.log('remove on prod')
+			myflags.push(flag); // console.log('remove on prod')
+			break; // console.log('remove on prod')
+		} // console.log('remove on prod')
+	} // console.log('remove on prod')
+	console.log('myflags:', myflags); // console.log('remove on prod')
 
 	// anything in subdir of watched dir - TODO
 	// moved to trash dir - TODO
