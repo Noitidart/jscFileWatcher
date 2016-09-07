@@ -16,6 +16,7 @@ var gDWNextId = 0;
 var gDWPollerNextId = 0;
 var gDWOSName = OS.Constants.Sys.Name.toLowerCase();
 var gDWPollers = [];
+const gDWRenamedLatency = 200;
 // each element is an object:
 	// {
 	// 	worker: instance of comm server
@@ -365,10 +366,10 @@ function DirectoryWatcher(aCallback) {
 									} else {
 										eventtype = 'REMOVED';
 									}
-									console.log('ok dispatching as ' + eventtype + ' as no IN_MOVE_FROM came in for 200ms, this.devhandler:', this.devhandler);
+									console.log('ok dispatching as ' + eventtype + ' as no IN_MOVE_FROM came in for ' + gDWRenamedLatency + 'ms, this.devhandler:', this.devhandler);
 									this.devhandler(filepath, eventtype, oldfilename);
 								},
-								timeout: setTimeout(()=>gDWStuff.possrename[event.id].triggerRemovedOrAdded(), 200) // if another event does not come in for 200ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
+								timeout: setTimeout(()=>gDWStuff.possrename[event.id].triggerRemovedOrAdded(), gDWRenamedLatency) // if another event does not come in for gDWRenamedLatency ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
 							};
 							return;
 						}
@@ -446,10 +447,10 @@ function DirectoryWatcher(aCallback) {
 							triggerRemoved: () => {
 								delete gDWStuff.possrename[event.cookie];
 								eventtype = 'REMOVED';
-								console.log('ok dispatching as REMOVED as no IN_MOVE_FROM came in for 200ms, this.devhandler:', this.devhandler);
+								console.log('ok dispatching as REMOVED as no IN_MOVE_FROM came in for ' + gDWRenamedLatency + 'ms, this.devhandler:', this.devhandler);
 								this.devhandler(filepath, eventtype, oldfilename);
 							},
-							timeout: setTimeout(()=>gDWStuff.possrename[event.cookie].triggerRemoved(), 200) // if another event does not come in for 200ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
+							timeout: setTimeout(()=>gDWStuff.possrename[event.cookie].triggerRemoved(), gDWRenamedLatency) // if another event does not come in for gDWRenamedLatency ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
 						};
 						return;
 					} else if (event.mask & ostypes.CONST.IN_DELETE) {
@@ -537,10 +538,10 @@ function DirectoryWatcher(aCallback) {
 								triggerRemoved: () => {
 									delete gDWStuff.possrename[event.fileinode];
 									eventtype = 'REMOVED';
-									console.log('ok dispatching as REMOVED as no IN_MOVE_FROM came in for 200ms, this.devhandler:', this.devhandler);
+									console.log('ok dispatching as REMOVED as no IN_MOVE_FROM came in for ' + gDWRenamedLatency + 'ms, this.devhandler:', this.devhandler);
 									this.devhandler(filepath, eventtype, oldfilename);
 								},
-								timeout: setTimeout(()=>gDWStuff.possrename[event.fileinode].triggerRemoved(), 200) // if another event does not come in for 200ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
+								timeout: setTimeout(()=>gDWStuff.possrename[event.fileinode].triggerRemoved(), gDWRenamedLatency) // if another event does not come in for gDWRenamedLatency ms, then dipsach this to `devhandler` as `eventtype` `ADDED`
 							};
 							return;
 						break;
